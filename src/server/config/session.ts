@@ -1,19 +1,28 @@
-import connectPgSimple from "connect-pg-simple";
+import connectMongo from "connect-mongo";
 import type { Express, RequestHandler } from "express";
 import flash from "express-flash";
 import session from "express-session";
+import dotenv from "dotenv";
 
 let sessionMiddleware: RequestHandler | undefined = undefined;
+const MongoStore = require('connect-mongo');
 
-export default (app: Express): RequestHandler => {
+const sessionSecret = process.env.SESSION_SECRET || 'defaultSecretKey';
+
+export default function (app: Express): RequestHandler {
     if(sessionMiddleware === undefined) {
         sessionMiddleware = session({
-            store: new (connectPgSimple(session))({
-                createTableIfMissing: true,
+            secret: sessionSecret, // Change this to a random secret key
+            resave: false,             // Don't save session if unmodified
+            saveUninitialized: false, // Don't save empty sessions
+            store: MongoStore.create({
+              mongoUrl: process.env.DATABASE_URL, // MongoDB URI
+              ttl: 14 * 24 * 60 * 60, // Session expiry time (14 days)
             }),
-            secret: process.env.SESSION_SECRET!,
-            resave: true,
-            saveUninitialized: true
+            cookie: {
+              secure: false, // Set to true if you're using HTTPS
+              maxAge: 1000 * 60 * 60 * 24, // Set cookie expiry time (e.g., 1 day)
+            }
         });
 
         app.use(sessionMiddleware);

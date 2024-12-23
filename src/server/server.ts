@@ -8,6 +8,7 @@ import * as routes from './routes';
 import * as configuration from './config';
 // import * as middleware from "./middleware";
 import { createServer } from "http";
+import mongoose from "mongoose";
 
 dotenv.config();
 
@@ -26,16 +27,25 @@ app.set("view engine", "ejs");
 const staticPath = path.join(process.cwd(), "src", "public");
 app.use(express.static(staticPath));
 
-configuration.configureLiveReload(app, staticPath);
-configuration.configureSession(app)
-configuration.configureSocketIO(server, app, configuration.configureSession(app));
+mongoose.connect(process.env.DATABASE_URL!)
+.then(() => {
+    console.log("MongoDB connected successfully");
+    configuration.configureLiveReload(app, staticPath);
+    configuration.configureSession(app);
+    configuration.configureSocketIO(server, app, configuration.configureSession(app));
 
-app.use("/", routes.home);
+    app.use("/", routes.home);
 
-app.use((_request, _response, next) => {
-    next(httpErrors(404));
-});
+    app.use((_request, _response, next) => {
+        next(httpErrors(404));
+    });
 
-server.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+    server.listen(PORT, () => {
+        console.log(`Server is running on port ${PORT}`);
+    });
+
+})
+.catch((err) => {
+    console.error("MongoDB connection error:", err);
+    process.exit(1);
 });
