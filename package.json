@@ -13,8 +13,8 @@
     "db:create": "node-pg-migrate create -j ts -- ",
     "db:migrate": "ts-node node_modules/.bin/node-pg-migrate -j ts up",
     "db:rollback": "ts-node node_modules/.bin/node-pg-migrate -j ts down",
-    "build:css": "postcss src/public/css/tailwind.css -o src/public/css/styles.css",
-    "tailwind:watch": "postcss src/public/css/tailwind.css -w -o src/public/css/styles.css"
+    "build:css": "postcss src/public/styles/tailwind.css -o src/public/styles/styles.css",
+    "tailwind:watch": "postcss src/public/styles/tailwind.css -w -o src/public/styles/styles.css"
   },
   "lint-staged": {
     "**/*": "prettier --write --ignore-unknown"

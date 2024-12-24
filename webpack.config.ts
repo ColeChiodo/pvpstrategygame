@@ -10,6 +10,7 @@ const mode =
 const config: webpack.Configuration = {
     entry: {
         main: path.join(process.cwd(), "src", "client", "main.ts"),
+        game: path.join(process.cwd(), "src", "client", "game.ts"),
     },
     mode,
     output: {
