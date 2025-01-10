@@ -6,7 +6,7 @@ import morgan from "morgan";
 import * as path from "path";
 import * as routes from './routes';
 import * as configuration from './config';
-// import * as middleware from "./middleware";
+import * as middleware from "./middleware";
 import { createServer } from "http";
 import mongoose from "mongoose";
 
@@ -35,15 +35,15 @@ mongoose.connect(process.env.DATABASE_URL!)
     configuration.configureSocketIO(server, app, configuration.configureSession(app));
 
     app.use("/", routes.home);
+    app.use("/auth", routes.auth);
 
     app.use((_request, _response, next) => {
         next(httpErrors(404));
     });
 
-    server.listen(PORT, () => {
+    server.listen(PORT as number, '0.0.0.0' as string, () => {
         console.log(`Server is running on port ${PORT}`);
     });
-
 })
 .catch((err) => {
     console.error("MongoDB connection error:", err);

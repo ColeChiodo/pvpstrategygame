@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "start": "ts-node src/server/server.ts",
-    "start:dev": "concurrently --names server,frontend -c blue,green \"npm run server:dev\" \"npm run build:dev\"",
+    "start:dev": "concurrently --names server,frontend -c blue,green \"npm run server:dev\" \"npm run build:dev\" \"npm run tailwind:watch\"",
     "server:dev": "nodemon --exec ts-node src/server/server.ts --ext ts,js,css,ejs --ignore src/public/js",
     "build:dev": "webpack build --mode development --watch",
     "prepare": "husky",

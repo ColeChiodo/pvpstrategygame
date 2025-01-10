@@ -1,8 +1,6 @@
-import connectMongo from "connect-mongo";
 import type { Express, RequestHandler } from "express";
 import flash from "express-flash";
 import session from "express-session";
-import dotenv from "dotenv";
 
 let sessionMiddleware: RequestHandler | undefined = undefined;
 const MongoStore = require('connect-mongo');

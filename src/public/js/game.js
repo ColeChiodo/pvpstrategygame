@@ -16,7 +16,7 @@
   \****************************/
 /***/ (() => {
 
-eval("\nconst canvas = document.getElementById('gameCanvas');\nconst ctx = canvas.getContext('2d');\n// resize canvas to fit window function\nfunction resizeCanvas() {\n    canvas.width = window.innerWidth;\n    canvas.height = window.innerHeight;\n    // redraw canvas\n    ctx.fillStyle = 'cornflowerblue';\n    ctx.fillRect(0, 0, canvas.width, canvas.height);\n}\nresizeCanvas();\nwindow.addEventListener('resize', resizeCanvas);\n\n\n//# sourceURL=webpack://pvpstrategygame/./src/client/game.ts?");
+eval("\nconst canvas = document.getElementById('gameCanvas');\nconst ctx = canvas.getContext('2d');\nfunction resizeCanvas() {\n    canvas.width = window.innerWidth;\n    canvas.height = window.innerHeight;\n}\nresizeCanvas();\nwindow.addEventListener('resize', resizeCanvas);\nfunction drawBackground() {\n    ctx.fillStyle = 'cornflowerblue';\n    ctx.fillRect(0, 0, canvas.width, canvas.height);\n}\nfunction drawPlayer(player) {\n    ctx.fillStyle = player.color;\n    ctx.fillRect(player.x, player.y, player.height, player.height);\n}\nfunction draw(player) {\n    drawBackground();\n    drawPlayer(player);\n}\nwindow.addEventListener('keydown', (e) => {\n    console.log('Key pressed:', e.key);\n    window.socket.emit('player-action', e.key);\n});\nfunction gameLoop() {\n    window.socket.on('gameState', (gameState) => {\n        console.log('Game State:', gameState);\n        draw(gameState.box);\n    });\n}\ngameLoop();\n\n\n//# sourceURL=webpack://pvpstrategygame/./src/client/game.ts?");
 
 /***/ })
 
