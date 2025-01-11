@@ -1,4 +1,6 @@
-const SCALE = 3.125;
+const MIN_SCALE = 1.0;
+const MAX_SCALE = 5.0;
+let SCALE = 3.125;
 
 let arenaImage: HTMLImageElement | null = null;
 let arena: Arena | null = null;
@@ -13,6 +15,7 @@ let units: Unit[] = [];
 
 let hoveredTile: { x: number, y: number, row: number, col: number } | null = null;
 let selectedTile: { x: number, y: number, row: number, col: number } | null = null;
+let actionTile: { x: number, y: number, row: number, col: number } | null = null;
 
 const canvas = document.getElementById('gameCanvas') as HTMLCanvasElement;
 const ctx = canvas.getContext('2d')!;
@@ -41,12 +44,24 @@ function draw() {
 window.addEventListener('keydown', (e) => {
     console.log('Key pressed:', e.key);
     window.socket.emit('player-action', e.key);
+
+    switch (e.key) {
+        case 'z':
+            if (SCALE !== MIN_SCALE)
+                SCALE -= 0.125;
+            break;
+        case 'x':
+            if (SCALE !== MAX_SCALE) 
+                SCALE += 0.125;
+            break;
+    }
 });
 
 function loadUnits(players: Player[]) {
     units = [];
     for (const player of players) {
         for (const unit of player.units) {
+            unit.owner = player;
             units.push(unit);
         }
     }
@@ -89,8 +104,8 @@ let tiles: { x: number, y: number, row: number, col: number}[] = [];
 function drawInteractionSquares() {
     if (!arenaImage) return;
     if (!arena) return;
-    const tileWidth = 100; // width of an isometric tile
-    const tileHeight = 50; // height of an isometric tile
+    const tileWidth = 32 * SCALE; // width of an isometric tile
+    const tileHeight = 16 * SCALE; // height of an isometric tile
     const rows = arena.tiles.length;
     const cols = arena.tiles[0].length;
 
@@ -104,7 +119,7 @@ function drawInteractionSquares() {
 
     // Calculate the offset to center the grid on the image
     const offsetX = imgCenterX - tileWidth / 2;
-    const offsetY = imgCenterY - gridHeight - tileHeight * 1.5;
+    const offsetY = imgCenterY - gridHeight - tileHeight - 8 * SCALE;
 
     // Draw the tiles
     tiles = [];
@@ -124,12 +139,12 @@ function drawInteractionSquares() {
 function drawIsometricTile(x: number, y: number, row: number, col: number) {
     ctx.beginPath();
     ctx.moveTo(x, y);
-    ctx.lineTo(x + 50, y + 25);
-    ctx.lineTo(x + 100, y);
-    ctx.lineTo(x + 50, y - 25);
+    ctx.lineTo(x + 16 * SCALE, y + 8 * SCALE);
+    ctx.lineTo(x + 32 * SCALE, y);
+    ctx.lineTo(x + 16 * SCALE, y - 8 * SCALE);
     ctx.closePath();
     
-    //ctx.stroke();
+    ctx.stroke();
 
     return { x, y, row, col };
 }
@@ -137,9 +152,9 @@ function drawIsometricTile(x: number, y: number, row: number, col: number) {
 function isPointInsideTile(px: number, py: number, tile: { x: number, y: number }): boolean {
     // Vertices of the tile
     const x1 = tile.x, y1 = tile.y;
-    const x2 = tile.x + 50, y2 = tile.y + 25;
-    const x3 = tile.x + 100, y3 = tile.y;
-    const x4 = tile.x + 50, y4 = tile.y - 25;
+    const x2 = tile.x + 16 * SCALE, y2 = tile.y + 8 * SCALE;
+    const x3 = tile.x + 32 * SCALE, y3 = tile.y;
+    const x4 = tile.x + 16 * SCALE, y4 = tile.y - 8 * SCALE;
 
     // Helper function to calculate the area of a triangle given by three points
     const sign = (x1: number, y1: number, x2: number, y2: number, x3: number, y3: number): number => {
@@ -200,30 +215,48 @@ canvas.addEventListener('mousemove', function(event) {
     }
 });
 
+function hasUnit(row: number, col: number): boolean {
+    for (const unit of units) {
+        if (unit.row === row && unit.col === col) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function unitIsTeam(row: number, col: number): boolean {
+    for (const unit of units) {
+        if (unit.row === row && unit.col === col) {
+            return unit.owner.id === window.socket.id;
+        }
+    }
+    return false;
+}
+
 function drawHoveredTile() {
     if (!hoveredTile) return;
     const frameSize = 32;
-    const highlightFrameX = 0;
+    const highlightFrameX = hasUnit(hoveredTile.row, hoveredTile.col) ? (unitIsTeam(hoveredTile.row, hoveredTile.col) ? 1 : 2) : 0;
     const highlightFrameY = 0;
 
     const sx = highlightFrameX * frameSize;
     const sy = highlightFrameY * frameSize;
 
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(uiImage, sx, sy, frameSize, frameSize, hoveredTile.x, hoveredTile.y - frameSize / 1.25, frameSize * SCALE, frameSize * SCALE);
+    ctx.drawImage(uiImage, sx, sy, frameSize, frameSize, hoveredTile.x, hoveredTile.y - 8 * SCALE, frameSize * SCALE, frameSize * SCALE);
 }
 
 function drawSelectedTile() {
     if (!selectedTile) return;
     const frameSize = 32;
-    const highlightFrameX = 1;
+    const highlightFrameX = 3;
     const highlightFrameY = 0;
 
     const sx = highlightFrameX * frameSize;
     const sy = highlightFrameY * frameSize;
 
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(uiImage, sx, sy, frameSize, frameSize, selectedTile.x, selectedTile.y - frameSize / 1.25, frameSize * SCALE, frameSize * SCALE);
+    ctx.drawImage(uiImage, sx, sy, frameSize, frameSize, selectedTile.x, selectedTile.y - 8 * SCALE, frameSize * SCALE, frameSize * SCALE);
 }
 
 function drawUI(){
@@ -243,7 +276,7 @@ function drawUnits(){
         const pos = coordToPosition(unit.row, unit.col);
 
         ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(testUnitImage, sx, sy, frameSize, frameSize, pos.x - frameSize / 2, pos.y - frameSize * SCALE + (3 * SCALE), frameSize * SCALE, frameSize * SCALE);
+        ctx.drawImage(testUnitImage, sx, sy, frameSize, frameSize, pos.x - 8 * SCALE, pos.y - frameSize * SCALE + (3 * SCALE), frameSize * SCALE, frameSize * SCALE);
     }
 }
 

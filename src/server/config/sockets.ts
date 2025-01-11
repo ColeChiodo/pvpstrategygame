@@ -54,8 +54,8 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
                     units: [],
                 };
                 newPlayer.units.push({
-                    row: 7,
-                    col: 7,
+                    row: gameState.players.length === 0 ? 0 : 9,
+                    col: gameState.players.length === 0 ? 0 : 9,
                     name: "test",
                     health: 3,
                     maxHealth: 3,

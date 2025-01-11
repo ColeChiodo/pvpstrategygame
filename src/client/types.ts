@@ -14,7 +14,7 @@ interface Arena {
 interface Unit {
     row: number;
     col: number;
-
+    owner: Player;
     name: string;
     health: number;
     maxHealth: number;
