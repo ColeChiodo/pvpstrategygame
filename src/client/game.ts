@@ -2,6 +2,9 @@ const MIN_SCALE = 1.0;
 const MAX_SCALE = 5.0;
 let SCALE = 3.125;
 
+let cameraOffsetX = 0;
+let cameraOffsetY = 0;
+
 let arenaImage: HTMLImageElement | null = null;
 let arena: Arena | null = null;
 
@@ -28,7 +31,7 @@ function drawBackground() {
 function drawArena() {
     if (arenaImage) {
         ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(arenaImage, (canvas.width - arena!.width * SCALE) / 2, (canvas.height - arena!.height * SCALE + 16 * SCALE) / 2, arena!.width * SCALE, arena!.height * SCALE);
+        ctx.drawImage(arenaImage, (canvas.width - arena!.width * SCALE) / 2 + cameraOffsetX, (canvas.height - arena!.height * SCALE + 16 * SCALE) / 2 + cameraOffsetY, arena!.width * SCALE, arena!.height * SCALE);
     }
 }
 
@@ -42,17 +45,37 @@ function draw() {
 }
 
 window.addEventListener('keydown', (e) => {
-    console.log('Key pressed:', e.key);
-    window.socket.emit('player-action', e.key);
+    //console.log('Key pressed:', e.key);
+    //window.socket.emit('player-action', e.key);
 
     switch (e.key) {
         case 'z':
             if (SCALE !== MIN_SCALE)
                 SCALE -= 0.125;
+            if (SCALE < MIN_SCALE)
+                SCALE = MIN_SCALE;
             break;
         case 'x':
             if (SCALE !== MAX_SCALE) 
                 SCALE += 0.125;
+            if (SCALE > MAX_SCALE)
+                SCALE = MAX_SCALE;
+            break;
+        case "ArrowUp":
+        case "w":
+            cameraOffsetY += 8 * SCALE;
+            break;
+        case "ArrowDown":
+        case "s":
+            cameraOffsetY -= 8 * SCALE;
+            break;
+        case "ArrowLeft":
+        case "a":
+            cameraOffsetX += 8 * SCALE;
+            break;
+        case "ArrowRight":
+        case "d":
+            cameraOffsetX -= 8 * SCALE;
             break;
     }
 });
@@ -61,7 +84,6 @@ function loadUnits(players: Player[]) {
     units = [];
     for (const player of players) {
         for (const unit of player.units) {
-            //unit.id = units.length + 1;
             unit.owner = player;
             units.push(unit);
         }
@@ -120,8 +142,8 @@ function drawInteractionSquares() {
     const gridHeight = (rows - 1) * tileHeight / 2; // Total height of the grid
 
     // Calculate the offset to center the grid on the image
-    const offsetX = imgCenterX - tileWidth / 2;
-    const offsetY = imgCenterY - gridHeight - tileHeight - 8 * SCALE;
+    const offsetX = imgCenterX - tileWidth / 2 + cameraOffsetX;
+    const offsetY = imgCenterY - gridHeight - tileHeight - 8 * SCALE + cameraOffsetY;
 
     // Draw the tiles
     tiles = [];
@@ -181,6 +203,10 @@ window.socket.on('player-unit-moved', (unitID: number, tile: { x: number, y: num
     console.log(`Unit ${unitID} is performing an action on tile (${tile.row}, ${tile.col})`);
 });
 
+let isDragging = false;
+let startX = 0;
+let startY = 0;
+
 canvas.addEventListener('click', function(event) {
     const clickX = event.offsetX;
     const clickY = event.offsetY;
@@ -213,6 +239,35 @@ canvas.addEventListener('click', function(event) {
     }
 });
 
+canvas.addEventListener('mousedown', (e) => {
+    if (e.button !== 1) return;
+    isDragging = true;
+    startX = e.clientX - cameraOffsetX;
+    startY = e.clientY - cameraOffsetY;
+});
+
+canvas.addEventListener('mouseup', () => {
+    isDragging = false;
+});
+
+canvas.addEventListener('mouseleave', () => {
+    isDragging = false;
+});
+
+canvas.addEventListener('wheel', (e) => {
+    if (e.deltaY < 0) {
+      if (SCALE !== MAX_SCALE)
+        SCALE *= 1.1;
+      if (SCALE > MAX_SCALE)
+        SCALE = MAX_SCALE;
+    } else if (e.deltaY > 0) {
+      if (SCALE !== MIN_SCALE)
+        SCALE *= 0.9;
+    if (SCALE < MIN_SCALE)
+        SCALE = MIN_SCALE;
+    }
+});
+
 canvas.addEventListener('mousemove', function(event) {
     const clickX = event.offsetX;
     const clickY = event.offsetY;
@@ -226,6 +281,125 @@ canvas.addEventListener('mousemove', function(event) {
         else {
             hoveredTile = null;
         }
+    }
+
+    if (isDragging) {
+        cameraOffsetX = event.clientX - startX;
+        cameraOffsetY = event.clientY - startY;
+    }
+});
+
+let touchStartTime = 0;
+const TAP_THRESHOLD = 200;
+
+canvas.addEventListener('touchstart', function(e) {
+    e.preventDefault(); // Prevent default touch behavior (like scrolling)
+
+    if (e.touches.length !== 1) return; // Ensure it's a single touch
+    touchStartTime = Date.now();
+
+    isDragging = true;
+    startX = e.touches[0].clientX - cameraOffsetX;
+    startY = e.touches[0].clientY - cameraOffsetY;
+
+    const touch = e.changedTouches[0];
+    const clickX = touch.clientX - canvas.offsetLeft;
+    const clickY = touch.clientY - canvas.offsetTop;
+
+    let found = false;
+    for (const tile of tiles) {
+        if (!hoveredTile) break;
+        if (isPointInsideTile(clickX, clickY, tile)) {
+            //console.log(`You clicked on: ${tile.row}, ${tile.col}`);
+
+            if (!selectedTile && unitIsTeam(hoveredTile.row, hoveredTile.col)) {
+                selectedTile = tile;
+            } else if (selectedTile && tile.row === selectedTile.row && tile.col === selectedTile.col) {
+                const unit = units.find(unit => unit.row === selectedTile!.row && unit.col === selectedTile!.col);
+                console.log(`Moving to: ${tile.row}, ${tile.col}`);
+                window.socket.emit('player-unit-move', unit!.id, tile);
+                break;
+            } else if (selectedTile && unitIsTeam(selectedTile.row, selectedTile.col)) {
+                const unit = units.find(unit => unit.row === selectedTile!.row && unit.col === selectedTile!.col);
+                console.log(`Moving to: ${tile.row}, ${tile.col}`);
+                window.socket.emit('player-unit-move', unit!.id, tile);
+                selectedTile = null;
+            }
+            found = true;
+            break;
+        }
+    }
+    if (!found) {
+        selectedTile = null;
+    }
+});
+
+let prevTouchDistance: number | null = null;
+
+canvas.addEventListener('touchmove', function(e) {
+    e.preventDefault();
+
+    if (e.touches.length === 1) {
+        if (!isDragging) return;
+
+        const touchX = e.touches[0].clientX;
+        const touchY = e.touches[0].clientY;
+
+        cameraOffsetX = touchX - startX;
+        cameraOffsetY = touchY - startY;
+
+        // Update hovered tile (similar to mousemove)
+        const clickX = touchX - canvas.offsetLeft;
+        const clickY = touchY - canvas.offsetTop;
+
+        for (const tile of tiles) {
+            if (isPointInsideTile(clickX, clickY, tile)) {
+                hoveredTile = tile;
+                break;
+            }
+            else {
+                hoveredTile = null;
+            }
+        }
+    }
+
+    if (e.touches.length === 2) {
+        // Get the coordinates of the two touch points
+        const touch1X = e.touches[0].clientX;
+        const touch1Y = e.touches[0].clientY;
+        const touch2X = e.touches[1].clientX;
+        const touch2Y = e.touches[1].clientY;
+
+        // Calculate the current distance between the two touch points
+        const currentDistance = Math.sqrt(
+            (touch2X - touch1X) ** 2 + (touch2Y - touch1Y) ** 2
+        );
+
+        if (prevTouchDistance !== null) {
+            // Calculate the scale factor based on the distance change
+            const scaleChange = currentDistance / prevTouchDistance;
+
+            // Apply the zoom (scale) adjustment
+            if (scaleChange > 1) {
+                // Zoom in (scale up)
+                if (SCALE !== MAX_SCALE) SCALE *= 1.05;
+                if (SCALE > MAX_SCALE) SCALE = MAX_SCALE;
+            } else {
+                // Zoom out (scale down)
+                if (SCALE !== MIN_SCALE) SCALE *= 0.95;
+                if (SCALE < MIN_SCALE) SCALE = MIN_SCALE;
+            }
+        }
+
+        // Update the previous touch distance for the next move event
+        prevTouchDistance = currentDistance;
+    }
+});
+
+canvas.addEventListener('touchend', function(e) {
+    isDragging = false;
+    if (e.touches.length < 2) {
+        prevTouchDistance = null;
     }
 });
 
@@ -317,7 +491,7 @@ function drawMoveTile(row: number, col: number){
 
 function drawUnits(){
     for (const unit of units){
-        const frameSize = 48;
+        const frameSize = 48; // change to 32
         const frameX = 0;
         const frameY = 0;
 

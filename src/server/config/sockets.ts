@@ -73,7 +73,8 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
                     socket.disconnect();
                 }
             }
-        
+            
+            // not used
             socket.on('player-action', (action: string) => {
                 console.log(`Received action from player ${socket.id}:`, action);
                 app.get("io").emit('gameState', gameState);
@@ -120,6 +121,11 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
                 socket.emit('player-unit-moved', unitID, tile);
                 app.get("io").emit('gameState', gameState);
             });
+
+            // after 1 second, send the gameState to the client
+            setTimeout(() => {
+                app.get("io").emit('gameState', gameState);
+            }, 1);
 
             socket.on("disconnect", () => {
                 // @ts-expect-error TODO figure out the type for session on request

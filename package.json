@@ -10,9 +10,6 @@
     "build:dev": "webpack build --mode development --watch",
     "prepare": "husky",
     "build": "webpack build",
-    "db:create": "node-pg-migrate create -j ts -- ",
-    "db:migrate": "ts-node node_modules/.bin/node-pg-migrate -j ts up",
-    "db:rollback": "ts-node node_modules/.bin/node-pg-migrate -j ts down",
     "build:css": "postcss src/public/styles/tailwind.css -o src/public/styles/styles.css",
     "tailwind:watch": "postcss src/public/styles/tailwind.css -w -o src/public/styles/styles.css"
   },
