@@ -10,6 +10,12 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
 
         let gameState = {
             players: [] as string[],
+            arena: {
+                width: 1024,
+                height: 512,
+                image: 'sample.png',
+                tiles: []
+            },
             box: {
                 x: 0,
                 y: 0,
