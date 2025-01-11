@@ -176,6 +176,11 @@ function isPointInsideTile(px: number, py: number, tile: { x: number, y: number 
     return !(hasNeg && hasPos);
 }
 
+window.socket.on('player-unit-moved', (unitID: number, tile: { x: number, y: number, row: number, col: number }) => {
+    // display action menu
+    console.log(`Unit ${unitID} is performing an action on tile (${tile.row}, ${tile.col})`);
+});
+
 canvas.addEventListener('click', function(event) {
     const clickX = event.offsetX;
     const clickY = event.offsetY;
@@ -184,15 +189,18 @@ canvas.addEventListener('click', function(event) {
     for (const tile of tiles) {
         if (!hoveredTile) break;
         if (isPointInsideTile(clickX, clickY, tile)) {
-            console.log(`You clicked on: ${tile.row}, ${tile.col}`);
+            //console.log(`You clicked on: ${tile.row}, ${tile.col}`);
 
             if (!selectedTile && unitIsTeam(hoveredTile.row, hoveredTile.col)) {
                 selectedTile = tile;
             } else if (selectedTile && tile.row === selectedTile.row && tile.col === selectedTile.col) {
+                const unit = units.find(unit => unit.row === selectedTile!.row && unit.col === selectedTile!.col);
+                console.log(`Moving to: ${tile.row}, ${tile.col}`);
+                window.socket.emit('player-unit-move', unit!.id, tile);
                 break;
             } else if (selectedTile && unitIsTeam(selectedTile.row, selectedTile.col)) {
                 const unit = units.find(unit => unit.row === selectedTile!.row && unit.col === selectedTile!.col);
-                console.log(`You moved to: ${tile.row}, ${tile.col}`);
+                console.log(`Moving to: ${tile.row}, ${tile.col}`);
                 window.socket.emit('player-unit-move', unit!.id, tile);
                 selectedTile = null;
             }
@@ -211,7 +219,7 @@ canvas.addEventListener('mousemove', function(event) {
 
     for (const tile of tiles) {
         if (isPointInsideTile(clickX, clickY, tile)) {
-            console.log(`You hovered on: ${tile.row}, ${tile.col}`);
+            //console.log(`You hovered on: ${tile.row}, ${tile.col}`);
             hoveredTile = tile;
             break;
         }
@@ -268,6 +276,43 @@ function drawSelectedTile() {
 function drawUI(){
     drawHoveredTile();
     drawSelectedTile();
+    drawActionTiles();
+}
+
+function drawActionTiles(){
+    if (selectedTile){
+        const unit = units.find(unit => unit.row === selectedTile!.row && unit.col === selectedTile!.col);
+        if (unit){
+            const mobility = unit.mobility;
+            const row = selectedTile.row;
+            const col = selectedTile.col;
+
+            for (let i = -mobility; i <= mobility; i++){
+                for (let j = -mobility; j <= mobility; j++){
+                    if (Math.abs(i) + Math.abs(j) <= mobility){
+                        if (i === 0 && j === 0) continue;
+                        drawMoveTile(row + i, col + j);
+                    }
+                }
+            }
+        }
+    }
+}
+
+function drawMoveTile(row: number, col: number){
+    if (!selectedTile) return;
+    const frameSize = 32;
+    const highlightFrameX = 3;
+    const highlightFrameY = 1;
+
+    const sx = highlightFrameX * frameSize;
+    const sy = highlightFrameY * frameSize;
+
+    const pos = coordToPosition(row, col);
+    if (pos.x === -9999 || pos.y === -9999) return;
+
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(uiImage, sx, sy, frameSize, frameSize, pos.x, pos.y - 8 * SCALE, frameSize * SCALE, frameSize * SCALE);
 }
 
 function drawUnits(){
@@ -292,5 +337,5 @@ function coordToPosition(row: number, col: number): { x: number, y: number } {
             return { x: tile.x, y: tile.y };
         }
     }
-    return { x: 0, y: 0 };
+    return { x: -9999, y: -9999 };
 }

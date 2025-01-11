@@ -63,7 +63,7 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
                     attack: 1,
                     defense: 1,
                     range: 1,
-                    mobility: 3,
+                    mobility: 1,
                 });
                 gameState.players.push(newPlayer);
             }
@@ -86,13 +86,38 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
                 let unit = player.units.find((unit) => unit.id === unitID);
                 if (!unit) return;
 
-                // check if no unit is already on the tile
-                let otherUnit = gameState.players.find((player) => player.units.find((unit) => unit.row === tile.row && unit.col === tile.col));
-                if (otherUnit) return;
-                
-                unit.row = tile.row;
-                unit.col = tile.col;
+                if (unit.row === tile.row && unit.col === tile.col) {
+                    // do nothing
+                } else {
+                    let otherUnit = gameState.players.find((player) => player.units.find((unit) => unit.row === tile.row && unit.col === tile.col));
+                    if (otherUnit) return;
 
+                    let mobility = unit.mobility;
+                    let row = unit.row;
+                    let col = unit.col;
+
+                    let validTiles = [];
+
+                    for (let i = -mobility; i <= mobility; i++){
+                        for (let j = -mobility; j <= mobility; j++){
+                            if (Math.abs(i) + Math.abs(j) <= mobility){
+                                if (row + i >= 0 && row + i < gameState.arena.height && col + j >= 0 && col + j < gameState.arena.width){
+                                    validTiles.push({row: row + i, col: col + j});
+                                }
+                            }
+                        }
+                    }
+
+                    if (!validTiles.find((validTile) => validTile.row === tile.row && validTile.col === tile.col)){
+                        console.log("Invalid move");
+                        return;
+                    }
+
+                    unit.row = tile.row;
+                    unit.col = tile.col;
+                }
+
+                socket.emit('player-unit-moved', unitID, tile);
                 app.get("io").emit('gameState', gameState);
             });
 
