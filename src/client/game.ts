@@ -93,6 +93,8 @@ function drawInteractionSquares() {
     for (let row = 0; row < rows; row++) {
         for (let col = 0; col < cols; col++) {
             // Calculate isometric coordinates
+            if(arena!.tiles[row][col] === 0) continue;
+
             const isoX = (col - row) * tileWidth / 2 + offsetX;
             const isoY = (col + row) * tileHeight / 2 + offsetY;
 
