@@ -51,16 +51,6 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
         
             socket.on('player-action', (action: string) => {
                 console.log(`Received action from player ${socket.id}:`, action);
-
-                if (action === 'ArrowRight') {
-                    gameState.box.x += 10;
-                } else if (action === 'ArrowLeft') {
-                    gameState.box.x -= 10;
-                } else if (action === 'ArrowUp') {
-                    gameState.box.y -= 10;
-                } else if (action === 'ArrowDown') {
-                    gameState.box.y += 10;
-                }
                 app.get("io").emit('gameState', gameState);
             });
 

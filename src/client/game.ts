@@ -2,7 +2,11 @@ const SCALE = 3.125;
 
 let arenaImage: HTMLImageElement | null = null;
 let arena: Arena | null = null;
-let player: Player | null = null;
+
+let uiImage = new Image();
+uiImage.src = '/assets/spritesheets/UI.png';
+
+let hoveredTile: { x: number, y: number, row: number, col: number } | null = null;
 
 const canvas = document.getElementById('gameCanvas') as HTMLCanvasElement;
 const ctx = canvas.getContext('2d')!;
@@ -19,18 +23,12 @@ function drawArena() {
     }
 }
 
-function drawPlayer() {
-    if (!player) return;
-    ctx.fillStyle = player.color;
-    ctx.fillRect(player.x, player.y, player.height, player.height);
-}
-
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     drawBackground();
     drawArena();
     drawInteractionSquares();
-    drawPlayer();
+    drawUI();
 }
 
 window.addEventListener('keydown', (e) => {
@@ -38,36 +36,26 @@ window.addEventListener('keydown', (e) => {
     window.socket.emit('player-action', e.key);
 });
 
+window.socket.on('gameState', (gameState) => {
+    console.log('Game State:', gameState);
+    loadArenaImage(gameState.arena); // move to a game start function in the future to only load once
+});
+
 function gameLoop() {
-    window.socket.on('gameState', (gameState) => {
-        console.log('Game State:', gameState);
-        loadArenaImage(gameState.arena); // move to a game start function in the future to only load once
-        loadBox(gameState.box); // move to a game start function in the future to only load once
-        draw();
-    });
+    draw();
+    requestAnimationFrame(gameLoop);
 }
 
 gameLoop();
 
-// ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
 function loadArenaImage(newArena: Arena) {
-    if (!arenaImage) {  // Only load the image once
+    if (!arenaImage) { 
         arenaImage = new Image();
         arenaImage.src = `/assets/maps/${newArena.image}`;
         arena = newArena;
         arenaImage.onload = () => {
             drawArena();
         };
-    }
-}
-
-function loadBox(newBox: Player) {
-    if (!player) {
-        player = newBox;
-    } else {
-        player.x = newBox.x;
-        player.y = newBox.y;
     }
 }
 
@@ -101,6 +89,7 @@ function drawInteractionSquares() {
     const offsetY = imgCenterY - gridHeight - tileHeight * 1.5;
 
     // Draw the tiles
+    tiles = [];
     for (let row = 0; row < rows; row++) {
         for (let col = 0; col < cols; col++) {
             // Calculate isometric coordinates
@@ -150,13 +139,10 @@ function isPointInsideTile(px: number, py: number, tile: { x: number, y: number 
     return !(hasNeg && hasPos);
 }
 
-
-// Attach click event listener to the canvas
 canvas.addEventListener('click', function(event) {
     const clickX = event.offsetX;
     const clickY = event.offsetY;
 
-    // Iterate over tiles to see if the click is inside any of them
     for (const tile of tiles) {
         if (isPointInsideTile(clickX, clickY, tile)) {
             console.log(`You clicked on: ${tile.col}, ${tile.row}`);
@@ -164,3 +150,36 @@ canvas.addEventListener('click', function(event) {
         }
     }
 });
+
+canvas.addEventListener('mousemove', function(event) {
+    const clickX = event.offsetX;
+    const clickY = event.offsetY;
+
+    for (const tile of tiles) {
+        if (isPointInsideTile(clickX, clickY, tile)) {
+            console.log(`You hovered on: ${tile.col}, ${tile.row}`);
+            hoveredTile = tile;
+            break;
+        }
+        else {
+            hoveredTile = null;
+        }
+    }
+});
+
+function drawHoveredTile() {
+    if (!hoveredTile) return;
+    const frameSize = 32;
+    const highlightFrameX = 0;
+    const highlightFrameY = 0;
+
+    const sx = highlightFrameX * frameSize;
+    const sy = highlightFrameY * frameSize;
+
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(uiImage, sx, sy, frameSize, frameSize, hoveredTile.x, hoveredTile.y - frameSize / 1.25, frameSize * SCALE, frameSize * SCALE);
+}
+
+function drawUI(){
+    drawHoveredTile();
+}
