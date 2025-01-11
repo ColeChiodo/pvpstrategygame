@@ -6,7 +6,13 @@ let arena: Arena | null = null;
 let uiImage = new Image();
 uiImage.src = '/assets/spritesheets/UI.png';
 
+let testUnitImage = new Image();
+testUnitImage.src = '/assets/spritesheets/units/test.png';
+
+let units: Unit[] = [];
+
 let hoveredTile: { x: number, y: number, row: number, col: number } | null = null;
+let selectedTile: { x: number, y: number, row: number, col: number } | null = null;
 
 const canvas = document.getElementById('gameCanvas') as HTMLCanvasElement;
 const ctx = canvas.getContext('2d')!;
@@ -27,8 +33,9 @@ function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     drawBackground();
     drawArena();
-    drawInteractionSquares();
     drawUI();
+    drawUnits();
+    drawInteractionSquares();
 }
 
 window.addEventListener('keydown', (e) => {
@@ -36,9 +43,19 @@ window.addEventListener('keydown', (e) => {
     window.socket.emit('player-action', e.key);
 });
 
+function loadUnits(players: Player[]) {
+    units = [];
+    for (const player of players) {
+        for (const unit of player.units) {
+            units.push(unit);
+        }
+    }
+}
+
 window.socket.on('gameState', (gameState) => {
     console.log('Game State:', gameState);
     loadArenaImage(gameState.arena); // move to a game start function in the future to only load once
+    loadUnits(gameState.players);
 });
 
 function gameLoop() {
@@ -71,10 +88,11 @@ let tiles: { x: number, y: number, row: number, col: number}[] = [];
 
 function drawInteractionSquares() {
     if (!arenaImage) return;
+    if (!arena) return;
     const tileWidth = 100; // width of an isometric tile
     const tileHeight = 50; // height of an isometric tile
-    const rows = 10;       // number of rows in the grid
-    const cols = 10;       // number of columns in the grid
+    const rows = arena.tiles.length;
+    const cols = arena.tiles[0].length;
 
     // get canvas center
     const imgCenterX = canvas.width / 2;
@@ -145,11 +163,24 @@ canvas.addEventListener('click', function(event) {
     const clickX = event.offsetX;
     const clickY = event.offsetY;
 
+    let found = false;
     for (const tile of tiles) {
         if (isPointInsideTile(clickX, clickY, tile)) {
-            console.log(`You clicked on: ${tile.col}, ${tile.row}`);
+            console.log(`You clicked on: ${tile.row}, ${tile.col}`);
+
+            if (!selectedTile) {
+                selectedTile = tile;
+            } else if (tile.row === selectedTile.row && tile.col === selectedTile.col) {
+                break;
+            } else {
+                selectedTile = tile;
+            }
+            found = true;
             break;
         }
+    }
+    if (!found) {
+        selectedTile = null;
     }
 });
 
@@ -159,7 +190,7 @@ canvas.addEventListener('mousemove', function(event) {
 
     for (const tile of tiles) {
         if (isPointInsideTile(clickX, clickY, tile)) {
-            console.log(`You hovered on: ${tile.col}, ${tile.row}`);
+            console.log(`You hovered on: ${tile.row}, ${tile.col}`);
             hoveredTile = tile;
             break;
         }
@@ -182,6 +213,45 @@ function drawHoveredTile() {
     ctx.drawImage(uiImage, sx, sy, frameSize, frameSize, hoveredTile.x, hoveredTile.y - frameSize / 1.25, frameSize * SCALE, frameSize * SCALE);
 }
 
+function drawSelectedTile() {
+    if (!selectedTile) return;
+    const frameSize = 32;
+    const highlightFrameX = 1;
+    const highlightFrameY = 0;
+
+    const sx = highlightFrameX * frameSize;
+    const sy = highlightFrameY * frameSize;
+
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(uiImage, sx, sy, frameSize, frameSize, selectedTile.x, selectedTile.y - frameSize / 1.25, frameSize * SCALE, frameSize * SCALE);
+}
+
 function drawUI(){
     drawHoveredTile();
+    drawSelectedTile();
+}
+
+function drawUnits(){
+    for (const unit of units){
+        const frameSize = 48;
+        const frameX = 0;
+        const frameY = 0;
+
+        const sx = frameX * frameSize;
+        const sy = frameY * frameSize;
+
+        const pos = coordToPosition(unit.row, unit.col);
+
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(testUnitImage, sx, sy, frameSize, frameSize, pos.x - frameSize / 2, pos.y - frameSize * SCALE + (3 * SCALE), frameSize * SCALE, frameSize * SCALE);
+    }
+}
+
+function coordToPosition(row: number, col: number): { x: number, y: number } {
+    for (const tile of tiles) {
+        if (tile.row === row && tile.col === col) {
+            return { x: tile.x, y: tile.y };
+        }
+    }
+    return { x: 0, y: 0 };
 }

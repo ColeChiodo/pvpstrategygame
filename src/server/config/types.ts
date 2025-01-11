@@ -12,8 +12,8 @@ interface Arena {
 }
 
 interface Unit {
-    row: number;
-    col: number;
+    x: number; // x grid position
+    y: number; // y grid position
 
     name: string;
     health: number;

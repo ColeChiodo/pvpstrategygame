@@ -9,7 +9,7 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
         io = new SocketIoServer(server);
 
         let gameState = {
-            players: [] as string[],
+            players: [] as Player[],
             arena: {
                 width: 1024,
                 height: 512,
@@ -24,14 +24,7 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
                         [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
                         [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
                         [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]],
-            },
-            box: {
-                x: 0,
-                y: 0,
-                color: 'red',
-                height: 50,
-                width: 50,
-            },
+            } as Arena,
         };
 
         app.set("io", io);
@@ -55,7 +48,23 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
             app.get("io").emit('gameState', gameState);
 
             if (gameState.players.length < 2) {
-                gameState.players.push(socket.id);
+                let newPlayer : Player = {
+                    id: socket.id,
+                    name: "Player " + gameState.players.length + 1,
+                    units: [],
+                };
+                newPlayer.units.push({
+                    row: 7,
+                    col: 7,
+                    name: "test",
+                    health: 3,
+                    maxHealth: 3,
+                    attack: 1,
+                    defense: 1,
+                    range: 1,
+                    mobility: 3,
+                });
+                gameState.players.push(newPlayer);
             }
         
             socket.on('player-action', (action: string) => {
@@ -66,6 +75,7 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
             socket.on("disconnect", () => {
                 // @ts-expect-error TODO figure out the type for session on request
                 console.log(`client disconnected (${socket.request.session.id})`);
+                gameState.players = gameState.players.filter((player) => player.id !== socket.id);
             })
         })
 
@@ -73,4 +83,30 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
     }
 
     return io;
+}
+
+interface Player {
+    id: string;
+    name: string;
+    units: Unit[];
+}
+
+interface Arena {
+    width: number;
+    height: number;
+    image: string;
+    tiles: number[][];
+}
+
+interface Unit {
+    row: number;
+    col: number;
+
+    name: string;
+    health: number;
+    maxHealth: number;
+    attack: number;
+    defense: number;
+    range: number;
+    mobility: number;
 }
