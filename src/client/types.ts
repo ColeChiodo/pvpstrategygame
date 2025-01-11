@@ -7,11 +7,12 @@ interface Player {
 interface Arena {
     width: number;
     height: number;
-    image: string;
+    name: string;
     tiles: number[][];
 }
 
 interface Unit {
+    id: number;
     row: number;
     col: number;
     owner: Player;

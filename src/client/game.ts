@@ -15,7 +15,7 @@ let units: Unit[] = [];
 
 let hoveredTile: { x: number, y: number, row: number, col: number } | null = null;
 let selectedTile: { x: number, y: number, row: number, col: number } | null = null;
-let actionTile: { x: number, y: number, row: number, col: number } | null = null;
+let moveTile: { x: number, y: number, row: number, col: number } | null = null;
 
 const canvas = document.getElementById('gameCanvas') as HTMLCanvasElement;
 const ctx = canvas.getContext('2d')!;
@@ -61,10 +61,12 @@ function loadUnits(players: Player[]) {
     units = [];
     for (const player of players) {
         for (const unit of player.units) {
+            //unit.id = units.length + 1;
             unit.owner = player;
             units.push(unit);
         }
     }
+    drawUnits();
 }
 
 window.socket.on('gameState', (gameState) => {
@@ -83,7 +85,7 @@ gameLoop();
 function loadArenaImage(newArena: Arena) {
     if (!arenaImage) { 
         arenaImage = new Image();
-        arenaImage.src = `/assets/maps/${newArena.image}`;
+        arenaImage.src = `/assets/maps/${newArena.name}.png`;
         arena = newArena;
         arenaImage.onload = () => {
             drawArena();
@@ -144,7 +146,7 @@ function drawIsometricTile(x: number, y: number, row: number, col: number) {
     ctx.lineTo(x + 16 * SCALE, y - 8 * SCALE);
     ctx.closePath();
     
-    ctx.stroke();
+    //ctx.stroke();
 
     return { x, y, row, col };
 }
@@ -180,15 +182,19 @@ canvas.addEventListener('click', function(event) {
 
     let found = false;
     for (const tile of tiles) {
+        if (!hoveredTile) break;
         if (isPointInsideTile(clickX, clickY, tile)) {
             console.log(`You clicked on: ${tile.row}, ${tile.col}`);
 
-            if (!selectedTile) {
+            if (!selectedTile && unitIsTeam(hoveredTile.row, hoveredTile.col)) {
                 selectedTile = tile;
-            } else if (tile.row === selectedTile.row && tile.col === selectedTile.col) {
+            } else if (selectedTile && tile.row === selectedTile.row && tile.col === selectedTile.col) {
                 break;
-            } else {
-                selectedTile = tile;
+            } else if (selectedTile && unitIsTeam(selectedTile.row, selectedTile.col)) {
+                const unit = units.find(unit => unit.row === selectedTile!.row && unit.col === selectedTile!.col);
+                console.log(`You moved to: ${tile.row}, ${tile.col}`);
+                window.socket.emit('player-unit-move', unit!.id, tile);
+                selectedTile = null;
             }
             found = true;
             break;

@@ -13,7 +13,7 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
             arena: {
                 width: 1024,
                 height: 512,
-                image: 'sample.png',
+                name: 'sample',
                 tiles: [[1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
                         [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
                         [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
@@ -45,7 +45,7 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
             // @ts-expect-error TODO figure out the type for session on request
             console.log(`client connected (${socket.request.session.id})`);
 
-            app.get("io").emit('gameState', gameState);
+            app.get("io").emit('gameState', gameState); // change this to initalize game state
 
             if (gameState.players.length < 2) {
                 let newPlayer : Player = {
@@ -54,6 +54,7 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
                     units: [],
                 };
                 newPlayer.units.push({
+                    id: newPlayer.units.length + 1,
                     row: gameState.players.length === 0 ? 0 : 9,
                     col: gameState.players.length === 0 ? 0 : 9,
                     name: "test",
@@ -66,16 +67,38 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
                 });
                 gameState.players.push(newPlayer);
             }
+            
+            if (gameState.players.length === 2) {
+                if (!gameState.players.find((player) => player.id === socket.id)) {
+                    socket.disconnect();
+                }
+            }
         
             socket.on('player-action', (action: string) => {
                 console.log(`Received action from player ${socket.id}:`, action);
                 app.get("io").emit('gameState', gameState);
             });
 
+            socket.on('player-unit-move', (unitID: number, tile: { x: number, y: number, row: number, col: number }) => {
+                console.log(`${socket.id}: unit ${unitID} moved to tile (${tile.row}, ${tile.col})`);
+                let player = gameState.players.find((player) => player.id === socket.id);
+                if (!player) return;
+                let unit = player.units.find((unit) => unit.id === unitID);
+                if (!unit) return;
+
+                // check if no unit is already on the tile
+                let otherUnit = gameState.players.find((player) => player.units.find((unit) => unit.row === tile.row && unit.col === tile.col));
+                if (otherUnit) return;
+                
+                unit.row = tile.row;
+                unit.col = tile.col;
+
+                app.get("io").emit('gameState', gameState);
+            });
+
             socket.on("disconnect", () => {
                 // @ts-expect-error TODO figure out the type for session on request
                 console.log(`client disconnected (${socket.request.session.id})`);
-                gameState.players = gameState.players.filter((player) => player.id !== socket.id);
             })
         })
 
@@ -94,14 +117,14 @@ interface Player {
 interface Arena {
     width: number;
     height: number;
-    image: string;
+    name: string;
     tiles: number[][];
 }
 
 interface Unit {
+    id: number;
     row: number;
     col: number;
-
     name: string;
     health: number;
     maxHealth: number;
