@@ -1,4 +1,4 @@
-const MIN_SCALE = 1.0;
+const MIN_SCALE = 1.0; 
 const MAX_SCALE = 5.0;
 let SCALE = 3.125;
 
@@ -12,7 +12,7 @@ let uiImage = new Image();
 uiImage.src = '/assets/spritesheets/UI.png';
 
 let testUnitImage = new Image();
-testUnitImage.src = '/assets/spritesheets/units/test.png';
+testUnitImage.src = `/assets/spritesheets/units/test.png`;
 
 let units: Unit[] = [];
 
@@ -42,8 +42,8 @@ function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     drawBackground();
     drawArena();
-    drawUI();
     drawUnits();
+    drawUI();
     drawInteractionSquares();
 }
 
@@ -379,6 +379,38 @@ function drawUI(){
     drawSelectedTile();
     drawMovementTiles();
     drawActionTiles();
+    drawHealthBars();
+}
+
+function drawHealthBars(){
+    for (const unit of units){
+        const pos = coordToPosition(unit.row, unit.col);
+        if (pos.x === -9999 || pos.y === -9999) return;
+
+        const frameSize = 16;
+        const frameX = unitIsTeam(unit.row, unit.col) ? 2 : 4;
+        const frameY = 4;
+
+        const sx = frameX * frameSize;
+        const sy = frameY * frameSize;
+
+        let gap = 1 * SCALE;
+        let totalWidth = unit.maxHealth * (frameSize * SCALE / 4) + (unit.maxHealth - 1) * gap;
+        let startX = pos.x - totalWidth / 2;
+
+        for (let i = 0; i < unit.maxHealth; i++) {
+            
+            let xPosition = startX + i * (frameSize * SCALE / 4 + gap) + frameSize * SCALE;
+
+            if (i < unit.health) {
+                ctx.imageSmoothingEnabled = false;
+                ctx.drawImage(uiImage, sx, sy, frameSize, frameSize, xPosition, pos.y - 28 * SCALE, frameSize * SCALE / 4, frameSize * SCALE / 4);
+            } else {
+                ctx.imageSmoothingEnabled = false;
+                ctx.drawImage(uiImage, sx + frameSize, sy, frameSize, frameSize, xPosition, pos.y - 28 * SCALE, frameSize * SCALE / 4, frameSize * SCALE / 4);
+            }
+        }
+    }
 }
 
 function drawMovementTiles(){
@@ -472,10 +504,17 @@ function drawActionTile(row: number, col: number, action: string){
 }
 
 function drawUnits(){
+    units.sort((a, b) => {
+        const posA = coordToPosition(a.row, a.col);
+        const posB = coordToPosition(b.row, b.col);
+        return posA.y - posB.y;
+    });
+
     for (const unit of units){
-        const frameSize = 48; // change to 32
+        const frameSize = 32;
+
         const frameX = 0;
-        const frameY = 0;
+        const frameY = unit.name === 'attack_guy' ? 0 : 1;
 
         const sx = frameX * frameSize;
         const sy = frameY * frameSize;
@@ -483,7 +522,7 @@ function drawUnits(){
         const pos = coordToPosition(unit.row, unit.col);
 
         ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(testUnitImage, sx, sy, frameSize, frameSize, pos.x - 8 * SCALE, pos.y - frameSize * SCALE + (3 * SCALE), frameSize * SCALE, frameSize * SCALE);
+        ctx.drawImage(testUnitImage, sx, sy, frameSize, frameSize, pos.x, pos.y - frameSize * SCALE + (8 * SCALE), frameSize * SCALE, frameSize * SCALE);
     }
 }
 
