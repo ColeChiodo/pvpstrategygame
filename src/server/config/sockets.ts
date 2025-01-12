@@ -58,12 +58,26 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
                     row: gameState.players.length === 0 ? 0 : 9,
                     col: gameState.players.length === 0 ? 0 : 9,
                     name: "test",
+                    action: "attack",
                     health: 3,
                     maxHealth: 3,
                     attack: 1,
                     defense: 1,
-                    range: 1,
-                    mobility: 1,
+                    range: 2,
+                    mobility: 2,
+                });
+                newPlayer.units.push({
+                    id: newPlayer.units.length + 1,
+                    row: gameState.players.length === 0 ? 1 : 8,
+                    col: gameState.players.length === 0 ? 1 : 8,
+                    name: "test",
+                    action: "heal",
+                    health: 3,
+                    maxHealth: 3,
+                    attack: 1,
+                    defense: 1,
+                    range: 2,
+                    mobility: 2,
                 });
                 gameState.players.push(newPlayer);
             }
@@ -122,6 +136,61 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
                 app.get("io").emit('gameState', gameState);
             });
 
+            socket.on('player-unit-action', (unitID: number, tile: { x: number, y: number, row: number, col: number }) => {
+                console.log(`${socket.id}: unit ${unitID} performing action on (${tile.row}, ${tile.col})`);
+                let player = gameState.players.find((player) => player.id === socket.id);
+                if (!player) return;
+                let unit = player.units.find((unit) => unit.id === unitID);
+                if (!unit) return;
+
+                let otherUnitsOwner = gameState.players.find((player) => player.units.find((unit) => unit.row === tile.row && unit.col === tile.col));
+                if (!otherUnitsOwner) return;
+                let otherUnit = otherUnitsOwner.units.find((unit) => unit.row === tile.row && unit.col === tile.col);
+                if (!otherUnit) return;
+
+                // if other unit in range
+                let range = unit.range;
+                let row = unit.row;
+                let col = unit.col;
+
+                let validTiles = [];
+
+                for (let i = -range; i <= range; i++){
+                    for (let j = -range; j <= range; j++){
+                        if (Math.abs(i) + Math.abs(j) <= range){
+                            if (row + i >= 0 && row + i < gameState.arena.height && col + j >= 0 && col + j < gameState.arena.width){
+                                validTiles.push({row: row + i, col: col + j});
+                            }
+                        }
+                    }
+                }
+
+                if (!validTiles.find((validTile) => validTile.row === tile.row && validTile.col === tile.col)){
+                    console.log("Invalid attack");
+                    return;
+                }
+
+                if (socket.id !== otherUnitsOwner.id) {
+                    // attack
+                    otherUnit.health -= unit.attack;
+                    console.log(`Unit ${unitID} attacked unit ${otherUnit.id} for ${unit.attack} damage. ${otherUnit.id} has ${otherUnit.health} health remaining.`);
+                    if (otherUnit.health <= 0) {
+                        console.log(`Unit ${otherUnit.id} has died.`);
+                        otherUnitsOwner.units = otherUnitsOwner.units.filter((unit) => unit.id !== otherUnit.id);
+                    }
+                } else {
+                    // heal
+                    otherUnit.health += unit.attack;
+                    if (otherUnit.health > otherUnit.maxHealth) {
+                        otherUnit.health = otherUnit.maxHealth;
+                    }
+                    console.log(`Unit ${unitID} healed unit ${otherUnit.id} for ${unit.attack} health. ${otherUnit.id} has ${otherUnit.health} health remaining.`);
+                }
+
+                //socket.emit('player-unit-actioned', unitID, tile);
+                app.get("io").emit('gameState', gameState);
+            });
+
             // after 1 second, send the gameState to the client
             setTimeout(() => {
                 app.get("io").emit('gameState', gameState);
@@ -157,6 +226,7 @@ interface Unit {
     row: number;
     col: number;
     name: string;
+    action: string;
     health: number;
     maxHealth: number;
     attack: number;

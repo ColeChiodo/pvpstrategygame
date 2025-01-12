@@ -16,6 +16,7 @@ interface Unit {
     row: number;
     col: number;
     owner: Player;
+    action: string;
     name: string;
     health: number;
     maxHealth: number;
