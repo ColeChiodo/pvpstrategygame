@@ -138,7 +138,6 @@ function loadPlayers(newPlayers: Player[]) {
 }
     
 window.socket.on('gameState', (gameState) => {
-    console.log('Game State:', gameState);
     loadArenaImage(gameState.arena); // move to a game start function in the future to only load once
     loadPlayers(gameState.players);
     loadUnits(gameState.players);
@@ -290,7 +289,6 @@ canvas.addEventListener('click', function(event) {
     for (const tile of tiles) {
         if (!hoveredTile) break;
         if (isPointInsideTile(clickX, clickY, tile)) {
-            //console.log(`You clicked on: ${tile.row}, ${tile.col}`);
             
             if (!isAction && !selectedTile && unitIsTeam(hoveredTile.row, hoveredTile.col) && unitCanMove(hoveredTile.row, hoveredTile.col)) {
                 // first click

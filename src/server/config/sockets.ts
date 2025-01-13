@@ -5,7 +5,7 @@ import { emit } from "process";
 
 let io: SocketIoServer | undefined;
 
-const MAX_TIME = 60 * 10; // 10 minutes
+const MAX_TIME = 60 * 5; 
 
 export default function (server: Server, app: Express, sessionMiddleware: RequestHandler): SocketIoServer {
     if(io === undefined) {
@@ -37,20 +37,32 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
                 gameID = generateGameId();
                 games[gameID] = initializeGameState(gameID);
                 let gameState = games[gameID];
-                setInterval(() => {
+                let interval = setInterval(() => {
                     if (gameState.players.length === 2) {
                         if (gameState.round % 2 === 0) {
                             gameState.player1Time -= 1;
         
-                            if (gameState.player1Time < 0) {
+                            if (gameState.player1Time === 0) {
                                 console.log(`${gameState.players[0].name} ran out of time`);
+                                endGame(gameID, interval);
                             }
                         } else {
                             gameState.player2Time -= 1;
         
-                            if (gameState.player2Time < 0) {
+                            if (gameState.player2Time === 0) {
                                 console.log(`${gameState.players[1].name} ran out of time`);
+                                endGame(gameID, interval);
                             }
+                        }
+
+                        if (gameState.players[0].units.length === 0) {
+                            console.log(`${gameState.players[0].name} has no units left`);
+                            endGame(gameID, interval);
+                        }
+
+                        if (gameState.players[1].units.length === 0) {
+                            console.log(`${gameState.players[1].name} has no units left`);
+                            endGame(gameID, interval);
                         }
                     }
                     emitGameState(gameID);
@@ -61,6 +73,9 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
             
             if (initGameState.players.length < 2 && !initGameState.players.find(p => p.id === sessionID)) {
                 addPlayerToGame(initGameState, socket);
+            } else if (initGameState.players.length < 2 && initGameState.players.find(p => p.id === sessionID)) {
+                const player = initGameState.players.find(p => p.id === sessionID);
+                if (player) player.socket = socket.id;
             } else if (initGameState.players.length === 2) {
                 const player = initGameState.players.find(p => p.id === sessionID);
                 if (player) player.socket = socket.id;
@@ -89,7 +104,7 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
                 }
 
                 console.log(`[${gameID}]: ${player.name}: unit ${unitID} moving to tile (${tile.row}, ${tile.col})`);
-                console.log(JSON.stringify(gameState));
+                socket.emit('player-unit-moved', unitID, tile);
                 emitGameState(gameID);
             });
 
@@ -146,11 +161,10 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
                 console.log(`client disconnected (${sessionID})`);
             });
 
-            function endGame(gameId: string) {
-                const gameState = games[gameId];
+            function endGame(gameId: string, interval: NodeJS.Timeout) {
+                clearInterval(interval);
+                emitGameState(gameId);
                 console.log(`[${gameId}]: Closing Game...`);
-                //app.get("io").emit('gameEnded', gameId);
-                emitGameState(gameID);
                 delete games[gameId];
             }
 
@@ -192,6 +206,7 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
             
             function emitGameState(gameId: string) {
                 const gameState = games[gameId];
+                if (!gameState) return;
                 for (let player of gameState.players) {
                     app.get('io').to(player.socket).emit('gameState', gameState);
                 }
@@ -383,111 +398,3 @@ function initializeGameState(gameID: string): GameState {
 function getGameIdForPlayer(sessionID: string): string {
     return playerGameMap[sessionID];
 }
-
-// export default function (server: Server, app: Express, sessionMiddleware: RequestHandler): SocketIoServer {
-//     if(io === undefined) {
-//         io = new SocketIoServer(server);
-
-//         setInterval(() => {
-//             if (gameState.players.length === 2) {
-//                 if (gameState.round % 2 === 0) {
-//                     gameState.player1Time -= 1;
-
-//                     if (gameState.player1Time < 0) {
-//                         console.log(`${gameState.players[0].name} ran out of time`);
-//                     }
-//                 } else {
-//                     gameState.player2Time -= 1;
-
-//                     if (gameState.player2Time < 0) {
-//                         console.log(`${gameState.players[1].name} ran out of time`);
-//                     }
-//                 }
-//             }
-//         }, 1000);
-
-//         app.set("io", io);
-//         io.on("connection", (socket) => {
-//             const { request } = socket;
-                    
-//             socket.use((_, next) => {
-//                 // @ts-expect-error TODO figure out the type for session on request
-//                 request.session.reload((error) => {
-//                     if(error) {
-//                         socket.disconnect();
-//                     } else {
-//                         next();
-//                     }
-//                 })
-//             });
-
-//             // @ts-expect-error TODO figure out the type for session on request
-//             console.log(`client connected (${socket.request.session.id})`);
-
-//             if (gameState.players.length < 2) {
-//                 // if socket.request.session.id is in gameState.players, then don't add it again
-//                 // @ts-expect-error
-//                 if (!gameState.players.find((player) => player.id === socket.request.session.id)) {
-//                     // @ts-expect-error
-//                     console.log(`Adding ${socket.request.session.user.username} to game`);
-//                     let newPlayer : Player = {
-//                         // @ts-expect-error TODO figure out the type for session on request
-//                         id: socket.request.session.id,
-//                         // @ts-expect-error TODO figure out the type for session on request
-//                         name: socket.request.session.user.username,
-//                         units: [],
-//                     };
-//                     newPlayer.units.push({
-//                         id: newPlayer.units.length + 1,
-//                         row: gameState.players.length === 0 ? 0 : 9,
-//                         col: gameState.players.length === 0 ? 0 : 9,
-//                         name: "attack_guy",
-//                         action: "attack",
-//                         canMove: true,
-//                         canAct: true,
-//                         health: 3,
-//                         maxHealth: 3,
-//                         attack: 1,
-//                         defense: 1,
-//                         range: 1,
-//                         mobility: 3,
-//                     });
-//                     newPlayer.units.push({
-//                         id: newPlayer.units.length + 1,
-//                         row: gameState.players.length === 0 ? 1 : 8,
-//                         col: gameState.players.length === 0 ? 1 : 8,
-//                         name: "heal_guy",
-//                         action: "heal",
-//                         canMove: true,
-//                         canAct: true,
-//                         health: 1,
-//                         maxHealth: 1,
-//                         attack: 2,
-//                         defense: 1,
-//                         range: 2,
-//                         mobility: 3,
-//                     });
-//                     gameState.players.push(newPlayer);
-//                     socket.emit('gameState', gameState);
-//                 } else {
-//                     // @ts-expect-error TODO figure out the type for session on request
-//                     console.log(`Player ${socket.request.session.user.username} reconnected`);
-//                 }
-//             }
-            
-//             if (gameState.players.length === 2) {
-//                 // @ts-expect-error
-//                 if (!gameState.players.find((player) => player.id === socket.request.session.id)) {
-//                     socket.disconnect();
-//                 }
-//             }
-
-            
-
-//         })
-
-//         io.engine.use(sessionMiddleware);
-//     }
-
-//     return io;
-// }
