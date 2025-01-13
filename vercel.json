@@ -1,0 +1,23 @@
+{
+    "version": 2,
+    "functions": {
+      "api/index.js": {
+        "runtime": "nodejs18.x"
+      }
+    },
+    "rewrites": [
+      {
+        "source": "/(.*)",
+        "destination": "/api/index.js"
+      }
+    ],
+    "builds": [
+      {
+        "src": "src/client/**/*.js",
+        "use": "@vercel/node"
+      }
+    ],
+    "buildCommand": "npm run build",
+    "outputDirectory": "src/public"
+  }
+  

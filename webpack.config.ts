@@ -14,7 +14,7 @@ const config: webpack.Configuration = {
     },
     mode,
     output: {
-        path: path.join(process.cwd(), "dist", "js"),
+        path: path.join(process.cwd(), "src", "public", "js"),
         filename: "[name].js",
     },
     module: {

@@ -15,7 +15,7 @@ const config = {
     },
     mode,
     output: {
-        path: path_1.default.join(process.cwd(), "dist", "js"),
+        path: path_1.default.join(process.cwd(), "src", "public", "js"),
         filename: "[name].js",
     },
     module: {

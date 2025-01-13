@@ -41,11 +41,15 @@ mongoose.connect(process.env.DATABASE_URL!)
         next(httpErrors(404));
     });
 
-    server.listen(PORT as number, '0.0.0.0' as string, () => {
-        console.log(`Server is running on port ${PORT}`);
-    });
+    if (process.env.NODE_ENV !== "production"){
+        server.listen(PORT as number, '0.0.0.0' as string, () => {
+            console.log(`Server is running on port ${PORT}`);
+        });
+    }
 })
 .catch((err) => {
     console.error("MongoDB connection error:", err);
     process.exit(1);
 });
+
+export default app;
