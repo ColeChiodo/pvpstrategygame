@@ -22,7 +22,9 @@ let units: Unit[] = [];
 let hoveredTile: { x: number, y: number, row: number, col: number } | null = null;
 let selectedTile: { x: number, y: number, row: number, col: number } | null = null;
 let moveTile: { x: number, y: number, row: number, col: number } | null = null;
+let validMoveTiles: { row: number, col: number }[] = [];
 let actionTile: { x: number, y: number, row: number, col: number } | null = null;
+let validActionTiles: { row: number, col: number }[] = [];
 
 let currentRound = 0;
 let player1Time = 0;
@@ -301,15 +303,19 @@ canvas.addEventListener('click', function(event) {
                 break;
             } else if (!isAction && selectedTile && unitIsTeam(selectedTile.row, selectedTile.col)) {
                 // move clicked on another tile to move
-                const unit = units.find(unit => unit.row === selectedTile!.row && unit.col === selectedTile!.col);
-                console.log(`Moving to: ${tile.row}, ${tile.col}`);
-                window.socket.emit('player-unit-move', unit!.id, tile);
+                if (validMoveTiles.find(validTile => validTile.row === tile.row && validTile.col === tile.col)) {
+                    const unit = units.find(unit => unit.row === selectedTile!.row && unit.col === selectedTile!.col);
+                    console.log(`Moving to: ${tile.row}, ${tile.col}`);
+                    window.socket.emit('player-unit-move', unit!.id, tile);
+                }
                 selectedTile = null;
             } else if (isAction && hasUnit(tile.row, tile.col)) {
                 // action clicked on another unit
-                const unit = units.find(unit => unit.row === moveTile!.row && unit.col === moveTile!.col);
-                console.log(`Action on: ${tile.row}, ${tile.col}`);
-                window.socket.emit('player-unit-action', unit!.id, tile);
+                if (validActionTiles.find(validTile => validTile.row === tile.row && validTile.col === tile.col)) {
+                    const unit = units.find(unit => unit.row === moveTile!.row && unit.col === moveTile!.col);
+                    console.log(`Action on: ${tile.row}, ${tile.col}`);
+                    window.socket.emit('player-unit-action', unit!.id, tile);
+                }
                 isAction = false;
                 moveTile = null;
             } else if (isAction && hasUnit(tile.row, tile.col)) {
@@ -492,6 +498,7 @@ function drawMovementTiles(){
     if (selectedTile){
         const unit = units.find(unit => unit.row === selectedTile!.row && unit.col === selectedTile!.col);
         if (unit){
+            validMoveTiles = [];
             const mobility = unit.mobility;
             const range = unit.range;
             const row = selectedTile.row;
@@ -501,8 +508,7 @@ function drawMovementTiles(){
             for (let i = -mobility; i <= mobility; i++) {
                 for (let j = -mobility; j <= mobility; j++) {
                     if (Math.abs(i) + Math.abs(j) <= mobility) {
-                        if (i === 0 && j === 0) continue;
-                        if (hasUnit(row + i, col + j)) continue;
+                        if (hasUnit(row + i, col + j) && (i !== 0 && j !== 0)) continue;
 
                         mobilityTiles.push({ x: row + i, y: col + j });
                         drawMoveTile(row + i, col + j);
@@ -539,6 +545,7 @@ function drawMovementTiles(){
 }
 
 function drawMoveTile(row: number, col: number){
+    validMoveTiles.push({ row, col });
     if (!selectedTile) return;
     const frameSize = 32;
     const highlightFrameX = 3;
@@ -559,6 +566,7 @@ function drawActionTiles(){
         if (moveTile){
             const unit = units.find(unit => unit.row === moveTile!.row && unit.col === moveTile!.col);
             if (unit){
+                validActionTiles = [];
                 const range = unit.range;
                 const row = moveTile.row;
                 const col = moveTile.col;
@@ -591,6 +599,7 @@ function drawActionTiles(){
 }
 
 function drawActionTile(row: number, col: number, action: string){
+    validActionTiles.push({ row, col });
     const frameSize = 32;
     const highlightFrameX = action === 'attack' ? 2 : 1;
     const highlightFrameY = 1;

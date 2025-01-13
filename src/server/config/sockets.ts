@@ -94,7 +94,7 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
                 if (!unit) return;
                 if (!unit.canMove) return;
                 let otherUnit = gameState.players.find((player) => player.units.find((unit) => unit.row === tile.row && unit.col === tile.col));
-                if (otherUnit) return;
+                if (otherUnit && otherUnit.id !== sessionID) return;
             
                 if (unit && isValidMove(unit, tile, gameState.arena)) {
                     unit.row = tile.row;
@@ -328,9 +328,7 @@ function isValidMove(unit: Unit, tile: { x: number, y: number, row: number, col:
     for (let i = -mobility; i <= mobility; i++){
         for (let j = -mobility; j <= mobility; j++){
             if (Math.abs(i) + Math.abs(j) <= mobility){
-                if (row + i >= 0 && row + i < arena.height && col + j >= 0 && col + j < arena.width){
-                    validTiles.push({row: row + i, col: col + j});
-                }
+                validTiles.push({row: row + i, col: col + j});
             }
         }
     }
