@@ -1,3 +1,6 @@
+// get inner html of element with id "user"
+const user = JSON.parse(document.getElementById('user')!.innerHTML);
+
 const MIN_SCALE = 1.0; 
 const MAX_SCALE = 5.0;
 let SCALE = 3.125;
@@ -322,7 +325,7 @@ function hasUnit(row: number, col: number): boolean {
 function unitIsTeam(row: number, col: number): boolean {
     for (const unit of units) {
         if (unit.row === row && unit.col === col) {
-            return unit.owner.id === window.socket.id;
+            return unit.owner.name === user.username;
         }
     }
     return false;
@@ -331,7 +334,7 @@ function unitIsTeam(row: number, col: number): boolean {
 function unitCanBeHealed(row: number, col: number): boolean {
     for (const unit of units) {
         if (unit.row === row && unit.col === col) {
-            if (unit.owner.id !== window.socket.id) return false;
+            if (unit.owner.name !== user.username) return false;
             return unit.health < unit.maxHealth;
         }
     }
@@ -341,7 +344,7 @@ function unitCanBeHealed(row: number, col: number): boolean {
 function unitCanBeAttacked(row: number, col: number): boolean {
     for (const unit of units) {
         if (unit.row === row && unit.col === col) {
-            if (unit.owner.id === window.socket.id) return false;
+            if (unit.owner.name === user.username) return false;
             return unit.health > 0;
         }
     }
@@ -418,14 +421,44 @@ function drawMovementTiles(){
         const unit = units.find(unit => unit.row === selectedTile!.row && unit.col === selectedTile!.col);
         if (unit){
             const mobility = unit.mobility;
+            const range = unit.range;
             const row = selectedTile.row;
             const col = selectedTile.col;
 
-            for (let i = -mobility; i <= mobility; i++){
-                for (let j = -mobility; j <= mobility; j++){
-                    if (Math.abs(i) + Math.abs(j) <= mobility){
+            let mobilityTiles = [];
+            for (let i = -mobility; i <= mobility; i++) {
+                for (let j = -mobility; j <= mobility; j++) {
+                    if (Math.abs(i) + Math.abs(j) <= mobility) {
                         if (i === 0 && j === 0) continue;
+                        if (hasUnit(row + i, col + j)) continue;
+
+                        mobilityTiles.push({ x: row + i, y: col + j });
                         drawMoveTile(row + i, col + j);
+                    }
+                }
+            }
+
+            // Second loop: Draw attack range borders
+            for (let tile of mobilityTiles) {
+                const mobilityTileRow = tile.x;
+                const mobilityTileCol = tile.y;
+
+                for (let i = -range; i <= range; i++) {
+                    for (let j = -range; j <= range; j++) {
+                        if (Math.abs(i) + Math.abs(j) <= range) {
+                            let action = unit.action;
+                            const attackRow = mobilityTileRow + i;
+                            const attackCol = mobilityTileCol + j;
+
+                            if (attackRow < 0 || attackRow >= arena!.tiles.length) continue;
+                            if (attackCol < 0 || attackCol >= arena!.tiles[0].length) continue;
+
+                            if (attackRow === row && attackCol === col) continue;
+                            if (mobilityTiles.find(tile => tile.x === attackRow && tile.y === attackCol)) continue;
+                            if (hasUnit(attackRow, attackCol)) continue;
+                            
+                            drawActionTile(attackRow, attackCol, action);
+                        }
                     }
                 }
             }
@@ -486,12 +519,9 @@ function drawActionTiles(){
 }
 
 function drawActionTile(row: number, col: number, action: string){
-    if (!moveTile) return;
     const frameSize = 32;
     const highlightFrameX = action === 'attack' ? 2 : 1;
     const highlightFrameY = 1;
-
-
 
     const sx = highlightFrameX * frameSize;
     const sy = highlightFrameY * frameSize;
@@ -536,7 +566,7 @@ function coordToPosition(row: number, col: number): { x: number, y: number } {
 }
 
 
-// -------------------------------------------------
+// -----------Touch Screen Logic---------------------------
 
 // let touchStartTime = 0;
 // const TAP_THRESHOLD = 200;

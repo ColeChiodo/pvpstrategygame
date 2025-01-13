@@ -12,7 +12,7 @@ router.get("/home", authenticationMiddleware, (_req, res) => {
 });
 
 router.get("/play", authenticationMiddleware, (_req, res) => {
-    res.render("game");
+    res.render("game", { user: res.locals.user });
 });
 
 router.get("/register", (_req, res) => {
