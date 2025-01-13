@@ -2,6 +2,7 @@ interface Player {
     id: string;
     name: string;
     units: Unit[];
+    time: number;
 }
 
 interface Arena {
@@ -16,8 +17,10 @@ interface Unit {
     row: number;
     col: number;
     owner: Player;
-    action: string;
     name: string;
+    action: string;
+    canMove: boolean;
+    canAct: boolean;
     health: number;
     maxHealth: number;
     attack: number;

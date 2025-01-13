@@ -1,4 +1,3 @@
-// get inner html of element with id "user"
 const user = JSON.parse(document.getElementById('user')!.innerHTML);
 
 const MIN_SCALE = 1.0; 
@@ -17,6 +16,7 @@ uiImage.src = '/assets/spritesheets/UI.png';
 let testUnitImage = new Image();
 testUnitImage.src = `/assets/spritesheets/units/test.png`;
 
+let players: Player[] = [];
 let units: Unit[] = [];
 
 let hoveredTile: { x: number, y: number, row: number, col: number } | null = null;
@@ -24,6 +24,9 @@ let selectedTile: { x: number, y: number, row: number, col: number } | null = nu
 let moveTile: { x: number, y: number, row: number, col: number } | null = null;
 let actionTile: { x: number, y: number, row: number, col: number } | null = null;
 
+let currentRound = 0;
+let player1Time = 0;
+let player2Time = 0;
 let isAction = false;
 
 const canvas = document.getElementById('gameCanvas') as HTMLCanvasElement;
@@ -48,12 +51,38 @@ function draw() {
     drawUnits();
     drawUI();
     drawInteractionSquares();
+    editHTML();
+}
+
+function formatTime(seconds: number): string {
+    const minutes = Math.floor(seconds / 60); 
+    const remainingSeconds = seconds % 60;
+
+    const formattedMinutes = minutes.toString().padStart(2, '0');
+    const formattedSeconds = remainingSeconds.toString().padStart(2, '0');
+
+    return `${formattedMinutes}:${formattedSeconds}`;
+}
+
+function editHTML() {
+    if (players.length < 2) return;
+    const player1Name = document.getElementById('player1Name') as HTMLDivElement;
+    const player2Name = document.getElementById('player2Name') as HTMLDivElement;
+
+    player1Name.innerHTML = players[0].name;
+    player2Name.innerHTML = players[1].name;
+
+    const player1Timer = document.getElementById('player1Time') as HTMLDivElement;
+    const player2Timer = document.getElementById('player2Time') as HTMLDivElement;
+
+    const player1FormattedTime = formatTime(player1Time);
+    const player2FormattedTime = formatTime(player2Time);
+
+    player1Timer.innerHTML = player1FormattedTime;
+    player2Timer.innerHTML = player2FormattedTime;
 }
 
 window.addEventListener('keydown', (e) => {
-    //console.log('Key pressed:', e.key);
-    //window.socket.emit('player-action', e.key);
-
     switch (e.key) {
         case 'z':
             if (SCALE !== MIN_SCALE)
@@ -83,6 +112,12 @@ window.addEventListener('keydown', (e) => {
         case "d":
             cameraOffsetX -= 8 * SCALE;
             break;
+        case "Enter":
+            window.socket.emit('force-end-turn');
+            selectedTile = null;
+            isAction = false;
+            moveTile = null;
+            break;
     }
 });
 
@@ -97,10 +132,19 @@ function loadUnits(players: Player[]) {
     drawUnits();
 }
 
+function loadPlayers(newPlayers: Player[]) {
+    players = [];
+    players = newPlayers;
+}
+    
 window.socket.on('gameState', (gameState) => {
     console.log('Game State:', gameState);
     loadArenaImage(gameState.arena); // move to a game start function in the future to only load once
+    loadPlayers(gameState.players);
     loadUnits(gameState.players);
+    currentRound = gameState.round;
+    player1Time = gameState.player1Time;
+    player2Time = gameState.player2Time;
 });
 
 function gameLoop() {
@@ -210,11 +254,35 @@ window.socket.on('player-unit-moved', (unitID: number, tile: { x: number, y: num
     console.log(`Unit ${unitID} looking to perform an action`);
 });
 
+function isTurn(){
+    return players[currentRound % 2].name === user.username;
+}
+
+function unitCanMove(row: number, col: number): boolean {
+    for (const unit of units) {
+        if (unit.row === row && unit.col === col) {
+            return unit.canMove;
+        }
+    }
+    return false;
+}
+
+function unitCanAct(row: number, col: number): boolean {
+    for (const unit of units) {
+        if (unit.row === row && unit.col === col) {
+            return unit.canAct;
+        }
+    }
+    return false;
+}
+
 let isDragging = false;
 let startX = 0;
 let startY = 0;
 
 canvas.addEventListener('click', function(event) {
+    if (!isTurn()) return;
+
     const clickX = event.offsetX;
     const clickY = event.offsetY;
 
@@ -224,7 +292,7 @@ canvas.addEventListener('click', function(event) {
         if (isPointInsideTile(clickX, clickY, tile)) {
             //console.log(`You clicked on: ${tile.row}, ${tile.col}`);
             
-            if (!isAction && !selectedTile && unitIsTeam(hoveredTile.row, hoveredTile.col)) {
+            if (!isAction && !selectedTile && unitIsTeam(hoveredTile.row, hoveredTile.col) && unitCanMove(hoveredTile.row, hoveredTile.col)) {
                 // first click
                 selectedTile = tile;
             } else if (!isAction && selectedTile && tile.row === selectedTile.row && tile.col === selectedTile.col) {
@@ -370,11 +438,17 @@ function drawSelectedTile() {
     const highlightFrameX = 3;
     const highlightFrameY = 0;
 
+    const col = selectedTile.col;
+    const row = selectedTile.row;
+
     const sx = highlightFrameX * frameSize;
     const sy = highlightFrameY * frameSize;
 
+    const pos = coordToPosition(row, col);
+
+
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(uiImage, sx, sy, frameSize, frameSize, selectedTile.x, selectedTile.y - 8 * SCALE, frameSize * SCALE, frameSize * SCALE);
+    ctx.drawImage(uiImage, sx, sy, frameSize, frameSize, pos.x, pos.y - 8 * SCALE, frameSize * SCALE, frameSize * SCALE);
 }
 
 function drawUI(){
