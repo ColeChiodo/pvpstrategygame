@@ -12,22 +12,27 @@
             overflow: hidden;
         }
     </style>
+    <script src="/js/tailwind.js"></script>
 </head>
 <body>
     <div id="user" style="position: absolute; left: -9999px;"><%= JSON.stringify(user) %></div>
     <canvas id="gameCanvas"></canvas>
 
-    <div id="ui" style="position: absolute; top: 0; left: 0; width: 100%; height: 50px; background-color: rgba(0, 0, 0, 0.0); color: white; display: flex; justify-content: space-around; align-items: center; padding: 10px; pointer-events: none;">
-        <div id="player1" style="display: flex; align-items: center;">
-            <div id="player1Name" style="margin-right: 10px;">Player 1</div>
+    <div id="ui" class="absolute top-0 left-0 w-full h-[50px] bg-transparent text-white flex justify-around items-center px-2 pointer-events-none">
+        <div id="player1" class="flex items-center">
+            <div id="player1Name" class="mr-2">Player 1</div>
             <div id="player1Time">00:00</div>
         </div>
-        <div id="player2" style="display: flex; align-items: center; justify-self: right;">
-            <div id="player2Name" style="margin-right: 10px;">Player 2</div>
+        <div id="player2" class="flex items-center justify-self-end">
+            <div id="player2Name" class="mr-2">Player 2</div>
             <div id="player2Time">00:00</div>
         </div>
     </div>
-    
+      
+    <div id="loading" class="absolute w-full h-screen min-h-screen bg-black bg-opacity-75 flex items-center justify-center top-0 left-0 flex-col">
+        <img src="https://media.tenor.com/wpSo-8CrXqUAAAAi/loading-loading-forever.gif" alt="Loading" class="object-contain max-w-16 max-h-16">
+        <div class="text-white mt-2">Finding Opponent...</div>
+    </div>       
 
     <script src="/js/main.js"></script>
     <script src="/js/game.js"></script>

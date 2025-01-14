@@ -47,6 +47,8 @@ function drawArena() {
 }
 
 function draw() {
+    const loading = document.getElementById('loading');
+    if (loading && players.length === 2) loading.remove();
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     drawBackground();
     drawArena();
@@ -283,6 +285,8 @@ let startY = 0;
 
 canvas.addEventListener('click', function(event) {
     if (!isTurn()) return;
+
+    if (players.length != 2) return;
 
     const clickX = event.offsetX;
     const clickY = event.offsetY;
@@ -589,6 +593,7 @@ function drawActionTiles(){
                 }
                 if (!actionPerformed){
                     console.log(`Unit ${unit.id} has no valid actions`);
+                    unit.canAct = false;
                     isAction = false;
                     moveTile = null;
                     window.socket.emit('force-unit-end-turn', unit.id);
@@ -633,6 +638,7 @@ function drawUnits(){
         const pos = coordToPosition(unit.row, unit.col);
 
         ctx.imageSmoothingEnabled = false;
+
         ctx.drawImage(testUnitImage, sx, sy, frameSize, frameSize, pos.x, pos.y - frameSize * SCALE + (8 * SCALE), frameSize * SCALE, frameSize * SCALE);
     }
 }
