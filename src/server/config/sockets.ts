@@ -80,7 +80,7 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
                 if (player) player.socket = socket.id;
             }
 
-            socket.emit('gameState', initGameState);
+            emitGameState(gameID);
             
             // Game Logic
             socket.on('player-unit-move', (unitID: number, tile: { x: number, y: number, row: number, col: number }) => {
@@ -158,13 +158,21 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
 
             socket.on("disconnect", () => {
                 console.log(`client disconnected (${sessionID})`);
+                // if disconnect and only one player in game, close game
+                const gameID = getGameIdForPlayer(sessionID);
+                const gameState = games[gameID];
+
+                if (gameState.players.length !== 2){
+                    console.log(`[${gameID}]: Closing Game...`);
+                    delete games[gameID];
+                }
             });
 
-            function endGame(gameId: string, interval: NodeJS.Timeout) {
+            function endGame(gameID: string, interval: NodeJS.Timeout) {
                 clearInterval(interval);
-                emitGameState(gameId);
-                console.log(`[${gameId}]: Closing Game...`);
-                delete games[gameId];
+                emitGameState(gameID);
+                console.log(`[${gameID}]: Closing Game...`);
+                delete games[gameID];
             }
 
             function nextRound() {
@@ -207,7 +215,8 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
                 const gameState = games[gameId];
                 if (!gameState) return;
                 for (let player of gameState.players) {
-                    app.get('io').to(player.socket).emit('gameState', gameState);
+                    let playerGameState = getPlayerGameState(gameState, player);
+                    app.get('io').to(player.socket).emit('gameState', playerGameState);
                 }
             }
             
@@ -257,6 +266,7 @@ interface GameState {
     round: number;
     player1Time: number;
     player2Time: number;
+    visibleTiles: { row: number, col: number }[];
 }
 
 const games: { [gameId: string]: GameState } = {}; // Store all games by ID
@@ -389,9 +399,53 @@ function initializeGameState(gameID: string): GameState {
         round: 0,
         player1Time: MAX_TIME,
         player2Time: MAX_TIME,
+        visibleTiles: [{ row: -1, col: -1 }],
     };
 }
 
 function getGameIdForPlayer(sessionID: string): string {
     return playerGameMap[sessionID];
+}
+
+function getPlayerGameState(gameState: GameState, player: Player): GameState {
+    // Shallow copy of the gameState object
+    let temp = { ...gameState };
+
+    // Deep copy the `arena` and `players` arrays to avoid mutating the original
+    temp.arena = { ...gameState.arena }; // Assuming arena is a simple object (can add deep copy logic if it's more complex)
+    temp.players = gameState.players.map(player => ({
+        ...player,
+        units: player.units.map(unit => ({ ...unit })), // Deep copy of the units array
+    }));
+
+    let visibleTiles: { row: number, col: number }[] = [];
+    for (const unit of player.units) {
+        let viewDistance = unit.range + unit.mobility;
+        let row = unit.row;
+        let col = unit.col;
+
+        for (let i = -viewDistance; i <= viewDistance; i++) {
+            for (let j = -viewDistance; j <= viewDistance; j++) {
+                if (Math.abs(i) + Math.abs(j) <= viewDistance) {
+                    if (row + i >= 0 && row + i < temp.arena.height && col + j >= 0 && col + j < temp.arena.width) {
+                        visibleTiles.push({ row: row + i, col: col + j });
+                    }
+                }
+            }
+        }
+    }
+
+    temp.visibleTiles = visibleTiles;
+
+    // For enemy units, if not in visible tiles, remove them
+    const otherPlayer = temp.players.find(otherPlayer => otherPlayer.id !== player.id);
+    if (otherPlayer) {
+        otherPlayer.units = otherPlayer.units.filter(enemyUnit => {
+            return visibleTiles.some(visibleTile => 
+                visibleTile.row === enemyUnit.row && visibleTile.col === enemyUnit.col
+            );
+        });
+    }
+
+    return temp;
 }

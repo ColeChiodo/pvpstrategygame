@@ -18,6 +18,7 @@ testUnitImage.src = `/assets/spritesheets/units/test.png`;
 
 let players: Player[] = [];
 let units: Unit[] = [];
+let visibleTiles: { row: number, col: number }[] = [];
 
 let hoveredTile: { x: number, y: number, row: number, col: number } | null = null;
 let selectedTile: { x: number, y: number, row: number, col: number } | null = null;
@@ -52,6 +53,7 @@ function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     drawBackground();
     drawArena();
+    drawFogOfWarTiles();
     drawUnits();
     drawUI();
     drawInteractionSquares();
@@ -145,6 +147,7 @@ window.socket.on('gameState', (gameState) => {
     loadArenaImage(gameState.arena); // move to a game start function in the future to only load once
     loadPlayers(gameState.players);
     loadUnits(gameState.players);
+    visibleTiles = gameState.visibleTiles;
     currentRound = gameState.round;
     player1Time = gameState.player1Time;
     player2Time = gameState.player2Time;
@@ -175,6 +178,7 @@ function resizeCanvas() {
 }
 resizeCanvas();
 window.addEventListener('resize', resizeCanvas);
+window.addEventListener('orientationchange', resizeCanvas);
 
 let tiles: { x: number, y: number, row: number, col: number}[] = [];
 
@@ -465,6 +469,39 @@ function drawUI(){
     drawMovementTiles();
     drawActionTiles();
     drawHealthBars();
+}
+
+function drawFogOfWarTiles(){
+    if (!arena) return;
+
+    for (let row = 0; row < arena.tiles.length; row++){
+        for (let col = 0; col < arena.tiles[row].length; col++){
+            if (arena.tiles[row][col] === 0) continue;
+            if (isVisibleTile(row, col)) continue;
+            drawFogOfWarTile(row, col);
+        }
+    }
+}
+
+function isVisibleTile(row: number, col: number): boolean {
+    const tile = visibleTiles.find(visibleTiles => visibleTiles.row === row && visibleTiles.col === col);
+    if (tile) return true;
+    return false;
+}
+
+function drawFogOfWarTile(row: number, col: number){
+    const frameSize = 32;
+    const highlightFrameX = 4;
+    const highlightFrameY = 1;
+
+    const sx = highlightFrameX * frameSize;
+    const sy = highlightFrameY * frameSize;
+
+    const pos = coordToPosition(row, col);
+    if (pos.x === -9999 || pos.y === -9999) return;
+
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(uiImage, sx, sy, frameSize, frameSize, pos.x, pos.y - 8 * SCALE, frameSize * SCALE, frameSize * SCALE);
 }
 
 function drawHealthBars(){

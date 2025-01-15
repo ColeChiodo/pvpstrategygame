@@ -4,11 +4,25 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Game</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: screen;
+            overflow-x: hidden;
+        }
+    </style>
+    <script src="/js/tailwind.js"></script>
 </head>
 <body>
     <p>Welcome, <%= user.username %></p>
     <a href="/auth/logout">Logout</a>
     <br/>
     <a href="/play">Go to Game</a>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            window.scrollTo(0, 50); // Scroll down just a bit to hide the URL bar
+        });
+    </script>
 </body>
 </html>
