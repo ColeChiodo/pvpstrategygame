@@ -96,7 +96,7 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
                 let otherUnit = gameState.players.find((player) => player.units.find((unit) => unit.row === tile.row && unit.col === tile.col));
                 if (otherUnit && otherUnit.id !== sessionID) return;
             
-                if (unit && isValidMove(unit, tile, gameState.arena)) {
+                if (unit && isValidMove(unit, tile, gameState)) {
                     unit.row = tile.row;
                     unit.col = tile.col;
                     unit.canMove = false;
@@ -123,7 +123,7 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
                 let otherUnit = otherUnitsOwner.units.find((unit) => unit.row === tile.row && unit.col === tile.col);
                 if (!otherUnit) return;
 
-                if(unit && isValidAction(unit, tile, gameState.arena)) {
+                if(unit && isValidAction(unit, tile, gameState)) {
                     if (sessionID !== otherUnitsOwner.id) {
                         // attack
                         otherUnit.health -= unit.attack;
@@ -269,6 +269,15 @@ interface GameState {
     visibleTiles: { row: number, col: number }[];
 }
 
+interface Tile {
+    x: number;
+    y: number;
+    g: number;
+    h: number;
+    f: number;
+    parent: Tile | null;
+}
+
 const games: { [gameId: string]: GameState } = {}; // Store all games by ID
 
 const playerGameMap: { [sessionId: string]: string } = {}; // Maps session ID to game ID
@@ -328,17 +337,55 @@ function generateGameId(): string {
     return `game-${Date.now()}`;
 }
 
-function isValidMove(unit: Unit, tile: { x: number, y: number, row: number, col: number }, arena: Arena): boolean {
+// A*
+function isValidMove(unit: Unit, tile: { x: number, y: number, row: number, col: number }, gameState: GameState): boolean {
+    const arena = gameState.arena;
     let mobility = unit.mobility;
     let row = unit.row;
     let col = unit.col;
 
     let validTiles = [];
 
-    for (let i = -mobility; i <= mobility; i++){
-        for (let j = -mobility; j <= mobility; j++){
-            if (Math.abs(i) + Math.abs(j) <= mobility){
-                validTiles.push({row: row + i, col: col + j});
+    for (let i = -mobility; i <= mobility; i++) {
+        for (let j = -mobility; j <= mobility; j++) {
+            if (Math.abs(i) + Math.abs(j) <= mobility) {
+                const targetRow = row + i;
+                const targetCol = col + j;
+
+                if (targetRow < 0 || targetCol < 0 || targetRow >= arena.tiles.length || targetCol >= arena.tiles[0].length) continue;
+                if (hasUnit(targetRow, targetCol, gameState) && (i !== 0 || j !== 0)) continue;
+                const targetTerrain: number = arena.tiles[targetRow][targetCol];
+                if (targetTerrain === 0) continue;
+
+                // Check the path for obstacles or terrain that blocks movement
+                const path = astarPath(row, col, targetRow, targetCol, arena);
+                if (path.length - 1 > mobility) continue;
+                let canMove = true;
+                let mobilityPenalty = 0;
+                for (const tile of path) {
+                    const terrain: number = arena.tiles[tile.y][tile.x];
+
+                    if((row !== tile.y && col !== tile.x) && hasUnit(tile.y, tile.x, gameState)) {
+                        canMove = false;
+                        break;
+                    }
+
+                    if (terrain === 0) {
+                        canMove = false;
+                        break;
+                    } else if (terrain === 2) {
+                        mobilityPenalty += 2;
+                    } else if (terrain === 3) {
+                        
+                    } else if (terrain === 4) {
+                        canMove = false;
+                        break;
+                    }
+                }
+
+                if (canMove && (mobility - mobilityPenalty >= 0)) {
+                    validTiles.push({row: row + i, col: col + j});
+                }
             }
         }
     }
@@ -351,18 +398,44 @@ function isValidMove(unit: Unit, tile: { x: number, y: number, row: number, col:
     return true;
 }
 
-function isValidAction(unit: Unit, tile: { x: number, y: number, row: number, col: number }, arena: Arena): boolean {
+// Bresenham
+function isValidAction(unit: Unit, tile: { x: number, y: number, row: number, col: number }, gameState: GameState): boolean {
+    const arena = gameState.arena;
     let range = unit.range;
     let row = unit.row;
     let col = unit.col;
 
     let validTiles = [];
 
-    for (let i = -range; i <= range; i++){
-        for (let j = -range; j <= range; j++){
-            if (Math.abs(i) + Math.abs(j) <= range){
-                if (row + i >= 0 && row + i < arena.height && col + j >= 0 && col + j < arena.width){
-                    validTiles.push({row: row + i, col: col + j});
+    for (let i = -range; i <= range; i++) {
+        for (let j = -range; j <= range; j++) {
+            if (Math.abs(i) + Math.abs(j) <= range) {
+
+                const targetRow = row + i;
+                const targetCol = col + j;
+
+                if (targetRow === row && targetCol === col) continue;
+
+                if (targetRow >= 0 && targetRow < arena.tiles.length && targetCol >= 0 && targetCol < arena.tiles[0].length) {
+                    // Check the path for tiles that can restrict visibility
+                    const path = bresenhamPath(row, col, targetRow, targetCol);
+                    let canSee = true;
+                    let rangePenalty = 0;
+
+                    for (const tile of path) {
+                        if (arena.tiles){
+                            const terrain: number = arena.tiles[tile.y][tile.x];
+
+                            if (terrain === 4) {
+                                canSee = false;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (canSee && (range - rangePenalty >= 0)) {
+                        validTiles.push({row: row + i, col: col + j});
+                    }
                 }
             }
         }
@@ -376,6 +449,7 @@ function isValidAction(unit: Unit, tile: { x: number, y: number, row: number, co
     return true;
 }
 
+// tile types 0 hole 1 ground 2 hill 3 forest 4 wall
 function initializeGameState(gameID: string): GameState {
     return {
         id: gameID,
@@ -385,11 +459,11 @@ function initializeGameState(gameID: string): GameState {
             width: 1024,
             height: 512,
             name: 'sample',
-            tiles: [[1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-                    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-                    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            tiles: [[1, 1, 1, 3, 1, 1, 1, 1, 1, 1],
+                    [1, 1, 1, 4, 1, 1, 1, 1, 1, 1],
+                    [1, 1, 1, 4, 1, 1, 1, 1, 1, 1],
                     [0, 2, 2, 0, 0, 0, 0, 1, 1, 0],
-                    [0, 2, 2, 0, 0, 0, 0, 1, 1, 0],
+                    [0, 1, 1, 0, 0, 0, 0, 1, 1, 0],
                     [0, 1, 1, 0, 0, 0, 0, 1, 1, 0],
                     [0, 1, 1, 0, 0, 0, 0, 1, 1, 0],
                     [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
@@ -408,21 +482,21 @@ function getGameIdForPlayer(sessionID: string): string {
 }
 
 function getPlayerGameState(gameState: GameState, player: Player): GameState {
-    // Shallow copy of the gameState object
     let temp = { ...gameState };
 
-    // Deep copy the `arena` and `players` arrays to avoid mutating the original
-    temp.arena = { ...gameState.arena }; // Assuming arena is a simple object (can add deep copy logic if it's more complex)
+    temp.arena = { ...gameState.arena };
     temp.players = gameState.players.map(player => ({
         ...player,
-        units: player.units.map(unit => ({ ...unit })), // Deep copy of the units array
+        units: player.units.map(unit => ({ ...unit })),
     }));
 
+    // calculate Fog Of War
     let visibleTiles: { row: number, col: number }[] = [];
     for (const unit of player.units) {
-        let viewDistance = unit.range + unit.mobility;
-        let row = unit.row;
-        let col = unit.col;
+        const row = unit.row;
+        const col = unit.col;
+        const modifier = temp.arena.tiles[row][col] === 2 ? 1 : 0;
+        const viewDistance = unit.range + unit.mobility + modifier;
 
         for (let i = -viewDistance; i <= viewDistance; i++) {
             for (let j = -viewDistance; j <= viewDistance; j++) {
@@ -431,7 +505,7 @@ function getPlayerGameState(gameState: GameState, player: Player): GameState {
                     const targetCol = col + j;
                     if (targetRow >= 0 && targetRow < temp.arena.tiles.length && targetCol >= 0 && targetCol < temp.arena.tiles[0].length) {
                         // Check the path for tiles that can restrict visibility
-                        const path = getPath(row, col, targetRow, targetCol);
+                        const path = bresenhamPath(row, col, targetRow, targetCol);
                         let canSee = true;
                         let visibilityPenalty = 0;
 
@@ -439,11 +513,15 @@ function getPlayerGameState(gameState: GameState, player: Player): GameState {
                             if (temp.arena.tiles){
                                 const terrain: number = temp.arena.tiles[tile.y][tile.x];
                                 
-                                if (terrain === 0) {
+                                if (terrain === 3) {
+                                    if (!adjacentTile(row, col, tile.y, tile.x)) {
+                                        canSee = false;
+                                        break;
+                                    }
+                                }
+                                if (terrain === 4) {
                                     canSee = false;
                                     break;
-                                } else if (terrain === 2) {
-                                    visibilityPenalty += 2;
                                 }
                             }
                         }
@@ -472,8 +550,14 @@ function getPlayerGameState(gameState: GameState, player: Player): GameState {
     return temp;
 }
 
-// Bresenham's Line Algorithm (diagonals are allowed)
-function getPath(startRow: number, startCol: number, endRow: number, endCol: number) {
+function adjacentTile(row1: number, col1: number, row2: number, col2: number): boolean {
+    return (row1 === row2 && col1 === col2) || 
+           (Math.abs(row1 - row2) === 1 && col1 === col2) || 
+           (Math.abs(col1 - col2) === 1 && row1 === row2);
+}
+
+// Bresenham's Line Algorithm
+function bresenhamPath(startRow: number, startCol: number, endRow: number, endCol: number) {
     const path = [];
     let x = startCol;
     let y = startRow;
@@ -499,4 +583,90 @@ function getPath(startRow: number, startCol: number, endRow: number, endCol: num
 
     path.push({ y: endRow, x: endCol });
     return path;
+}
+
+// A* Pathfinding Algorithm
+function astarPath(startRow: number, startCol: number, endRow: number, endCol: number, arena: Arena): { x: number, y: number }[] {
+    const grid = arena.tiles;
+    const openList: Tile[] = [];
+    const closedList: Set<string> = new Set();
+
+    const startTile: Tile = { 
+        x: startCol, 
+        y: startRow, 
+        g: 0, 
+        h: heuristic({ x: startCol, y: startRow, g: 0, h: 0, f: 0, parent: null }, { x: endCol, y: endRow, g: 0, h: 0, f: 0, parent: null }), 
+        f: 0, 
+        parent: null 
+    };
+    const endTile: Tile = { x: endCol, y: endRow, g: 0, h: 0, f: 0, parent: null };
+
+    openList.push(startTile);
+
+    const neighbors = [
+        { x: 0, y: -1 }, { x: 0, y: 1 }, { x: -1, y: 0 }, { x: 1, y: 0 },
+    ];
+
+    while (openList.length > 0) {
+        // Sort openList by F cost (lowest F cost first)
+        openList.sort((a, b) => a.f - b.f);
+        const current = openList.shift()!; // Get the tile with the lowest F cost
+
+        // If we've reached the goal, reconstruct the path
+        if (current.x === endTile.x && current.y === endTile.y) {
+            const path: { x: number, y: number }[] = [];
+            let currentTile: Tile | null = current;
+            while (currentTile) {
+                path.unshift({ x: currentTile.x, y: currentTile.y });
+                currentTile = currentTile.parent;
+            }
+            return path;
+        }
+
+        closedList.add(`${current.x},${current.y}`);
+
+        // Check all neighbors
+        for (const { x: dx, y: dy } of neighbors) {
+            const neighborX = current.x + dx;
+            const neighborY = current.y + dy;
+
+            // Check if the neighbor is within bounds and is not an obstacle (assuming 0 = walkable, 1 = obstacle)
+            if (neighborX >= 0 && neighborX < grid[0].length && neighborY >= 0 && neighborY < grid.length && grid[neighborY][neighborX] !== 0) {
+                const neighbor: Tile = {
+                    x: neighborX,
+                    y: neighborY,
+                    g: current.g + 1, // Assume cost to move to any neighbor is 1
+                    h: heuristic({ x: neighborX, y: neighborY, g: 0, h: 0, f: 0, parent: null }, { x: endCol, y: endRow, g: 0, h: 0, f: 0, parent: null }),
+                    f: 0,
+                    parent: current
+                };                
+
+                if (closedList.has(`${neighbor.x},${neighbor.y}`)) {
+                    continue; // Skip if already evaluated
+                }
+
+                // Check if this neighbor is better (lower f) than any previously evaluated
+                if (!openList.some(tile => tile.x === neighbor.x && tile.y === neighbor.y)) {
+                    neighbor.f = neighbor.g + neighbor.h;
+                    openList.push(neighbor);
+                }
+            }
+        }
+    }
+
+    return []; // No path found
+}
+
+function heuristic(a: Tile, b: Tile): number {
+    return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+}
+
+function hasUnit(row: number, col: number, gameState: GameState): boolean {
+    const units = [...gameState.players[0].units, ...gameState.players[1].units];
+    for (const unit of units) {
+        if (unit.row === row && unit.col === col) {
+            return true;
+        }
+    }
+    return false;
 }

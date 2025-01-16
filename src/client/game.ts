@@ -562,20 +562,30 @@ function drawMovementTiles(){
 
                         if (targetRow < 0 || targetCol < 0 || targetRow >= arena.tiles.length || targetCol >= arena.tiles[0].length) continue;
                         if (hasUnit(targetRow, targetCol) && (i !== 0 || j !== 0)) continue;
-
+                        const targetTerrain: number = arena.tiles[targetRow][targetCol];
+                        if (targetTerrain === 0) continue;
 
                         // Check the path for obstacles or terrain that blocks movement
-                        const path = getPath(row, col, targetRow, targetCol);
+                        const path = astarPath(row, col, targetRow, targetCol);
+                        if (path.length - 1 > mobility) continue;
                         let canMove = true;
                         let mobilityPenalty = 0;
                         for (const tile of path) {
                             const terrain: number = arena.tiles[tile.y][tile.x];
 
-                            if (terrain === 0) {
+                            if((row !== tile.y && col !== tile.x) && hasUnit(tile.y, tile.x)) {
+                                canMove = false;
+                                break;
+                            } else if (terrain === 0) {
                                 canMove = false;
                                 break;
                             } else if (terrain === 2) {
                                 mobilityPenalty += 2;
+                            } else if (terrain === 3) {
+                                
+                            } else if (terrain === 4) {
+                                canMove = false;
+                                break;
                             }
                         }
 
@@ -596,17 +606,40 @@ function drawMovementTiles(){
                     for (let j = -range; j <= range; j++) {
                         if (Math.abs(i) + Math.abs(j) <= range) {
                             let action = unit.action;
-                            const attackRow = mobilityTileRow + i;
-                            const attackCol = mobilityTileCol + j;
+                            const targetRow = mobilityTileRow + i;
+                            const targetCol = mobilityTileCol + j;
 
-                            if (attackRow < 0 || attackRow >= arena!.tiles.length) continue;
-                            if (attackCol < 0 || attackCol >= arena!.tiles[0].length) continue;
+                            if (targetRow === row && targetCol === col) continue;
+                            if (mobilityTiles.find(tile => tile.x === targetRow && tile.y === targetCol)) continue;
+                            if (hasUnit(targetRow, targetCol)) continue;
 
-                            if (attackRow === row && attackCol === col) continue;
-                            if (mobilityTiles.find(tile => tile.x === attackRow && tile.y === attackCol)) continue;
-                            if (hasUnit(attackRow, attackCol)) continue;
-                            
-                            drawActionTile(attackRow, attackCol, action);
+                            if (targetRow >= 0 && targetRow < arena.tiles.length && targetCol >= 0 && targetCol < arena.tiles[0].length) {
+                                // Check the path for tiles that can restrict visibility
+                                const path = bresenhamPath(mobilityTileRow, mobilityTileCol, targetRow, targetCol);
+                                let canSee = true;
+                                let rangePenalty = 0;
+        
+                                for (const tile of path) {
+                                    if (arena.tiles){
+                                        const terrain: number = arena.tiles[tile.y][tile.x];
+                                        
+                                        if (terrain === 3) {
+                                            if (!adjacentTile(row, col, tile.y, tile.x)){
+                                                canSee = false;
+                                                break;
+                                            }
+                                        }
+                                        if (terrain === 4) {
+                                            canSee = false;
+                                            break;
+                                        }
+                                    }
+                                }
+        
+                                if (canSee && (range - rangePenalty >= 0)) {
+                                    drawActionTile(targetRow, targetCol, action);
+                                }
+                            }
                         }
                     }
                 }
@@ -615,8 +648,91 @@ function drawMovementTiles(){
     }
 }
 
-// Bresenham's Line Algorithm (diagonals are allowed)
-function getPath(startRow: number, startCol: number, endRow: number, endCol: number) {
+function adjacentTile(row1: number, col1: number, row2: number, col2: number): boolean {
+    return (row1 === row2 && col1 === col2) || 
+           (Math.abs(row1 - row2) === 1 && col1 === col2) || 
+           (Math.abs(col1 - col2) === 1 && row1 === row2);
+}
+
+// A* Pathfinding Algorithm
+function astarPath(startRow: number, startCol: number, endRow: number, endCol: number): { x: number, y: number }[] {
+    if (!arena) return [];
+    const grid = arena.tiles;
+    const openList: Tile[] = [];
+    const closedList: Set<string> = new Set();
+
+    const startTile: Tile = { 
+        x: startCol, 
+        y: startRow, 
+        g: 0, 
+        h: heuristic({ x: startCol, y: startRow, g: 0, h: 0, f: 0, parent: null }, { x: endCol, y: endRow, g: 0, h: 0, f: 0, parent: null }), 
+        f: 0, 
+        parent: null 
+    };
+    const endTile: Tile = { x: endCol, y: endRow, g: 0, h: 0, f: 0, parent: null };
+
+    openList.push(startTile);
+
+    const neighbors = [
+        { x: 0, y: -1 }, { x: 0, y: 1 }, { x: -1, y: 0 }, { x: 1, y: 0 },
+    ];
+
+    while (openList.length > 0) {
+        // Sort openList by F cost (lowest F cost first)
+        openList.sort((a, b) => a.f - b.f);
+        const current = openList.shift()!; // Get the tile with the lowest F cost
+
+        // If we've reached the goal, reconstruct the path
+        if (current.x === endTile.x && current.y === endTile.y) {
+            const path: { x: number, y: number }[] = [];
+            let currentTile: Tile | null = current;
+            while (currentTile) {
+                path.unshift({ x: currentTile.x, y: currentTile.y });
+                currentTile = currentTile.parent;
+            }
+            return path;
+        }
+
+        closedList.add(`${current.x},${current.y}`);
+
+        // Check all neighbors
+        for (const { x: dx, y: dy } of neighbors) {
+            const neighborX = current.x + dx;
+            const neighborY = current.y + dy;
+
+            // Check if the neighbor is within bounds and is not an obstacle (assuming 0 = walkable, 1 = obstacle)
+            if (neighborX >= 0 && neighborX < grid[0].length && neighborY >= 0 && neighborY < grid.length && grid[neighborY][neighborX] !== 0) {
+                const neighbor: Tile = {
+                    x: neighborX,
+                    y: neighborY,
+                    g: current.g + 1, // Assume cost to move to any neighbor is 1
+                    h: heuristic({ x: neighborX, y: neighborY, g: 0, h: 0, f: 0, parent: null }, { x: endCol, y: endRow, g: 0, h: 0, f: 0, parent: null }),
+                    f: 0,
+                    parent: current
+                };                
+
+                if (closedList.has(`${neighbor.x},${neighbor.y}`)) {
+                    continue; // Skip if already evaluated
+                }
+
+                // Check if this neighbor is better (lower f) than any previously evaluated
+                if (!openList.some(tile => tile.x === neighbor.x && tile.y === neighbor.y)) {
+                    neighbor.f = neighbor.g + neighbor.h;
+                    openList.push(neighbor);
+                }
+            }
+        }
+    }
+
+    return []; // No path found
+}
+
+function heuristic(a: Tile, b: Tile): number {
+    return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+}
+
+// Bresenham's Line Algorithm
+function bresenhamPath(startRow: number, startCol: number, endRow: number, endCol: number) {
     const path = [];
     let x = startCol;
     let y = startRow;
@@ -649,7 +765,7 @@ function drawPath(){
     if (!hoveredTile) return;
     if (!validMoveTiles) return;
 
-    const path = getPath(selectedTile.row, selectedTile.col, hoveredTile.row, hoveredTile.col);
+    const path = astarPath(selectedTile.row, selectedTile.col, hoveredTile.row, hoveredTile.col);
 
     for (const tile of path){
         console.log(tile);

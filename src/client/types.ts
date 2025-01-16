@@ -28,3 +28,12 @@ interface Unit {
     range: number;
     mobility: number;
 }
+
+interface Tile {
+    x: number;
+    y: number;
+    g: number;
+    h: number;
+    f: number;
+    parent: Tile | null;
+}
