@@ -4,22 +4,49 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Register</title>
+    <script src="/js/tailwind.js"></script>
 </head>
-<body>
-    <form action="/auth/register" method="POST">
-        <label for="username">Username</label>
-        <input type="text" name="username" id="username" required>
-        <br/>
-        <label for="email">Email</label>
-        <input type="email" name="email" id="email" required>
-        <br/>
-        <label for="password">Password</label>
-        <input type="password" name="password" id="password" required>
-        <br/>
-        <label for="password_confirmation">Confirm Password</label>
-        <input type="confirm_password" name="password_confirmation" id="password_confirmation" required>
-        <br/>
-        <button type="submit">Register</button>
-    </form>
+<body class="bg-primary flex items-center justify-center min-h-screen">
+
+    <div class="bg-secondary p-8 w-full max-w-md text-white">
+        <h1 class="text-3xl font-bold mb-6 text-center">Register</h1>
+
+        <form action="/auth/register" method="POST" class="space-y-4">
+            <div>
+                <label for="username" class="block text-sm font-medium">Username</label>
+                <input type="text" name="username" id="username" required 
+                       class="bg-white text-primary mt-1 block w-full px-4 py-2 border-r-4 border-b-4 border-primary focus:outline-none focus:ring-2 focus:ring-primary">
+            </div>
+
+            <div>
+                <label for="email" class="block text-sm font-medium">Email</label>
+                <input type="email" name="email" id="email" required 
+                       class="bg-white text-primary mt-1 block w-full px-4 py-2 border-r-4 border-b-4 border-primary focus:outline-none focus:ring-2 focus:ring-primary">
+            </div>
+
+            <div>
+                <label for="password" class="block text-sm font-medium">Password</label>
+                <input type="password" name="password" id="password" required
+                       class="bg-white text-primary mt-1 block w-full px-4 py-2 border-r-4 border-b-4 border-primary focus:outline-none focus:ring-2 focus:ring-primary">
+            </div>
+
+            <div>
+                <label for="password_confirmation" class="block text-sm font-medium">Confirm Password</label>
+                <input type="password" name="password_confirmation" id="password_confirmation" required
+                       class="bg-white text-primary mt-1 block w-full px-4 py-2 border-r-4 border-b-4 border-primary focus:outline-none focus:ring-2 focus:ring-primary">
+            </div>
+
+            <div>
+                <button type="submit" class="w-full py-2 bg-green-400 text-primary font-semibold hover:bg-green-500 border-r-4 border-b-4 border-primary focus:outline-none focus:ring-2 focus:ring-primary focus:ring-opacity-50">
+                    Register
+                </button>
+            </div>
+        </form>
+
+        <div class="mt-4 text-center">
+            <a href="/login" class="text-sm text-blue-500 hover:text-blue-700">Already have an account? Login</a>
+        </div>
+    </div>
+
 </body>
 </html>

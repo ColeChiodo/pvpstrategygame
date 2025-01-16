@@ -4,17 +4,37 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login</title>
+    <script src="/js/tailwind.js"></script>
 </head>
-<body>
-    <form action="/auth/login" method="POST">
-        <label for="credential">Username</label>
-        <input type="text" name="credential" id="credential" required>
-        <br/>
-        <label for="password">Password</label>
-        <input type="password" name="password" id="password" required>
-        <br/>
-        <button type="submit">Login</button>
-    </form>
-    <a href="/register">Register</a>
+<body class="bg-primary flex items-center justify-center min-h-screen">
+
+    <div class="bg-secondary p-8 w-full max-w-md text-white">
+        <h1 class="text-3xl font-bold mb-6 text-center">Login</h1>
+        
+        <form action="/auth/login" method="POST" class="space-y-4">
+            <div>
+                <label for="credential" class="block text-sm font-medium">Username or Email</label>
+                <input type="text" name="credential" id="credential" required 
+                       class="bg-white text-primary mt-1 block w-full px-4 py-2 border-r-4 border-b-4 border-primary focus:outline-none focus:ring-2 focus:ring-primary">
+            </div>
+
+            <div>
+                <label for="password" class="block text-sm font-medium">Password</label>
+                <input type="password" name="password" id="password" required
+                    class="bg-white text-primary mt-1 block w-full px-4 py-2 border-r-4 border-b-4 border-primary focus:outline-none focus:ring-2 focus:ring-primary">
+            </div>
+
+            <div>
+                <button type="submit" class="w-full py-2 bg-green-400 text-primary font-semibold hover:bg-green-500 border-r-4 border-b-4 border-primary focus:outline-none focus:ring-2 focus:ring-primary focus:ring-opacity-50">
+                    Login
+                </button>
+            </div>
+        </form>
+
+        <div class="mt-4 text-center">
+            <a href="/register" class="text-sm text-blue-500 hover:text-blue-700">Don't have an account? Register</a>
+        </div>
+    </div>
+
 </body>
 </html>
