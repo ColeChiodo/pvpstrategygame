@@ -163,16 +163,20 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
                 const gameState = games[gameID];
 
                 if (gameState.players.length !== 2){
-                    console.log(`[${gameID}]: Closing Game...`);
-                    delete games[gameID];
+                    let interval = setInterval(() => {}, 9999);
+                    endGame(gameID, interval);
                 }
+                
             });
 
             function endGame(gameID: string, interval: NodeJS.Timeout) {
                 clearInterval(interval);
                 emitGameState(gameID);
                 console.log(`[${gameID}]: Closing Game...`);
-                delete games[gameID];
+                if(games[gameID]){
+                    delete games[gameID];
+                }
+                
             }
 
             function nextRound() {
@@ -512,7 +516,7 @@ function getPlayerGameState(gameState: GameState, player: Player): GameState {
                         for (const tile of path) {
                             if (temp.arena.tiles){
                                 const terrain: number = temp.arena.tiles[tile.y][tile.x];
-                                
+
                                 if (terrain === 3) {
                                     if (!adjacentTile(row, col, tile.y, tile.x)) {
                                         canSee = false;

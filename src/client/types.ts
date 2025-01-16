@@ -37,3 +37,9 @@ interface Tile {
     f: number;
     parent: Tile | null;
 }
+
+interface TileType {
+    id: number;
+    name: string;
+    movement: number;
+}
