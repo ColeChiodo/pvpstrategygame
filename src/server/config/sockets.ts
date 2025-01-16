@@ -388,8 +388,8 @@ function initializeGameState(gameID: string): GameState {
             tiles: [[1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
                     [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
                     [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-                    [0, 1, 1, 0, 0, 0, 0, 1, 1, 0],
-                    [0, 1, 1, 0, 0, 0, 0, 1, 1, 0],
+                    [0, 2, 2, 0, 0, 0, 0, 1, 1, 0],
+                    [0, 2, 2, 0, 0, 0, 0, 1, 1, 0],
                     [0, 1, 1, 0, 0, 0, 0, 1, 1, 0],
                     [0, 1, 1, 0, 0, 0, 0, 1, 1, 0],
                     [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
@@ -427,8 +427,30 @@ function getPlayerGameState(gameState: GameState, player: Player): GameState {
         for (let i = -viewDistance; i <= viewDistance; i++) {
             for (let j = -viewDistance; j <= viewDistance; j++) {
                 if (Math.abs(i) + Math.abs(j) <= viewDistance) {
-                    if (row + i >= 0 && row + i < temp.arena.height && col + j >= 0 && col + j < temp.arena.width) {
-                        visibleTiles.push({ row: row + i, col: col + j });
+                    const targetRow = row + i;
+                    const targetCol = col + j;
+                    if (targetRow >= 0 && targetRow < temp.arena.tiles.length && targetCol >= 0 && targetCol < temp.arena.tiles[0].length) {
+                        // Check the path for tiles that can restrict visibility
+                        const path = getPath(row, col, targetRow, targetCol);
+                        let canSee = true;
+                        let visibilityPenalty = 0;
+
+                        for (const tile of path) {
+                            if (temp.arena.tiles){
+                                const terrain: number = temp.arena.tiles[tile.y][tile.x];
+                                
+                                if (terrain === 0) {
+                                    canSee = false;
+                                    break;
+                                } else if (terrain === 2) {
+                                    visibilityPenalty += 2;
+                                }
+                            }
+                        }
+
+                        if (canSee && (viewDistance - visibilityPenalty >= 0)) {
+                            visibleTiles.push({ row: row + i, col: col + j });
+                        }
                     }
                 }
             }
@@ -448,4 +470,33 @@ function getPlayerGameState(gameState: GameState, player: Player): GameState {
     }
 
     return temp;
+}
+
+// Bresenham's Line Algorithm (diagonals are allowed)
+function getPath(startRow: number, startCol: number, endRow: number, endCol: number) {
+    const path = [];
+    let x = startCol;
+    let y = startRow;
+    const dx = Math.abs(endCol - startCol);
+    const dy = Math.abs(endRow - startRow);
+    const sx = startCol < endCol ? 1 : -1;
+    const sy = startRow < endRow ? 1 : -1;
+    let err = dx - dy;
+
+    while (x !== endCol || y !== endRow) {
+        path.push({ x, y });
+
+        const e2 = err * 2;
+        if (e2 > -dy) {
+            err -= dy;
+            x += sx;
+        }
+        if (e2 < dx) {
+            err += dx;
+            y += sy;
+        }
+    }
+
+    path.push({ y: endRow, x: endCol });
+    return path;
 }

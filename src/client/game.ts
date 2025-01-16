@@ -474,6 +474,7 @@ function drawUI(){
     drawSelectedTile();
     drawMovementTiles();
     drawActionTiles();
+    drawPath();
     drawHealthBars();
 }
 
@@ -542,6 +543,7 @@ function drawHealthBars(){
 }
 
 function drawMovementTiles(){
+    if (!arena) return;
     if (selectedTile){
         const unit = units.find(unit => unit.row === selectedTile!.row && unit.col === selectedTile!.col);
         if (unit){
@@ -555,15 +557,37 @@ function drawMovementTiles(){
             for (let i = -mobility; i <= mobility; i++) {
                 for (let j = -mobility; j <= mobility; j++) {
                     if (Math.abs(i) + Math.abs(j) <= mobility) {
-                        if (hasUnit(row + i, col + j) && (i !== 0 && j !== 0)) continue;
+                        const targetRow = row + i;
+                        const targetCol = col + j;
 
-                        mobilityTiles.push({ x: row + i, y: col + j });
-                        drawMoveTile(row + i, col + j);
+                        if (targetRow < 0 || targetCol < 0 || targetRow >= arena.tiles.length || targetCol >= arena.tiles[0].length) continue;
+                        if (hasUnit(targetRow, targetCol) && (i !== 0 || j !== 0)) continue;
+
+
+                        // Check the path for obstacles or terrain that blocks movement
+                        const path = getPath(row, col, targetRow, targetCol);
+                        let canMove = true;
+                        let mobilityPenalty = 0;
+                        for (const tile of path) {
+                            const terrain: number = arena.tiles[tile.y][tile.x];
+
+                            if (terrain === 0) {
+                                canMove = false;
+                                break;
+                            } else if (terrain === 2) {
+                                mobilityPenalty += 2;
+                            }
+                        }
+
+                        if (canMove && (mobility - mobilityPenalty >= 0)) {
+                            mobilityTiles.push({ x: targetRow, y: targetCol });
+                            drawMoveTile(targetRow, targetCol);
+                        }
                     }
                 }
             }
 
-            // Second loop: Draw attack range borders
+            //Second loop: Draw attack range borders
             for (let tile of mobilityTiles) {
                 const mobilityTileRow = tile.x;
                 const mobilityTileCol = tile.y;
@@ -589,6 +613,65 @@ function drawMovementTiles(){
             }
         }
     }
+}
+
+// Bresenham's Line Algorithm (diagonals are allowed)
+function getPath(startRow: number, startCol: number, endRow: number, endCol: number) {
+    const path = [];
+    let x = startCol;
+    let y = startRow;
+    const dx = Math.abs(endCol - startCol);
+    const dy = Math.abs(endRow - startRow);
+    const sx = startCol < endCol ? 1 : -1;
+    const sy = startRow < endRow ? 1 : -1;
+    let err = dx - dy;
+
+    while (x !== endCol || y !== endRow) {
+        path.push({ x, y });
+
+        const e2 = err * 2;
+        if (e2 > -dy) {
+            err -= dy;
+            x += sx;
+        }
+        if (e2 < dx) {
+            err += dx;
+            y += sy;
+        }
+    }
+
+    path.push({ y: endRow, x: endCol });
+    return path;
+}
+
+function drawPath(){
+    if (!selectedTile) return;
+    if (!hoveredTile) return;
+    if (!validMoveTiles) return;
+
+    const path = getPath(selectedTile.row, selectedTile.col, hoveredTile.row, hoveredTile.col);
+
+    for (const tile of path){
+        console.log(tile);
+        if (validMoveTiles.find(validTile => validTile.row === tile.y && validTile.col === tile.x)){
+            drawPathTile(tile.y, tile.x);
+        }
+    }
+}
+
+function drawPathTile(row: number, col: number){
+    const frameSize = 32;
+    const highlightFrameX = 0;
+    const highlightFrameY = 4;
+
+    const sx = highlightFrameX * frameSize;
+    const sy = highlightFrameY * frameSize;
+
+    const pos = coordToPosition(row, col);
+    if (pos.x === -9999 || pos.y === -9999) return;
+
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(uiImage, sx, sy, frameSize, frameSize, pos.x, pos.y - 8 * SCALE, frameSize * SCALE, frameSize * SCALE);
 }
 
 function drawMoveTile(row: number, col: number){
