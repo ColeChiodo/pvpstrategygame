@@ -32,6 +32,7 @@ let player1Time = 0;
 let player2Time = 0;
 let isAction = false;
 
+const endTurnBtn = document.getElementById('endTurnBtn') as HTMLButtonElement;
 const canvas = document.getElementById('gameCanvas') as HTMLCanvasElement;
 const ctx = canvas.getContext('2d')!;
 
@@ -141,6 +142,11 @@ function loadUnits(players: Player[]) {
 function loadPlayers(newPlayers: Player[]) {
     players = [];
     players = newPlayers;
+
+    if (players.length === 2){
+        if (isTurn()) endTurnBtn.disabled = false;
+        else endTurnBtn.disabled = true;
+    }
 }
     
 window.socket.on('gameState', (gameState) => {
@@ -805,3 +811,11 @@ function coordToPosition(row: number, col: number): { x: number, y: number } {
 //         prevTouchDistance = null;
 //     }
 // });
+
+// ---------------UI EVENTS--------------------------------------------------------
+endTurnBtn.addEventListener('click', function(e){
+    window.socket.emit('force-end-turn');
+    selectedTile = null;
+    isAction = false;
+    moveTile = null;
+});
