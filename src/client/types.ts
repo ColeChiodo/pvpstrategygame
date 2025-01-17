@@ -28,6 +28,17 @@ interface Unit {
     defense: number;
     range: number;
     mobility: number;
+    currentStatus: string;
+    sprite: Sprite;
+}
+
+interface Sprite {
+    name: string;
+    image: string;
+    idleFrames: number;
+    currentFrame: number;
+    framesElapsed: number;
+    framesHold: number;
 }
 
 interface Tile {

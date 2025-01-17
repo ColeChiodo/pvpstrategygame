@@ -1,4 +1,5 @@
 import * as helpers from './helpers';
+import { sprites } from './sprites';
 
 const user = JSON.parse(document.getElementById('user')!.innerHTML);
 
@@ -147,6 +148,8 @@ function loadUnits(players: Player[]) {
     for (const player of players) {
         for (const unit of player.units) {
             unit.owner = player;
+            unit.currentStatus = "idle";
+            unit.sprite = sprites.find(sprite => sprite.name === unit.name) || sprites[0];
             units.push(unit);
         }
     }
@@ -971,7 +974,7 @@ function drawUnits(){
     for (const unit of units){
         const frameSize = 32;
 
-        const frameX = 0;
+        const frameX = unit.sprite.currentFrame;
         const frameY = 0;
 
         const sx = frameX * frameSize;
@@ -982,6 +985,16 @@ function drawUnits(){
         ctx.imageSmoothingEnabled = false;
 
         ctx.drawImage(testUnitImage, sx, sy, frameSize, frameSize, pos.x, pos.y - frameSize * SCALE + (8 * SCALE), frameSize * SCALE, frameSize * SCALE);
+
+        //update the animation of the sprite
+        unit.sprite.framesElapsed++;
+        if (unit.sprite.framesElapsed % unit.sprite.framesHold === 0) {
+            if (unit.sprite.currentFrame < unit.sprite.idleFrames - 1) {
+                unit.sprite.currentFrame++;
+            } else {
+                unit.sprite.currentFrame = 0;
+            }
+        }
     }
 }
 

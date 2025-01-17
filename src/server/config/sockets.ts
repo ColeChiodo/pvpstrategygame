@@ -102,7 +102,9 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
             
                 if (unit && isValidMove(unit, target, gameState)) {
                     const origin: {row: number, col: number} = {row: unit.row, col: unit.col};
-                    socket.emit('player-unit-moving', unit, origin, target);
+                    for (let player of gameState.players) {
+                        app.get('io').to(player.socket).emit('player-unit-moving', unit, origin, target);
+                    }
                     unit.row = target.row;
                     unit.col = target.col;
                     unit.canMove = false;   
@@ -114,10 +116,9 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
             });
 
             socket.on('player-unit-action', (unitID: number, tile: { x: number, y: number, row: number, col: number }) => {
-                const gameID = getGameIdForPlayer(sessionID); // Function to get the gameId for this player
+                const gameID = getGameIdForPlayer(sessionID); 
                 const gameState = games[gameID];
             
-                // Find player and unit
                 const player = gameState.players.find(p => p.id === sessionID);
                 if (!player) return;
                 const unit = player.units.find(u => u.id === unitID);
@@ -151,7 +152,7 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
             });
 
             socket.on("force-end-turn", () => {
-                const gameID = getGameIdForPlayer(sessionID); // Function to get the gameId for this player
+                const gameID = getGameIdForPlayer(sessionID);
                 const gameState = games[gameID];
                 
                 const player = gameState.players.find(p => p.id === sessionID);
@@ -185,10 +186,9 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
             }
 
             function nextRound() {
-                const gameID = getGameIdForPlayer(sessionID); // Function to get the gameId for this player
+                const gameID = getGameIdForPlayer(sessionID); 
                 const gameState = games[gameID];
             
-                // Find player and unit
                 const oldPlayer = gameState.players.find(p => p.id === sessionID);
                 if (!oldPlayer) return;
                 gameState.round += 1;
@@ -757,7 +757,7 @@ function addPlayerToGame(gameState: GameState, socket: Socket) {
         row: gameState.players.length === 0 ? 1 : 8,
         col: gameState.players.length === 0 ? 2 : 7,
         name: "tank",
-        action: "defend",
+        action: "attack",
         canMove: true,
         canAct: true,
         health: 4,
