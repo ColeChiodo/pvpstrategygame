@@ -1,5 +1,6 @@
 interface Player {
     id: string;
+    socket: string;
     name: string;
     units: Unit[];
     time: number;

@@ -184,6 +184,31 @@ window.socket.on('gameOver', (player) => {
     gameOver = true;
 });
 
+window.socket.on('nextRound', (player) => {
+    const nextRoundMsg = document.getElementById('nextRoundMsg');
+    if (!nextRoundMsg) return;
+    const nextTurnBG = document.getElementById('nextTurnBG');
+    if(!nextTurnBG) return;
+
+    if (player.socket !== window.socket.id){
+        nextRoundMsg.innerHTML = "ENEMY TURN";
+        nextTurnBG.classList.add("border-red-500");
+        nextTurnBG.classList.remove("border-blue-500");
+    } else {
+        nextRoundMsg.innerHTML = "YOUR TURN";
+        nextTurnBG.classList.add("border-blue-500");
+        nextTurnBG.classList.remove("border-red-500");
+    }
+
+    const nextTurnDiv = document.getElementById("nextTurn") as HTMLDivElement;
+    nextTurnDiv.classList.toggle("top-full");
+    nextTurnDiv.classList.toggle("top-0");
+    setTimeout(() => {
+        nextTurnDiv.classList.toggle("top-full");
+        nextTurnDiv.classList.toggle("top-0");
+    }, 4000);
+});
+
 function gameLoop() {
     draw();
     requestAnimationFrame(gameLoop);

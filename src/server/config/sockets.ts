@@ -215,6 +215,10 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
                     unit.canMove = true;
                 });
 
+                for (let player of gameState.players) {
+                    app.get('io').to(player.socket).emit('nextRound', gameState.players[gameState.round % 2]);
+                }
+
                 emitGameState(gameID);
             }
             
