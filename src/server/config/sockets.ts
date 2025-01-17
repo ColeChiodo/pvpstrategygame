@@ -43,6 +43,7 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
         
                             if (gameState.player1Time === 0) {
                                 console.log(`${gameState.players[0].name} ran out of time`);
+                                winnerChosen(gameID, gameState.players[1]);
                                 endGame(gameID, interval);
                             }
                         } else {
@@ -50,17 +51,20 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
         
                             if (gameState.player2Time === 0) {
                                 console.log(`${gameState.players[1].name} ran out of time`);
+                                winnerChosen(gameID, gameState.players[0]);
                                 endGame(gameID, interval);
                             }
                         }
 
                         if (gameState.players[0].units.length === 0) {
                             console.log(`${gameState.players[0].name} has no units left`);
+                            winnerChosen(gameID, gameState.players[1]);
                             endGame(gameID, interval);
                         }
 
                         if (gameState.players[1].units.length === 0) {
                             console.log(`${gameState.players[1].name} has no units left`);
+                            winnerChosen(gameID, gameState.players[0]);
                             endGame(gameID, interval);
                         }
                     }
@@ -161,7 +165,7 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
                 // if disconnect and only one player in game, close game
                 const gameID = getGameIdForPlayer(sessionID);
                 const gameState = games[gameID];
-
+                if (!gameState || !gameState.players) return;
                 if (gameState.players.length !== 2){
                     let interval = setInterval(() => {}, 9999);
                     endGame(gameID, interval);
@@ -176,7 +180,6 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
                 if(games[gameID]){
                     delete games[gameID];
                 }
-                
             }
 
             function nextRound() {
@@ -215,12 +218,20 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
                 emitGameState(gameID);
             }
             
-            function emitGameState(gameId: string) {
-                const gameState = games[gameId];
+            function emitGameState(gameID: string) {
+                const gameState = games[gameID];
                 if (!gameState) return;
                 for (let player of gameState.players) {
                     let playerGameState = getPlayerGameState(gameState, player);
                     app.get('io').to(player.socket).emit('gameState', playerGameState);
+                }
+            }
+
+            function winnerChosen(gameID: string, winner: Player) {
+                const gameState = games[gameID];
+                if (!gameState) return;
+                for (let player of gameState.players) {
+                    app.get('io').to(player.socket).emit('gameOver', winner);
                 }
             }
             

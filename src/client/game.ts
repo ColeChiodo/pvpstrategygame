@@ -40,6 +40,8 @@ let player2Time = 0;
 let isAction = false;
 
 const endTurnBtn = document.getElementById('endTurnBtn') as HTMLButtonElement;
+const gameOverUI = document.getElementById('gameOver') as HTMLDivElement;
+let gameOver = false;
 const canvas = document.getElementById('gameCanvas') as HTMLCanvasElement;
 const ctx = canvas.getContext('2d')!;
 
@@ -56,8 +58,10 @@ function drawArena() {
 }
 
 function draw() {
+    if (!gameOver) gameOverUI.style.display = 'none';
+    else gameOverUI.style.display = 'flex';
     const loading = document.getElementById('loading');
-    if (loading && players.length === 2) loading.remove();
+    if (loading && players.length === 2) loading.style.display = 'none';
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     drawBackground();
     drawArena();
@@ -164,6 +168,20 @@ window.socket.on('gameState', (gameState) => {
     currentRound = gameState.round;
     player1Time = gameState.player1Time;
     player2Time = gameState.player2Time;
+});
+
+window.socket.on('gameOver', (player) => {
+    const gameOverMsg = document.getElementById('gameOverMsg');
+    if (!gameOverMsg) return;
+
+    if (player.socket !== window.socket.id){
+        
+        gameOverMsg.innerHTML = "YOU LOSE...";
+    } else {
+        gameOverMsg.innerHTML = "YOU WIN!";
+    }
+
+    gameOver = true;
 });
 
 function gameLoop() {
@@ -484,79 +502,53 @@ function drawUI(){
     drawPath();
     drawHealthBars();
     drawTileInfo();
+    drawHoveredUnitName();
 }
 
 function drawTileInfo() {
-    if (!selectedTile) {
-        drawHoveredTileInfo(0);
-    } else {
-        drawHoveredTileInfo(1);
-        drawSelectedTileInfo();
-    }
-}
-
-function drawHoveredTileInfo(offset: number) {
     if (!arena) return;
     if (!hoveredTile) return;
-    const bgWidth = 250;
-    const bgHeight = 125;
+    const bgWidth = 256;
+    const bgHeight = 64;
     const margin = 10;
     const padding = 10;
-    const squareX = margin;
-    const squareY = canvas.height - bgHeight - margin - (bgHeight * offset) - (margin * offset);
+    const squareX = 0;
+    const squareY = margin;
 
     const terrain: number = arena.tiles[hoveredTile.row][hoveredTile.col];
     const terrainType = tileTypes.find(tile => tile.id === terrain);
     if (!terrainType) return;
 
     ctx.fillStyle = '#45283c';
-    ctx.fillRect(squareX, squareY, bgWidth, bgHeight);
+    ctx.fillRect(squareX, squareY, bgWidth, bgHeight); // replace with tile info ui back image
 
-    ctx.fillStyle = '#222034';
-    ctx.font = '16px "Press Start 2P"';
-    ctx.fillText(terrainType.name, squareX + padding, squareY + padding + 16);
-    ctx.fillText(`MOV ${terrainType.movement}`, squareX + padding, squareY + 2 * padding + 32);
-
-    if (hasUnit(hoveredTile.row, hoveredTile.col)) {
-        const hoveredUnit = units.find(unit => hoveredTile!.row === unit.row && hoveredTile!.col === unit.col);
-        if (!hoveredUnit) return;
-        ctx.fillText(hoveredUnit.name, squareX + padding, squareY + 3 * padding + 48);
-        ctx.font = '12px "Press Start 2P"';
-        ctx.fillText(`AP:${hoveredUnit.attack}`, squareX + padding, squareY + 4 * padding + 60);
-        ctx.fillText(`DEF:${hoveredUnit.defense}`, squareX + padding + 64, squareY + 4 * padding + 60);
-    }
+    ctx.fillStyle = 'white';
+    ctx.font = '24px "Press Start 2P"';
+    ctx.fillText(terrainType.name, squareX + padding, squareY + padding + 34);
 }
 
-function drawSelectedTileInfo() {
+function drawHoveredUnitName() {
     if (!arena) return;
-    if (!selectedTile) return;
-    const bgWidth = 250;
-    const bgHeight = 125;
+    if (!hoveredTile) return;
+    if (!hasUnit(hoveredTile.row, hoveredTile.col)) return;
+
+    const bgHeight = 64;
     const margin = 10;
     const padding = 10;
-    const squareX = margin;
-    const squareY = canvas.height - bgHeight - margin;
+    const squareX = 0;
+    const squareY = canvas.height - bgHeight - margin - (64 * 4);
 
-    const terrain: number = arena.tiles[selectedTile.row][selectedTile.col];
-    const terrainType = tileTypes.find(tile => tile.id === terrain);
-    if (!terrainType) return;
+    const hoveredUnit = units.find(unit => unit.row === hoveredTile!.row && unit.col === hoveredTile!.col);
+    if (!hoveredUnit) return;
+
+    const bgWidth = hoveredUnit.name.length * 24 + 6 * padding;
 
     ctx.fillStyle = '#45283c';
-    ctx.fillRect(squareX, squareY, bgWidth, bgHeight);
+    ctx.fillRect(squareX, squareY, bgWidth, bgHeight); // replace with tile info ui back image
 
-    ctx.fillStyle = '#222034';
-    ctx.font = '16px "Press Start 2P"';
-    ctx.fillText(terrainType.name, squareX + padding, squareY + padding + 16);
-    ctx.fillText(terrainType.movement.toString(), squareX + padding, squareY + 2 * padding + 32);
-
-    if (hasUnit(selectedTile.row, selectedTile.col)) {
-        const selectedUnit = units.find(unit => selectedTile!.row === unit.row && selectedTile!.col === unit.col);
-        if (!selectedUnit) return;
-        ctx.fillText(selectedUnit.name, squareX + padding, squareY + 3 * padding + 48);
-        ctx.font = '12px "Press Start 2P"';
-        ctx.fillText(`AP:${selectedUnit.attack}`, squareX + padding, squareY + 4 * padding + 60);
-        ctx.fillText(`DEF:${selectedUnit.defense}`, squareX + padding + 64, squareY + 4 * padding + 60);
-    }
+    ctx.fillStyle = 'white';
+    ctx.font = '24px "Press Start 2P"';
+    ctx.fillText(hoveredUnit.name.toUpperCase(), squareX + padding, squareY + padding + 34);
 }
 
 function drawFogOfWarTiles() {
