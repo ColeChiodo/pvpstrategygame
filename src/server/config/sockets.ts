@@ -87,7 +87,7 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
             emitGameState(gameID);
             
             // Game Logic
-            socket.on('player-unit-move', (unitID: number, tile: { x: number, y: number, row: number, col: number }) => {
+            socket.on('player-unit-move', (unitID: number, target: { x: number, y: number, row: number, col: number }) => {
                 const gameID = getGameIdForPlayer(sessionID); // Function to get the gameId for this player
                 const gameState = games[gameID];
             
@@ -97,17 +97,19 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
                 const unit = player.units.find(u => u.id === unitID);
                 if (!unit) return;
                 if (!unit.canMove) return;
-                let otherUnit = gameState.players.find((player) => player.units.find((unit) => unit.row === tile.row && unit.col === tile.col));
+                let otherUnit = gameState.players.find((player) => player.units.find((unit) => unit.row === target.row && unit.col === target.col));
                 if (otherUnit && otherUnit.id !== sessionID) return;
             
-                if (unit && isValidMove(unit, tile, gameState)) {
-                    unit.row = tile.row;
-                    unit.col = tile.col;
-                    unit.canMove = false;
+                if (unit && isValidMove(unit, target, gameState)) {
+                    const origin: {row: number, col: number} = {row: unit.row, col: unit.col};
+                    socket.emit('player-unit-moving', unit, origin, target);
+                    unit.row = target.row;
+                    unit.col = target.col;
+                    unit.canMove = false;   
                 }
 
-                console.log(`[${gameID}]: ${player.name}: unit ${unitID} moving to tile (${tile.row}, ${tile.col})`);
-                socket.emit('player-unit-moved', unitID, tile);
+                console.log(`[${gameID}]: ${player.name}: unit ${unitID} moving to tile (${target.row}, ${target.col})`);
+                
                 emitGameState(gameID);
             });
 
@@ -300,57 +302,6 @@ interface Tile {
 const games: { [gameId: string]: GameState } = {}; // Store all games by ID
 
 const playerGameMap: { [sessionId: string]: string } = {}; // Maps session ID to game ID
-
-function addPlayerToGame(gameState: GameState, socket: Socket) {
-    // @ts-expect-error
-    const sessionID = socket.request.session.id;
-    // @ts-expect-error
-    const username = socket.request.session.user.username;
-
-    console.log(`Adding ${username} to game ${gameState.id}`);
-
-    let newPlayer: Player = {
-        id: sessionID,
-        socket: socket.id,
-        name: username,
-        units: [],
-    };
-
-    newPlayer.units.push({
-        id: newPlayer.units.length + 1,
-        row: gameState.players.length === 0 ? 0 : 9,
-        col: gameState.players.length === 0 ? 0 : 9,
-        name: "attack_guy",
-        action: "attack",
-        canMove: true,
-        canAct: true,
-        health: 3,
-        maxHealth: 3,
-        attack: 1,
-        defense: 1,
-        range: 1,
-        mobility: 3,
-    });
-
-    newPlayer.units.push({
-        id: newPlayer.units.length + 1,
-        row: gameState.players.length === 0 ? 1 : 8,
-        col: gameState.players.length === 0 ? 1 : 8,
-        name: "heal_guy",
-        action: "heal",
-        canMove: true,
-        canAct: true,
-        health: 1,
-        maxHealth: 1,
-        attack: 2,
-        defense: 1,
-        range: 2,
-        mobility: 3,
-    });
-
-    gameState.players.push(newPlayer);
-    playerGameMap[sessionID] = gameState.id;
-}
 
 function generateGameId(): string {
     return `game-${Date.now()}`;
@@ -688,4 +639,135 @@ function hasUnit(row: number, col: number, gameState: GameState): boolean {
         }
     }
     return false;
+}
+
+function addPlayerToGame(gameState: GameState, socket: Socket) {
+    // @ts-expect-error
+    const sessionID = socket.request.session.id;
+    // @ts-expect-error
+    const username = socket.request.session.user.username;
+
+    console.log(`Adding ${username} to game ${gameState.id}`);
+
+    let newPlayer: Player = {
+        id: sessionID,
+        socket: socket.id,
+        name: username,
+        units: [],
+    };
+
+    newPlayer.units.push({
+        id: newPlayer.units.length + 1,
+        row: gameState.players.length === 0 ? 0 : 9,
+        col: gameState.players.length === 0 ? 0 : 9,
+        name: "melee",
+        action: "attack",
+        canMove: true,
+        canAct: true,
+        health: 3,
+        maxHealth: 3,
+        attack: 3,
+        defense: 1,
+        range: 1,
+        mobility: 2,
+    });
+    
+    newPlayer.units.push({
+        id: newPlayer.units.length + 1,
+        row: gameState.players.length === 0 ? 0 : 9,
+        col: gameState.players.length === 0 ? 1 : 8,
+        name: "ranged",
+        action: "attack",
+        canMove: true,
+        canAct: true,
+        health: 2,
+        maxHealth: 2,
+        attack: 2,
+        defense: 0,
+        range: 3,
+        mobility: 3,
+    });
+    
+    newPlayer.units.push({
+        id: newPlayer.units.length + 1,
+        row: gameState.players.length === 0 ? 0 : 9,
+        col: gameState.players.length === 0 ? 2 : 7,
+        name: "mage",
+        action: "attack",
+        canMove: true,
+        canAct: true,
+        health: 2,
+        maxHealth: 2,
+        attack: 4,
+        defense: 0,
+        range: 2,
+        mobility: 2,
+    });
+    
+    newPlayer.units.push({
+        id: newPlayer.units.length + 1,
+        row: gameState.players.length === 0 ? 0 : 9,
+        col: gameState.players.length === 0 ? 3 : 6,
+        name: "healer",
+        action: "heal",
+        canMove: true,
+        canAct: true,
+        health: 1,
+        maxHealth: 1,
+        attack: 3,
+        defense: 0,
+        range: 2,
+        mobility: 4,
+    });
+    
+    newPlayer.units.push({
+        id: newPlayer.units.length + 1,
+        row: gameState.players.length === 0 ? 1 : 8,
+        col: gameState.players.length === 0 ? 0 : 9,
+        name: "cavalry",
+        action: "attack",
+        canMove: true,
+        canAct: true,
+        health: 2,
+        maxHealth: 2,
+        attack: 2,
+        defense: 1,
+        range: 1,
+        mobility: 4,
+    });
+    
+    newPlayer.units.push({
+        id: newPlayer.units.length + 1,
+        row: gameState.players.length === 0 ? 1 : 8,
+        col: gameState.players.length === 0 ? 1 : 8,
+        name: "scout",
+        action: "attack",
+        canMove: true,
+        canAct: true,
+        health: 2,
+        maxHealth: 2,
+        attack: 1,
+        defense: 1,
+        range: 1,
+        mobility: 5,
+    });
+    
+    newPlayer.units.push({
+        id: newPlayer.units.length + 1,
+        row: gameState.players.length === 0 ? 1 : 8,
+        col: gameState.players.length === 0 ? 2 : 7,
+        name: "tank",
+        action: "defend",
+        canMove: true,
+        canAct: true,
+        health: 4,
+        maxHealth: 4,
+        attack: 1,
+        defense: 2,
+        range: 1,
+        mobility: 2,
+    });    
+
+    gameState.players.push(newPlayer);
+    playerGameMap[sessionID] = gameState.id;
 }

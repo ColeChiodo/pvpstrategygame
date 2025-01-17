@@ -1,8 +1,10 @@
+import * as helpers from './helpers';
+
 const user = JSON.parse(document.getElementById('user')!.innerHTML);
 
 const MIN_SCALE = 1.0; 
 const MAX_SCALE = 5.0;
-let SCALE = 3.125;
+export let SCALE = 3.125;
 
 let cameraOffsetX = 0;
 let cameraOffsetY = 0;
@@ -140,6 +142,7 @@ window.addEventListener('keydown', (e) => {
 });
 
 function loadUnits(players: Player[]) {
+    if (isAnimating) return;
     units = [];
     for (const player of players) {
         for (const unit of player.units) {
@@ -147,7 +150,6 @@ function loadUnits(players: Player[]) {
             units.push(unit);
         }
     }
-    drawUnits();
 }
 
 function loadPlayers(newPlayers: Player[]) {
@@ -286,36 +288,36 @@ function drawIsometricTile(x: number, y: number, row: number, col: number) {
     return { x, y, row, col };
 }
 
-function isPointInsideTile(px: number, py: number, tile: { x: number, y: number }): boolean {
-    // Vertices of the tile
-    const x1 = tile.x, y1 = tile.y;
-    const x2 = tile.x + 16 * SCALE, y2 = tile.y + 8 * SCALE;
-    const x3 = tile.x + 32 * SCALE, y3 = tile.y;
-    const x4 = tile.x + 16 * SCALE, y4 = tile.y - 8 * SCALE;
+window.socket.on('player-unit-moving', (unit: Unit, origin: {row: number, col: number}, target: { x: number, y: number, row: number, col: number }) => {
+    isAction = true;
+    animateMove(unit, origin, target);
+    moveTile = target;
+    console.log(`Unit ${unit.id} looking to perform an action`);
+});
 
-    // Helper function to calculate the area of a triangle given by three points
-    const sign = (x1: number, y1: number, x2: number, y2: number, x3: number, y3: number): number => {
-        return (x1 - x3) * (y2 - y3) - (x2 - x3) * (y1 - y3);
-    };
+let isAnimating = false;
 
-    // Check if the point is inside the tile (diamond shape)
-    const d1 = sign(px, py, x1, y1, x2, y2);
-    const d2 = sign(px, py, x2, y2, x3, y3);
-    const d3 = sign(px, py, x3, y3, x4, y4);
-    const d4 = sign(px, py, x4, y4, x1, y1);
-
-    const hasNeg = (d1 < 0) || (d2 < 0) || (d3 < 0) || (d4 < 0);
-    const hasPos = (d1 > 0) || (d2 > 0) || (d3 > 0) || (d4 > 0);
-
-    // Point is inside the tile if all signs are the same (either all positive or all negative)
-    return !(hasNeg && hasPos);
+function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-window.socket.on('player-unit-moved', (unitID: number, tile: { x: number, y: number, row: number, col: number }) => {
-    isAction = true;
-    moveTile = tile;
-    console.log(`Unit ${unitID} looking to perform an action`);
-});
+async function animateMove(tempUnit: Unit, origin: { row: number, col: number }, target: { x: number, y: number, row: number, col: number }) {
+    isAnimating = true;
+    const path = astarPath(origin.row, origin.col, target.row, target.col);
+    const realUnit = units.find(unit => unit.row === tempUnit.row && unit.col === tempUnit.col);
+    if (!realUnit) return;
+    
+    for (const tile of path) {
+        if (!isAnimating) break;
+        // set realunits sprite to running animation
+        // play footstep sound
+        realUnit.row = tile.y;
+        realUnit.col = tile.x;
+        await sleep(100);
+    }
+
+    isAnimating = false;
+}
 
 function isTurn(){
     return players[currentRound % 2].name === user.username;
@@ -330,20 +332,21 @@ function unitCanMove(row: number, col: number): boolean {
     return false;
 }
 
-function unitCanAct(row: number, col: number): boolean {
-    for (const unit of units) {
-        if (unit.row === row && unit.col === col) {
-            return unit.canAct;
-        }
-    }
-    return false;
-}
+// function unitCanAct(row: number, col: number): boolean {
+//     for (const unit of units) {
+//         if (unit.row === row && unit.col === col) {
+//             return unit.canAct;
+//         }
+//     }
+//     return false;
+// }
 
 let isDragging = false;
 let startX = 0;
 let startY = 0;
 
 canvas.addEventListener('click', function(event) {
+    if (isAnimating) isAnimating = false;
     if (!isTurn()) return;
 
     if (players.length != 2) return;
@@ -354,7 +357,7 @@ canvas.addEventListener('click', function(event) {
     let found = false;
     for (const tile of tiles) {
         if (!hoveredTile) break;
-        if (isPointInsideTile(clickX, clickY, tile)) {
+        if (helpers.isPointInsideTile(clickX, clickY, tile)) {
             
             if (!isAction && !selectedTile && unitIsTeam(hoveredTile.row, hoveredTile.col) && unitCanMove(hoveredTile.row, hoveredTile.col)) {
                 // first click
@@ -433,7 +436,7 @@ canvas.addEventListener('mousemove', function(event) {
     const clickY = event.offsetY;
 
     for (const tile of tiles) {
-        if (isPointInsideTile(clickX, clickY, tile)) {
+        if (helpers.isPointInsideTile(clickX, clickY, tile)) {
             //console.log(`You hovered on: ${tile.row}, ${tile.col}`);
             hoveredTile = tile;
             break;
@@ -866,7 +869,6 @@ function drawPath(){
     const path = astarPath(selectedTile.row, selectedTile.col, hoveredTile.row, hoveredTile.col);
 
     for (const tile of path){
-        console.log(tile);
         if (validMoveTiles.find(validTile => validTile.row === tile.y && validTile.col === tile.x)){
             drawPathTile(tile.y, tile.x);
         }
@@ -970,7 +972,7 @@ function drawUnits(){
         const frameSize = 32;
 
         const frameX = 0;
-        const frameY = unit.name === 'attack_guy' ? 0 : 1;
+        const frameY = 0;
 
         const sx = frameX * frameSize;
         const sy = frameY * frameSize;
