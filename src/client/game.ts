@@ -143,14 +143,28 @@ window.addEventListener('keydown', (e) => {
 });
 
 function loadUnits(players: Player[]) {
-    if (isAnimating) return;
-    units = [];
-    for (const player of players) {
-        for (const unit of player.units) {
-            unit.owner = player;
-            unit.currentStatus = "idle";
-            unit.sprite = sprites.find(sprite => sprite.name === unit.name) || sprites[0];
-            units.push(unit);
+    if (!isAnimating) {
+        units = [];
+        for (const player of players) {
+            for (const unit of player.units) {
+                unit.owner = player;
+                unit.sprite = sprites.find(sprite => sprite.name === unit.name) || sprites[0];
+                unit.currentStatus = unit.canMove || unit.canAct ? 0 : 1;
+                units.push(unit);
+            }
+        }
+    } else {
+        if (!animatingUnit) return;
+        units = [];
+        units.push(animatingUnit);
+        for (const player of players) {
+            for (const unit of player.units) {
+                if (unit.id === animatingUnit.id) continue;
+                unit.owner = player;
+                unit.sprite = sprites.find(sprite => sprite.name === unit.name) || sprites[0];
+                unit.currentStatus = unit.canMove || unit.canAct ? 0 : 1;
+                units.push(unit);
+            }
         }
     }
 }
@@ -299,6 +313,7 @@ window.socket.on('player-unit-moving', (unit: Unit, origin: {row: number, col: n
 });
 
 let isAnimating = false;
+let animatingUnit: Unit | null;
 
 function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -312,7 +327,9 @@ async function animateMove(tempUnit: Unit, origin: { row: number, col: number },
     
     for (const tile of path) {
         if (!isAnimating) break;
-        // set realunits sprite to running animation
+        animatingUnit = realUnit;
+        realUnit.currentStatus = 2;
+        realUnit.sprite.currentFrame = 0;
         // play footstep sound
         realUnit.row = tile.y;
         realUnit.col = tile.x;
@@ -320,6 +337,9 @@ async function animateMove(tempUnit: Unit, origin: { row: number, col: number },
     }
 
     isAnimating = false;
+    animatingUnit = null;
+    realUnit.currentStatus = 0;
+    realUnit.sprite.currentFrame = 0;
 }
 
 function isTurn(){
@@ -334,15 +354,6 @@ function unitCanMove(row: number, col: number): boolean {
     }
     return false;
 }
-
-// function unitCanAct(row: number, col: number): boolean {
-//     for (const unit of units) {
-//         if (unit.row === row && unit.col === col) {
-//             return unit.canAct;
-//         }
-//     }
-//     return false;
-// }
 
 let isDragging = false;
 let startX = 0;
@@ -975,7 +986,7 @@ function drawUnits(){
         const frameSize = 32;
 
         const frameX = unit.sprite.currentFrame;
-        const frameY = 0;
+        const frameY = unit.currentStatus;
 
         const sx = frameX * frameSize;
         const sy = frameY * frameSize;

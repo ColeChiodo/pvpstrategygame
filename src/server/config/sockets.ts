@@ -5,6 +5,7 @@ import { Server as SocketIoServer, Socket } from "socket.io";
 let io: SocketIoServer | undefined;
 
 const MAX_TIME = 60 * 5; 
+const TICKRATE = 8;
 
 export default function (server: Server, app: Express, sessionMiddleware: RequestHandler): SocketIoServer {
     if(io === undefined) {
@@ -36,40 +37,45 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
                 gameID = generateGameId();
                 games[gameID] = initializeGameState(gameID);
                 let gameState = games[gameID];
+                
+                let tick = 0;
                 let interval = setInterval(() => {
-                    if (gameState.players.length === 2) {
-                        if (gameState.round % 2 === 0) {
-                            gameState.player1Time -= 1;
-        
-                            if (gameState.player1Time === 0) {
-                                console.log(`${gameState.players[0].name} ran out of time`);
+                    if (tick % TICKRATE === 0) {
+                        if (gameState.players.length === 2) {
+                            if (gameState.round % 2 === 0) {
+                                gameState.player1Time -= 1;
+            
+                                if (gameState.player1Time === 0) {
+                                    console.log(`${gameState.players[0].name} ran out of time`);
+                                    winnerChosen(gameID, gameState.players[1]);
+                                    endGame(gameID, interval);
+                                }
+                            } else {
+                                gameState.player2Time -= 1;
+            
+                                if (gameState.player2Time === 0) {
+                                    console.log(`${gameState.players[1].name} ran out of time`);
+                                    winnerChosen(gameID, gameState.players[0]);
+                                    endGame(gameID, interval);
+                                }
+                            }
+
+                            if (gameState.players[0].units.length === 0) {
+                                console.log(`${gameState.players[0].name} has no units left`);
                                 winnerChosen(gameID, gameState.players[1]);
                                 endGame(gameID, interval);
                             }
-                        } else {
-                            gameState.player2Time -= 1;
-        
-                            if (gameState.player2Time === 0) {
-                                console.log(`${gameState.players[1].name} ran out of time`);
+
+                            if (gameState.players[1].units.length === 0) {
+                                console.log(`${gameState.players[1].name} has no units left`);
                                 winnerChosen(gameID, gameState.players[0]);
                                 endGame(gameID, interval);
                             }
                         }
-
-                        if (gameState.players[0].units.length === 0) {
-                            console.log(`${gameState.players[0].name} has no units left`);
-                            winnerChosen(gameID, gameState.players[1]);
-                            endGame(gameID, interval);
-                        }
-
-                        if (gameState.players[1].units.length === 0) {
-                            console.log(`${gameState.players[1].name} has no units left`);
-                            winnerChosen(gameID, gameState.players[0]);
-                            endGame(gameID, interval);
-                        }
                     }
                     emitGameState(gameID);
-                }, 1000);
+                    tick++;
+                }, 1000 / TICKRATE);
             }
 
             const initGameState = games[gameID];
@@ -163,6 +169,20 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
                 nextRound();
             });
 
+            socket.on("force-unit-end-turn", (unitID: number) => {
+                const gameID = getGameIdForPlayer(sessionID);
+                const gameState = games[gameID];
+                
+                const player = gameState.players.find(p => p.id === sessionID);
+                if (!player) return;
+                const unit = player.units.find(u => u.id === unitID);
+                if (!unit) return;
+
+                unit.canAct = false;
+
+                emitGameState(gameID);
+            });
+
             socket.on("disconnect", () => {
                 console.log(`client disconnected (${sessionID})`);
                 // if disconnect and only one player in game, close game
@@ -217,11 +237,11 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
                     unit.canMove = true;
                 });
 
+                emitGameState(gameID);
+
                 for (let player of gameState.players) {
                     app.get('io').to(player.socket).emit('nextRound', gameState.players[gameState.round % 2]);
                 }
-
-                emitGameState(gameID);
             }
             
             function emitGameState(gameID: string) {

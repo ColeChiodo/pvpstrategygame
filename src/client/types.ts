@@ -28,7 +28,7 @@ interface Unit {
     defense: number;
     range: number;
     mobility: number;
-    currentStatus: string;
+    currentStatus: number;
     sprite: Sprite;
 }
 
