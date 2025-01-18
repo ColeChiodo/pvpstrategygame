@@ -139,7 +139,7 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
                 if(unit && isValidAction(unit, tile, gameState)) {
                     if (sessionID !== otherUnitsOwner.id) {
                         // attack
-                        otherUnit.health -= unit.attack;
+                        otherUnit.health -= unit.attack * (1 - otherUnit.defense / (otherUnit.defense + 20));
                         console.log(`[${gameID}]: ${player.name}: unit ${unitID} attacking at tile (${tile.row}, ${tile.col}). ${otherUnit.id} has ${otherUnit.health} health remaining.`);
                         if (otherUnit.health <= 0) {
                             otherUnitsOwner.units = otherUnitsOwner.units.filter((unit) => unit.id !== otherUnit.id);
