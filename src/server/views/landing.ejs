@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Game</title>
+    <title>Game Title</title>
     <script src="/js/tailwind.js"></script>
 </head>
 <body class="bg-primary flex flex-col items-center justify-start min-h-screen overflow-x-auto">
@@ -39,8 +39,29 @@
         </div>
     </div>     
     
-    <div id="second" class="bg-primary w-screen h-screen flex justify-center">
-        <p class="text-white">TEST TEXT</p>
+    <div id="second" class="bg-primary sm:w-screen md:w-1/2 flex justify-center p-4 flex-col">
+        <div class="flex flex-col lg:flex-row">
+            <div class="flex flex-col">
+                <p class="text-white text-xl mb-4 font-bold">{GAME TITLE}</p>
+                <p class="text-white my-4">Turn Based Player-Versus-Player Strategy Tactics Game. Take Control of several units to defeat you opponent.</p>
+            </div>
+            <img src="/assets/landing/example.png"
+            alt="Example Game Scene"
+            style="image-rendering: pixelated;">
+        </div>
+
+        <div class="flex flex-col lg:flex-row">
+            <div class="flex flex-col">
+                <p class="text-white text-xl my-4 font-bold">Play Against Others</p>
+                <p class="text-white mb-4">Match up against players from around the world, or create a private match for you and your friends.</p>
+            </div>
+            <img src="/assets/landing/example.png"
+            alt="Example Game Scene"
+            style="image-rendering: pixelated;">
+        </div>
+        <div class="flex items-center justify-center">
+            <a href="/home" class="block m-4 px-6 py-3 bg-green-400 text-primary hover:bg-green-500 transition border-r-4 border-b-4 border-primary text-center w-full lg:w-1/4">PLAY NOW</a>
+        </div>
     </div>
 
     <script>
@@ -62,4 +83,5 @@
     </script>
 
 </body>
+<%- include('partials/footer') %>
 </html>

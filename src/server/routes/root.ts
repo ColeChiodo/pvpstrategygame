@@ -23,4 +23,16 @@ router.get("/login", (_req, res) => {
     res.render("login");
 });
 
+router.get("/terms", (_req, res) => {
+    res.render("terms");
+});
+
+router.get("/privacy", (_req, res) => {
+    res.render("privacy");
+});
+
+router.get("/about", (_req, res) => {
+    res.render("about");
+});
+
 export default router;
