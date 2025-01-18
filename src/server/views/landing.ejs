@@ -6,21 +6,60 @@
     <title>Game</title>
     <script src="/js/tailwind.js"></script>
 </head>
-<body class="bg-black flex flex-col items-center justify-center min-h-screen">
+<body class="bg-primary flex flex-col items-center justify-start min-h-screen overflow-x-auto">
 
-    <div id="main" class="bg-secondary w-screen p-8 items-center justify-center flex flex-col">
-        <div class="flex flex-col items-center justify-center">
-            <h1 class="text-4xl font-bold text-white text-center justify-center">PVP STRATEGY GAME</h1>
+    <div id="main" class="bg-secondary w-screen h-screen flex items-center justify-center overflow-hidden">
+        <div id="paralaxed" class="relative w-full h-full">
+            <img id="bg-image" src="/assets/landing/tempbackground.png"
+                 alt="Paralaxed Sci-fi Cityscape Background"
+                 class="absolute top-0 left-0 h-screen w-auto object-cover"
+                 style="image-rendering: pixelated; z-index: 1;">
     
-            <div class="space-y-4">
-                <a href="/home" class="block m-4 px-6 py-3 bg-green-400 text-primary hover:bg-green-500 transition border-r-4 border-b-4 border-primary text-center">PLAY NOW</a>
+            <img id="distant-image" src="/assets/landing/tempdistant.png"
+                 alt="Paralaxed Sci-fi Cityscape Distant"
+                 class="absolute top-0 left-0 h-screen w-auto object-cover"
+                 style="image-rendering: pixelated; z-index: 2;">
+    
+            <img id="near-image" src="/assets/landing/tempnear.png"
+                 alt="Paralaxed Sci-fi Cityscape Near"
+                 class="absolute top-0 left-0 h-screen w-auto object-cover"
+                 style="image-rendering: pixelated; z-index: 3;">
+    
+            <img id="foreground-image" src="/assets/landing/tempforeground.png"
+                 alt="Paralaxed Sci-fi Cityscape Foreground"
+                 class="absolute top-0 left-0 h-screen w-auto object-cover"
+                 style="image-rendering: pixelated; z-index: 4;">
+                
+            <div id="titleAndPlay" class="absolute inset-0 flex flex-col items-center justify-center text-center text-white z-10">
+                <img src="/assets/landing/title.png" alt="Game Title" class="w-[500px]" style="image-rendering: pixelated;">
+                <div class="space-y-4">
+                    <a href="/home" class="-mt-8 block m-4 px-6 py-3 bg-green-400 text-primary hover:bg-green-500 transition border-r-4 border-b-4 border-primary">PLAY NOW</a>
+                </div>
             </div>
         </div>
+    </div>     
+    
+    <div id="second" class="bg-primary w-screen h-screen flex justify-center">
+        <p class="text-white">TEST TEXT</p>
     </div>
 
-    <div id="main" class="bg-primary w-screen h-screen items-center justify-center flex flex-col">
+    <script>
+        const bgImage = document.getElementById('bg-image');
+        const distantImage = document.getElementById('distant-image');
+        const nearImage = document.getElementById('near-image');
+        const titleAndPlay = document.getElementById('titleAndPlay');
 
-    </div>
+        function handleParallax() {
+            const scrollY = window.scrollY;
+
+            bgImage.style.transform = `translateY(${scrollY * 0.3}px)`; // Slow movement for background
+            distantImage.style.transform = `translateY(${scrollY * 0.5}px)`; // Faster for distant layer
+            nearImage.style.transform = `translateY(${scrollY * 0.7}px)`; // Even faster for near layer
+            //titleAndPlay.style.transform = `translateY(${scrollY * 0.9}px)`; // Fastest for foreground
+        }
+
+        window.addEventListener('scroll', handleParallax);
+    </script>
 
 </body>
 </html>
