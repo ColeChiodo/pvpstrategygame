@@ -356,117 +356,6 @@ function unitCanMove(row: number, col: number): boolean {
     return false;
 }
 
-let isDragging = false;
-let startX = 0;
-let startY = 0;
-
-canvas.addEventListener('click', function(event) {
-    if (isAnimating) isAnimating = false;
-    if (!isTurn()) return;
-
-    if (players.length != 2) return;
-
-    const clickX = event.offsetX;
-    const clickY = event.offsetY;
-
-    let found = false;
-    for (const tile of tiles) {
-        if (!hoveredTile) break;
-        if (helpers.isPointInsideTile(clickX, clickY, tile)) {
-            
-            if (!isAction && !selectedTile && unitIsTeam(hoveredTile.row, hoveredTile.col) && unitCanMove(hoveredTile.row, hoveredTile.col)) {
-                // first click
-                selectedTile = tile;
-            } else if (!isAction && selectedTile && tile.row === selectedTile.row && tile.col === selectedTile.col) {
-                // move clicked on the same tile to stay
-                const unit = units.find(unit => unit.row === selectedTile!.row && unit.col === selectedTile!.col);
-                console.log(`Staying on: ${tile.row}, ${tile.col}`);
-                window.socket.emit('player-unit-move', unit!.id, tile);
-                break;
-            } else if (!isAction && selectedTile && unitIsTeam(selectedTile.row, selectedTile.col)) {
-                // move clicked on another tile to move
-                if (validMoveTiles.find(validTile => validTile.row === tile.row && validTile.col === tile.col)) {
-                    const unit = units.find(unit => unit.row === selectedTile!.row && unit.col === selectedTile!.col);
-                    console.log(`Moving to: ${tile.row}, ${tile.col}`);
-                    window.socket.emit('player-unit-move', unit!.id, tile);
-                }
-                selectedTile = null;
-            } else if (isAction && hasUnit(tile.row, tile.col)) {
-                // action clicked on another unit
-                if (validActionTiles.find(validTile => validTile.row === tile.row && validTile.col === tile.col)) {
-                    const unit = units.find(unit => unit.row === moveTile!.row && unit.col === moveTile!.col);
-                    console.log(`Action on: ${tile.row}, ${tile.col}`);
-                    window.socket.emit('player-unit-action', unit!.id, tile);
-                }
-                isAction = false;
-                moveTile = null;
-            } else if (isAction && hasUnit(tile.row, tile.col)) {
-                // action clicked on same tile to cancel
-                const unit = units.find(unit => unit.row === moveTile!.row && unit.col === moveTile!.col);
-                isAction = false;
-                moveTile = null;
-                console.log(`Cancel action on: ${tile.row}, ${tile.col}`);
-                window.socket.emit('player-unit-action', unit!.id, tile);
-            }
-            found = true;
-            break;
-        }
-    }
-    if (!found) {
-        selectedTile = null;
-    }
-});
-
-canvas.addEventListener('mousedown', (e) => {
-    if (e.button !== 1) return;
-    isDragging = true;
-    startX = e.clientX - cameraOffsetX;
-    startY = e.clientY - cameraOffsetY;
-});
-
-canvas.addEventListener('mouseup', () => {
-    isDragging = false;
-});
-
-canvas.addEventListener('mouseleave', () => {
-    isDragging = false;
-});
-
-canvas.addEventListener('wheel', (e) => {
-    if (e.deltaY < 0) {
-      if (SCALE !== MAX_SCALE)
-        SCALE *= 1.1;
-      if (SCALE > MAX_SCALE)
-        SCALE = MAX_SCALE;
-    } else if (e.deltaY > 0) {
-      if (SCALE !== MIN_SCALE)
-        SCALE *= 0.9;
-    if (SCALE < MIN_SCALE)
-        SCALE = MIN_SCALE;
-    }
-});
-
-canvas.addEventListener('mousemove', function(event) {
-    const clickX = event.offsetX;
-    const clickY = event.offsetY;
-
-    for (const tile of tiles) {
-        if (helpers.isPointInsideTile(clickX, clickY, tile)) {
-            //console.log(`You hovered on: ${tile.row}, ${tile.col}`);
-            hoveredTile = tile;
-            break;
-        }
-        else {
-            hoveredTile = null;
-        }
-    }
-
-    if (isDragging) {
-        cameraOffsetX = event.clientX - startX;
-        cameraOffsetY = event.clientY - startY;
-    }
-});
-
 function hasUnit(row: number, col: number): boolean {
     for (const unit of units) {
         if (unit.row === row && unit.col === col) {
@@ -1021,122 +910,287 @@ function coordToPosition(row: number, col: number): { x: number, y: number } {
     return { x: -9999, y: -9999 };
 }
 
+// -----------Canvas Events Controls-----------------------
+
+let isDragging = false;
+let startX = 0;
+let startY = 0;
+
+canvas.addEventListener('click', function(event) {
+    if (isAnimating) isAnimating = false;
+    if (!isTurn()) return;
+
+    if (players.length != 2) return;
+
+    const clickX = event.offsetX;
+    const clickY = event.offsetY;
+
+    let found = false;
+    for (const tile of tiles) {
+        if (!hoveredTile) break;
+        if (helpers.isPointInsideTile(clickX, clickY, tile)) {
+            
+            if (!isAction && !selectedTile && unitIsTeam(hoveredTile.row, hoveredTile.col) && unitCanMove(hoveredTile.row, hoveredTile.col)) {
+                // first click
+                selectedTile = tile;
+            } else if (!isAction && selectedTile && tile.row === selectedTile.row && tile.col === selectedTile.col) {
+                // move clicked on the same tile to stay
+                const unit = units.find(unit => unit.row === selectedTile!.row && unit.col === selectedTile!.col);
+                console.log(`Staying on: ${tile.row}, ${tile.col}`);
+                window.socket.emit('player-unit-move', unit!.id, tile);
+                break;
+            } else if (!isAction && selectedTile && unitIsTeam(selectedTile.row, selectedTile.col)) {
+                // move clicked on another tile to move
+                if (validMoveTiles.find(validTile => validTile.row === tile.row && validTile.col === tile.col)) {
+                    const unit = units.find(unit => unit.row === selectedTile!.row && unit.col === selectedTile!.col);
+                    console.log(`Moving to: ${tile.row}, ${tile.col}`);
+                    window.socket.emit('player-unit-move', unit!.id, tile);
+                }
+                selectedTile = null;
+            } else if (isAction && hasUnit(tile.row, tile.col)) {
+                // action clicked on another unit
+                if (validActionTiles.find(validTile => validTile.row === tile.row && validTile.col === tile.col)) {
+                    const unit = units.find(unit => unit.row === moveTile!.row && unit.col === moveTile!.col);
+                    console.log(`Action on: ${tile.row}, ${tile.col}`);
+                    window.socket.emit('player-unit-action', unit!.id, tile);
+                }
+                isAction = false;
+                moveTile = null;
+            } else if (isAction && hasUnit(tile.row, tile.col)) {
+                // action clicked on same tile to cancel
+                const unit = units.find(unit => unit.row === moveTile!.row && unit.col === moveTile!.col);
+                isAction = false;
+                moveTile = null;
+                console.log(`Cancel action on: ${tile.row}, ${tile.col}`);
+                window.socket.emit('player-unit-action', unit!.id, tile);
+            }
+            found = true;
+            break;
+        }
+    }
+    if (!found) {
+        selectedTile = null;
+    }
+});
+
+canvas.addEventListener('mousedown', (e) => {
+    if (e.button !== 1) return;
+    isDragging = true;
+    startX = e.clientX - cameraOffsetX;
+    startY = e.clientY - cameraOffsetY;
+});
+
+canvas.addEventListener('mouseup', () => {
+    isDragging = false;
+});
+
+canvas.addEventListener('mouseleave', () => {
+    isDragging = false;
+});
+
+canvas.addEventListener('wheel', (e) => {
+    if (e.deltaY < 0) {
+      if (SCALE !== MAX_SCALE)
+        SCALE *= 1.1;
+      if (SCALE > MAX_SCALE)
+        SCALE = MAX_SCALE;
+    } else if (e.deltaY > 0) {
+      if (SCALE !== MIN_SCALE)
+        SCALE *= 0.9;
+    if (SCALE < MIN_SCALE)
+        SCALE = MIN_SCALE;
+    }
+});
+
+canvas.addEventListener('mousemove', function(event) {
+    const clickX = event.offsetX;
+    const clickY = event.offsetY;
+
+    for (const tile of tiles) {
+        if (helpers.isPointInsideTile(clickX, clickY, tile)) {
+            //console.log(`You hovered on: ${tile.row}, ${tile.col}`);
+            hoveredTile = tile;
+            break;
+        }
+        else {
+            hoveredTile = null;
+        }
+    }
+
+    if (isDragging) {
+        cameraOffsetX = event.clientX - startX;
+        cameraOffsetY = event.clientY - startY;
+    }
+});
 
 // -----------Touch Screen Logic---------------------------
 
-// let touchStartTime = 0;
-// const TAP_THRESHOLD = 200;
+let touchStartTime = 0;
+const TAP_THRESHOLD = 200;
+let prevTouchDistance: number | null = null;
 
-// canvas.addEventListener('touchstart', function(e) {
-//     e.preventDefault(); // Prevent default touch behavior (like scrolling)
+canvas.addEventListener('touchstart', function(e) {
+    e.preventDefault(); // Prevent default touch behavior (like scrolling)
 
-//     if (e.touches.length !== 1) return; // Ensure it's a single touch
-//     touchStartTime = Date.now();
+    if (e.touches.length === 1) {
+        touchStartTime = Date.now();
 
-//     isDragging = true;
-//     startX = e.touches[0].clientX - cameraOffsetX;
-//     startY = e.touches[0].clientY - cameraOffsetY;
+        // Single touch - start drag
+        isDragging = true;
+        startX = e.touches[0].clientX - cameraOffsetX;
+        startY = e.touches[0].clientY - cameraOffsetY;
 
-//     const touch = e.changedTouches[0];
-//     const clickX = touch.clientX - canvas.offsetLeft;
-//     const clickY = touch.clientY - canvas.offsetTop;
+        const touch = e.changedTouches[0];
+        const clickX = touch.clientX - canvas.offsetLeft;
+        const clickY = touch.clientY - canvas.offsetTop;
 
-//     let found = false;
-//     for (const tile of tiles) {
-//         if (!hoveredTile) break;
-//         if (isPointInsideTile(clickX, clickY, tile)) {
-//             //console.log(`You clicked on: ${tile.row}, ${tile.col}`);
+        let found = false;
+        for (const tile of tiles) {
+            if (!hoveredTile) break;
+            if (helpers.isPointInsideTile(clickX, clickY, tile)) {
+                //console.log(`You clicked on: ${tile.row}, ${tile.col}`);
 
-//             if (!selectedTile && unitIsTeam(hoveredTile.row, hoveredTile.col)) {
-//                 selectedTile = tile;
-//             } else if (selectedTile && tile.row === selectedTile.row && tile.col === selectedTile.col) {
-//                 const unit = units.find(unit => unit.row === selectedTile!.row && unit.col === selectedTile!.col);
-//                 console.log(`Moving to: ${tile.row}, ${tile.col}`);
-//                 window.socket.emit('player-unit-move', unit!.id, tile);
-//                 break;
-//             } else if (selectedTile && unitIsTeam(selectedTile.row, selectedTile.col)) {
-//                 const unit = units.find(unit => unit.row === selectedTile!.row && unit.col === selectedTile!.col);
-//                 console.log(`Moving to: ${tile.row}, ${tile.col}`);
-//                 window.socket.emit('player-unit-move', unit!.id, tile);
-//                 selectedTile = null;
-//             }
-//             found = true;
-//             break;
-//         }
-//     }
-//     if (!found) {
-//         selectedTile = null;
-//     }
-// });
+                if (!selectedTile && unitIsTeam(hoveredTile.row, hoveredTile.col)) {
+                    selectedTile = tile;
+                } else if (selectedTile && tile.row === selectedTile.row && tile.col === selectedTile.col) {
+                    const unit = units.find(unit => unit.row === selectedTile!.row && unit.col === selectedTile!.col);
+                    console.log(`Staying on: ${tile.row}, ${tile.col}`);
+                    window.socket.emit('player-unit-move', unit!.id, tile);
+                    break;
+                } else if (selectedTile && unitIsTeam(selectedTile.row, selectedTile.col)) {
+                    const unit = units.find(unit => unit.row === selectedTile!.row && unit.col === selectedTile!.col);
+                    console.log(`Moving to: ${tile.row}, ${tile.col}`);
+                    window.socket.emit('player-unit-move', unit!.id, tile);
+                    selectedTile = null;
+                }
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            selectedTile = null;
+        }
+    } else if (e.touches.length === 2) {
+        // Two touches - pinch-to-zoom
+        const touch1X = e.touches[0].clientX;
+        const touch1Y = e.touches[0].clientY;
+        const touch2X = e.touches[1].clientX;
+        const touch2Y = e.touches[1].clientY;
 
-// let prevTouchDistance: number | null = null;
+        // Calculate the initial distance between the two touch points
+        prevTouchDistance = Math.sqrt(
+            (touch2X - touch1X) ** 2 + (touch2Y - touch1Y) ** 2
+        );
+    }
+});
 
-// canvas.addEventListener('touchmove', function(e) {
-//     e.preventDefault();
+canvas.addEventListener('touchmove', function(e) {
+    e.preventDefault();
 
-//     if (e.touches.length === 1) {
-//         if (!isDragging) return;
+    if (e.touches.length === 1) {
+        const touchX = e.touches[0].clientX;
+        const touchY = e.touches[0].clientY;
 
-//         const touchX = e.touches[0].clientX;
-//         const touchY = e.touches[0].clientY;
+        if (isDragging) {
+            cameraOffsetX = touchX - startX;
+            cameraOffsetY = touchY - startY;
 
-//         cameraOffsetX = touchX - startX;
-//         cameraOffsetY = touchY - startY;
+            // Update hovered tile (similar to mousemove)
+            const clickX = touchX - canvas.offsetLeft;
+            const clickY = touchY - canvas.offsetTop;
 
-//         // Update hovered tile (similar to mousemove)
-//         const clickX = touchX - canvas.offsetLeft;
-//         const clickY = touchY - canvas.offsetTop;
+            for (const tile of tiles) {
+                if (helpers.isPointInsideTile(clickX, clickY, tile)) {
+                    hoveredTile = tile;
+                    break;
+                } else {
+                    hoveredTile = null;
+                }
+            }
+        }
 
-//         for (const tile of tiles) {
-//             if (isPointInsideTile(clickX, clickY, tile)) {
-//                 hoveredTile = tile;
-//                 break;
-//             }
-//             else {
-//                 hoveredTile = null;
-//             }
-//         }
-//     }
+        // Check if the movement is enough to start a drag (move threshold)
+        const movementThreshold = 5; // Pixels of movement threshold before considering it a drag
+        const moved = Math.abs(touchX - startX) > movementThreshold || Math.abs(touchY - startY) > movementThreshold;
+        if (moved) {
+            isDragging = true;
+        }
+    }
 
-//     if (e.touches.length === 2) {
-//         // Get the coordinates of the two touch points
-//         const touch1X = e.touches[0].clientX;
-//         const touch1Y = e.touches[0].clientY;
-//         const touch2X = e.touches[1].clientX;
-//         const touch2Y = e.touches[1].clientY;
+    if (e.touches.length === 2) {
+        // Two touches - pinch-to-zoom
+        const touch1X = e.touches[0].clientX;
+        const touch1Y = e.touches[0].clientY;
+        const touch2X = e.touches[1].clientX;
+        const touch2Y = e.touches[1].clientY;
 
-//         // Calculate the current distance between the two touch points
-//         const currentDistance = Math.sqrt(
-//             (touch2X - touch1X) ** 2 + (touch2Y - touch1Y) ** 2
-//         );
+        // Calculate the current distance between the two touch points
+        const currentDistance = Math.sqrt(
+            (touch2X - touch1X) ** 2 + (touch2Y - touch1Y) ** 2
+        );
 
-//         if (prevTouchDistance !== null) {
-//             // Calculate the scale factor based on the distance change
-//             const scaleChange = currentDistance / prevTouchDistance;
+        if (prevTouchDistance !== null) {
+            // Calculate the scale factor based on the distance change
+            const scaleChange = currentDistance / prevTouchDistance;
 
-//             // Apply the zoom (scale) adjustment
-//             if (scaleChange > 1) {
-//                 // Zoom in (scale up)
-//                 if (SCALE !== MAX_SCALE) SCALE *= 1.05;
-//                 if (SCALE > MAX_SCALE) SCALE = MAX_SCALE;
-//             } else {
-//                 // Zoom out (scale down)
-//                 if (SCALE !== MIN_SCALE) SCALE *= 0.95;
-//                 if (SCALE < MIN_SCALE) SCALE = MIN_SCALE;
-//             }
-//         }
+            // Apply the zoom (scale) adjustment
+            if (scaleChange > 1) {
+                // Zoom in (scale up)
+                if (SCALE !== MAX_SCALE) SCALE *= 1.05;
+                if (SCALE > MAX_SCALE) SCALE = MAX_SCALE;
+            } else {
+                // Zoom out (scale down)
+                if (SCALE !== MIN_SCALE) SCALE *= 0.95;
+                if (SCALE < MIN_SCALE) SCALE = MIN_SCALE;
+            }
+        }
 
-//         // Update the previous touch distance for the next move event
-//         prevTouchDistance = currentDistance;
-//     }
-// });
+        // Update the previous touch distance for the next move event
+        prevTouchDistance = currentDistance;
+    }
+});
 
-// canvas.addEventListener('touchend', function(e) {
-//     isDragging = false;
-//     if (e.touches.length < 2) {
-//         prevTouchDistance = null;
-//     }
-// });
+canvas.addEventListener('touchend', function(e) {
+    const touchEndTime = Date.now();
+    const touchDuration = touchEndTime - touchStartTime;
+
+    if (e.touches.length === 0 && touchDuration < TAP_THRESHOLD) {
+        // This was a tap (short touch duration and no dragging)
+        const touch = e.changedTouches[0];
+        const clickX = touch.clientX - canvas.offsetLeft;
+        const clickY = touch.clientY - canvas.offsetTop;
+
+        let found = false;
+        for (const tile of tiles) {
+            if (!hoveredTile) continue;
+            if (helpers.isPointInsideTile(clickX, clickY, tile)) {
+                if (!selectedTile && unitIsTeam(hoveredTile.row, hoveredTile.col)) {
+                    selectedTile = tile;
+                } else if (selectedTile && tile.row === selectedTile.row && tile.col === selectedTile.col) {
+                    const unit = units.find(unit => unit.row === selectedTile!.row && unit.col === selectedTile!.col);
+                    console.log(`Staying on: ${tile.row}, ${tile.col}`);
+                    window.socket.emit('player-unit-move', unit!.id, tile);
+                    break;
+                } else if (selectedTile && unitIsTeam(selectedTile.row, selectedTile.col)) {
+                    const unit = units.find(unit => unit.row === selectedTile!.row && unit.col === selectedTile!.col);
+                    console.log(`Moving to: ${tile.row}, ${tile.col}`);
+                    window.socket.emit('player-unit-move', unit!.id, tile);
+                    selectedTile = null;
+                }
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            selectedTile = null;
+        }
+    }
+
+    isDragging = false;
+    if (e.touches.length < 2) {
+        prevTouchDistance = null;
+    }
+});
 
 // ---------------UI EVENTS--------------------------------------------------------
 endTurnBtn.addEventListener('click', function(e){
