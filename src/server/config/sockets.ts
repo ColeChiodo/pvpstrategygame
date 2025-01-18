@@ -273,6 +273,7 @@ interface Player {
     id: string;
     socket: string;
     name: string;
+    profileimage: string;
     units: Unit[];
 }
 
@@ -666,6 +667,8 @@ function addPlayerToGame(gameState: GameState, socket: Socket) {
     const sessionID = socket.request.session.id;
     // @ts-expect-error
     const username = socket.request.session.user.username;
+    // @ts-expect-error
+    const profilePic = socket.request.session.user.profileimage;
 
     console.log(`Adding ${username} to game ${gameState.id}`);
 
@@ -673,6 +676,7 @@ function addPlayerToGame(gameState: GameState, socket: Socket) {
         id: sessionID,
         socket: socket.id,
         name: username,
+        profileimage: profilePic ? profilePic : "default",
         units: [],
     };
 

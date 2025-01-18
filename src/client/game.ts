@@ -1,14 +1,12 @@
 import * as helpers from './helpers';
 import { sprites } from './sprites';
 
-const user = JSON.parse(document.getElementById('user')!.innerHTML);
-
 const MIN_SCALE = 1.0; 
 const MAX_SCALE = 5.0;
 export let SCALE = 3.125;
 
 let cameraOffsetX = 0;
-let cameraOffsetY = 0;
+let cameraOffsetY = 75;
 
 let arenaImage: HTMLImageElement | null = null;
 let arena: Arena | null = null;
@@ -22,9 +20,6 @@ const tileTypes: TileType[] = [
 
 let uiImage = new Image();
 uiImage.src = '/assets/spritesheets/UI.png';
-
-let testUnitImage = new Image();
-testUnitImage.src = `/assets/spritesheets/units/test.png`;
 
 let players: Player[] = [];
 let units: Unit[] = [];
@@ -92,6 +87,12 @@ function editHTML() {
 
     player1Name.innerHTML = players[0].name;
     player2Name.innerHTML = players[1].name;
+
+    const player1ProfilePic = document.getElementById('player1ProfilePic') as HTMLImageElement;
+    const player2ProfilePic = document.getElementById('player2ProfilePic') as HTMLImageElement;
+
+    player1ProfilePic.src = `/assets/profileimages/${players[0].profileimage}.png`;
+    player2ProfilePic.src = `/assets/profileimages/${players[1].profileimage}.png`;
 
     const player1Timer = document.getElementById('player1Time') as HTMLDivElement;
     const player2Timer = document.getElementById('player2Time') as HTMLDivElement;
@@ -343,7 +344,7 @@ async function animateMove(tempUnit: Unit, origin: { row: number, col: number },
 }
 
 function isTurn(){
-    return players[currentRound % 2].name === user.username;
+    return players[currentRound % 2].socket === window.socket.id;
 }
 
 function unitCanMove(row: number, col: number): boolean {
@@ -478,7 +479,7 @@ function hasUnit(row: number, col: number): boolean {
 function unitIsTeam(row: number, col: number): boolean {
     for (const unit of units) {
         if (unit.row === row && unit.col === col) {
-            return unit.owner.name === user.username;
+            return unit.owner.socket === window.socket.id;
         }
     }
     return false;
@@ -487,7 +488,7 @@ function unitIsTeam(row: number, col: number): boolean {
 function unitCanBeHealed(row: number, col: number): boolean {
     for (const unit of units) {
         if (unit.row === row && unit.col === col) {
-            if (unit.owner.name !== user.username) return false;
+            if (unit.owner.socket !== window.socket.id) return false;
             return unit.health < unit.maxHealth;
         }
     }
@@ -497,7 +498,7 @@ function unitCanBeHealed(row: number, col: number): boolean {
 function unitCanBeAttacked(row: number, col: number): boolean {
     for (const unit of units) {
         if (unit.row === row && unit.col === col) {
-            if (unit.owner.name === user.username) return false;
+            if (unit.owner.socket === window.socket.id) return false;
             return unit.health > 0;
         }
     }
@@ -995,7 +996,9 @@ function drawUnits(){
 
         ctx.imageSmoothingEnabled = false;
 
-        ctx.drawImage(testUnitImage, sx, sy, frameSize, frameSize, pos.x, pos.y - frameSize * SCALE + (8 * SCALE), frameSize * SCALE, frameSize * SCALE);
+        let unitImage = new Image();
+        unitImage.src = `/assets/spritesheets/units/${unit.sprite.name}.png`
+        ctx.drawImage(unitImage, sx, sy, frameSize, frameSize, pos.x, pos.y - frameSize * SCALE + (8 * SCALE), frameSize * SCALE, frameSize * SCALE);
 
         //update the animation of the sprite
         unit.sprite.framesElapsed++;

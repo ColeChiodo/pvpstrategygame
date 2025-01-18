@@ -2,6 +2,7 @@ interface Player {
     id: string;
     socket: string;
     name: string;
+    profileimage: string;
     units: Unit[];
     time: number;
 }
