@@ -7,7 +7,7 @@
     <link rel="icon" type="image/png" href="/assets/profileimages/default.png">
     <script src="/js/tailwind.js"></script>
 </head>
-<body class="bg-primary flex flex-col items-center justify-start min-h-screen overflow-x-auto">
+<body class="bg-primary flex flex-col items-center justify-start min-h-screen overflow-x-auto text-md">
 
     <div id="main" class="bg-secondary w-screen h-screen flex items-center justify-center overflow-hidden">
         <div id="paralaxed" class="relative w-full h-full">
@@ -43,21 +43,23 @@
     <div id="second" class="bg-primary sm:w-screen md:w-1/2 flex justify-center p-4 flex-col">
         <div class="flex flex-col lg:flex-row">
             <div class="flex flex-col">
-                <p class="text-white text-xl mb-4 font-bold">{GAME TITLE}</p>
-                <p class="text-white my-4">Turn Based Player-Versus-Player Strategy Tactics Game. Take Control of several units to defeat you opponent.</p>
+                <p class="text-white text-4xl font-bold">{GAME TITLE}</p>
+                <p class="text-white mb-4">Turn Based Player-Versus-Player Strategy Tactics Game. Take Control of several units to defeat you opponent.</p>
             </div>
             <img src="/assets/landing/example.png"
             alt="Example Game Scene"
+            class="object-cover"
             style="image-rendering: pixelated;">
         </div>
 
         <div class="flex flex-col lg:flex-row">
             <div class="flex flex-col">
-                <p class="text-white text-xl my-4 font-bold">Play Against Others</p>
+                <p class="text-white text-4xl mt-4 font-bold">Play Against Others</p>
                 <p class="text-white mb-4">Match up against players from around the world, or create a private match for you and your friends.</p>
             </div>
             <img src="/assets/landing/example.png"
             alt="Example Game Scene"
+            class="object-cover"
             style="image-rendering: pixelated;">
         </div>
         <div class="flex items-center justify-center">

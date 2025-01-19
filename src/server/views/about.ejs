@@ -8,8 +8,51 @@
     <script src="/js/tailwind.js"></script>
 </head>
 <%- include('partials/header') %>
-<body>
+<body class="bg-primary flex flex-col items-center">
+
+    <div class="min-h-screen flex flex-col items-center p-8 w-screen lg:w-1/2  text-md">
+        <!-- Author Section -->
+        <div class="flex flex-col lg:flex-row w-full">
+            <div class="flex flex-col">
+                <p class="text-white text-xl m-4 font-bold">Author</p>
+                <p class="text-white my-4">Hi, Im Cole Chiodo. A recent Computer Science Graduate with an interest in video games.<br/>Learn more at <a href="http://colechiodo.cc" class="underline">colechiodo.cc</a></p>
+            </div>
+        </div>
     
+        <!-- Project Description Section -->
+        <div class="flex flex-col lg:flex-row w-full">
+            <div class="flex flex-col">
+                <p class="text-white text-xl m-4 font-bold">Project Description</p>
+                <p class="text-white my-4">I decided to make this project while searching for a job to pass the time and improve my Software Engineering skills.</p>
+            </div>
+        </div>
+    
+        <!-- Credits Section -->
+        <div class="flex flex-col lg:flex-row w-full">
+            <div class="flex flex-col">
+                <p class="text-white text-xl m-4 font-bold">Credits</p>
+                <p class="text-white my-4">Font: "VT323" by The VT323 Project Authors (peter.hull@oikoi.com) is used under the  SIL Open Font License, Version 1.1.</p>
+            </div>
+        </div>
+    
+        <!-- How It Is Made Section -->
+        <div class="flex flex-col lg:flex-row w-full">
+            <div class="flex flex-col">
+                <p class="text-white text-xl m-4 font-bold">How It Is Made</p>
+                <p class="text-white my-4">"[Project Name]" was created using a combination of tools and technologies, including.</p>
+            </div>
+        </div>
+    
+        <!-- Future Plans Section -->
+        <div class="flex flex-col lg:flex-row w-full">
+            <div class="flex flex-col">
+                <p class="text-white text-xl m-4 font-bold">Future Plans</p>
+                <p class="text-white my-4">Looking ahead, I plan to continue working on this project. Some of the key developments include [upcoming features, improvements, or collaborations]. We aim to continue [the project's goals or vision] and expand its reach to [new audiences, markets, or applications]. Stay tuned for updates!</p>
+            </div>
+        </div>
+    </div>
+    
+
 </body>
 <%- include('partials/footer') %>
 </html>

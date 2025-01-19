@@ -7,20 +7,20 @@
     <link rel="icon" type="image/png" href="/assets/profileimages/default.png">
     <script src="/js/tailwind.js"></script>
 </head>
-<body class="bg-primary flex items-center justify-center min-h-screen">
+<body class="bg-primary flex items-center justify-center min-h-screen text-lg">
 
     <div class="bg-secondary p-8 w-full max-w-md text-white">
         <h1 class="text-3xl font-bold mb-6 text-center">Login</h1>
         
         <form action="/auth/login" method="POST" class="space-y-4">
             <div>
-                <label for="credential" class="block text-sm font-medium">Username or Email</label>
+                <label for="credential" class="block font-medium">Username or Email</label>
                 <input type="text" name="credential" id="credential" required 
                        class="bg-white text-primary mt-1 block w-full px-4 py-2 border-r-4 border-b-4 border-primary focus:outline-none focus:ring-2 focus:ring-primary">
             </div>
 
             <div>
-                <label for="password" class="block text-sm font-medium">Password</label>
+                <label for="password" class="block font-medium">Password</label>
                 <input type="password" name="password" id="password" required
                     class="bg-white text-primary mt-1 block w-full px-4 py-2 border-r-4 border-b-4 border-primary focus:outline-none focus:ring-2 focus:ring-primary">
             </div>

@@ -7,32 +7,32 @@
     <link rel="icon" type="image/png" href="/assets/profileimages/default.png">
     <script src="/js/tailwind.js"></script>
 </head>
-<body class="bg-primary flex items-center justify-center min-h-screen">
+<body class="bg-primary flex items-center justify-center min-h-screen text-md">
 
     <div class="bg-secondary p-8 w-full max-w-md text-white">
         <h1 class="text-3xl font-bold mb-6 text-center">Register</h1>
 
         <form action="/auth/register" method="POST" class="space-y-4">
             <div>
-                <label for="username" class="block text-sm font-medium">Username</label>
+                <label for="username" class="block font-medium">Username</label>
                 <input type="text" name="username" id="username" required 
                        class="bg-white text-primary mt-1 block w-full px-4 py-2 border-r-4 border-b-4 border-primary focus:outline-none focus:ring-2 focus:ring-primary">
             </div>
 
             <div>
-                <label for="email" class="block text-sm font-medium">Email</label>
+                <label for="email" class="block font-medium">Email</label>
                 <input type="email" name="email" id="email" required 
                        class="bg-white text-primary mt-1 block w-full px-4 py-2 border-r-4 border-b-4 border-primary focus:outline-none focus:ring-2 focus:ring-primary">
             </div>
 
             <div>
-                <label for="password" class="block text-sm font-medium">Password</label>
+                <label for="password" class="block font-medium">Password</label>
                 <input type="password" name="password" id="password" required
                        class="bg-white text-primary mt-1 block w-full px-4 py-2 border-r-4 border-b-4 border-primary focus:outline-none focus:ring-2 focus:ring-primary">
             </div>
 
             <div>
-                <label for="password_confirmation" class="block text-sm font-medium">Confirm Password</label>
+                <label for="password_confirmation" class="block font-medium">Confirm Password</label>
                 <input type="password" name="password_confirmation" id="password_confirmation" required
                        class="bg-white text-primary mt-1 block w-full px-4 py-2 border-r-4 border-b-4 border-primary focus:outline-none focus:ring-2 focus:ring-primary">
             </div>
