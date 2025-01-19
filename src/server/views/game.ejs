@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <%- include('partials/meta') %>
     <title>Play | Game Title</title>
     <link rel="icon" type="image/png" href="/assets/profileimages/default.png">
     <script src="/js/tailwind.js"></script>
@@ -20,21 +21,21 @@
     <canvas id="gameCanvas" class="fixed top-0 left-0"></canvas>
 
     <div id="playerInfo" class="fixed top-0 left-0 w-full h-[100px] bg-transparent text-white flex justify-between items-center px-4 pointer-events-none mt-3">
-        <div id="player1" class="flex items-center bg-blue-500 p-3 w-[300px]">
+        <div id="player1" class="flex items-center p-3 w-[300px] border-4">
             <img id="player1ProfilePic" src="/assets/profileimages/default.png" 
                  alt="Player 1 Profile Picture" 
                  class="w-[64px] h-[64px] mr-3" 
                  style="image-rendering: pixelated;">
-            <div class="text-left">
-                <div id="player1Name" class="font-bold text-lg">Player 1</div>
-                <div id="player1Time" class="text-sm">00:00</div>
+            <div class="text-left text-primary">
+                <div id="player1Name" class="font-bold text-lg -my-3">Player 1</div>
+                <div id="player1Time" class="-my-3">00:00</div>
             </div>
         </div>
 
-        <div id="player2" class="flex items-center bg-red-500 p-3 w-[300px] justify-end text-right">
-            <div class="text-right mr-3">
-                <div id="player2Name" class="font-bold text-lg">Player 2</div>
-                <div id="player2Time" class="text-sm">00:00</div>
+        <div id="player2" class="flex items-center p-3 w-[300px] justify-end text-right border-4">
+            <div class="text-right mr-3 text-primary">
+                <div id="player2Name" class="font-bold text-lg -my-3">Player 2</div>
+                <div id="player2Time" class="-my-3">00:00</div>
             </div>
             <img id="player2ProfilePic" src="/assets/profileimages/default.png" 
                  alt="Player 2 Profile Picture" 
@@ -46,7 +47,7 @@
     
 
     <div id="endTurn" class="fixed bottom-0 right-0 flex items-center justify-center flex-col p-4">
-        <button id="endTurnBtn" class="mt-3 bg-red-500 text-primary p-2 border-r-4 border-b-4 border-primary hover:bg-red-600 transition h-32 w-64 disabled:bg-gray-500">End Turn</button>
+        <button id="endTurnBtn" class="mt-3 bg-red-500 text-primary p-2 border-r-4 border-b-4 border-primary hover:bg-red-600 transition h-16 w-32 text-md lg:h-32 lg:w-64 lg:text-lg disabled:bg-gray-500">End Turn</button>
     </div>
 
     <div id="loading" class="fixed w-full h-screen min-h-screen bg-black bg-opacity-85 flex items-center justify-center top-0 left-0 flex-col">

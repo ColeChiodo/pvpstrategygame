@@ -23,8 +23,9 @@ uiImage.src = '/assets/spritesheets/UI.png';
 
 let players: Player[] = [];
 let units: Unit[] = [];
-let visibleTiles: { row: number, col: number }[] = [];
+let tiles: { x: number, y: number, row: number, col: number}[] = [];
 
+let visibleTiles: { row: number, col: number }[] = [];
 let hoveredTile: { x: number, y: number, row: number, col: number } | null = null;
 let selectedTile: { x: number, y: number, row: number, col: number } | null = null;
 let moveTile: { x: number, y: number, row: number, col: number } | null = null;
@@ -43,105 +44,12 @@ let gameOver = false;
 const canvas = document.getElementById('gameCanvas') as HTMLCanvasElement;
 const ctx = canvas.getContext('2d')!;
 
-function drawBackground() {
-    ctx.fillStyle = '#222034';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+function gameLoop() {
+    draw();
+    requestAnimationFrame(gameLoop);
 }
 
-function drawArena() {
-    if (arenaImage) {
-        ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(arenaImage, (canvas.width - arena!.width * SCALE) / 2 + cameraOffsetX, (canvas.height - arena!.height * SCALE + 16 * SCALE) / 2 + cameraOffsetY, arena!.width * SCALE, arena!.height * SCALE);
-    }
-}
-
-function draw() {
-    if (!gameOver) gameOverUI.style.display = 'none';
-    else gameOverUI.style.display = 'flex';
-    const loading = document.getElementById('loading');
-    if (loading && players.length === 2) loading.style.display = 'none';
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    drawBackground();
-    drawArena();
-    drawFogOfWarTiles();
-    drawUnits();
-    drawUI();
-    drawInteractionSquares();
-    editHTML();
-}
-
-function formatTime(seconds: number): string {
-    const minutes = Math.floor(seconds / 60); 
-    const remainingSeconds = seconds % 60;
-
-    const formattedMinutes = minutes.toString().padStart(2, '0');
-    const formattedSeconds = remainingSeconds.toString().padStart(2, '0');
-
-    return `${formattedMinutes}:${formattedSeconds}`;
-}
-
-function editHTML() {
-    if (players.length < 2) return;
-    const player1Name = document.getElementById('player1Name') as HTMLDivElement;
-    const player2Name = document.getElementById('player2Name') as HTMLDivElement;
-
-    player1Name.innerHTML = players[0].name;
-    player2Name.innerHTML = players[1].name;
-
-    const player1ProfilePic = document.getElementById('player1ProfilePic') as HTMLImageElement;
-    const player2ProfilePic = document.getElementById('player2ProfilePic') as HTMLImageElement;
-
-    player1ProfilePic.src = `/assets/profileimages/${players[0].profileimage}.png`;
-    player2ProfilePic.src = `/assets/profileimages/${players[1].profileimage}.png`;
-
-    const player1Timer = document.getElementById('player1Time') as HTMLDivElement;
-    const player2Timer = document.getElementById('player2Time') as HTMLDivElement;
-
-    const player1FormattedTime = formatTime(player1Time);
-    const player2FormattedTime = formatTime(player2Time);
-
-    player1Timer.innerHTML = player1FormattedTime;
-    player2Timer.innerHTML = player2FormattedTime;
-}
-
-window.addEventListener('keydown', (e) => {
-    switch (e.key) {
-        case 'z':
-            if (SCALE !== MIN_SCALE)
-                SCALE -= 0.125;
-            if (SCALE < MIN_SCALE)
-                SCALE = MIN_SCALE;
-            break;
-        case 'x':
-            if (SCALE !== MAX_SCALE) 
-                SCALE += 0.125;
-            if (SCALE > MAX_SCALE)
-                SCALE = MAX_SCALE;
-            break;
-        case "ArrowUp":
-        case "w":
-            cameraOffsetY += 8 * SCALE;
-            break;
-        case "ArrowDown":
-        case "s":
-            cameraOffsetY -= 8 * SCALE;
-            break;
-        case "ArrowLeft":
-        case "a":
-            cameraOffsetX += 8 * SCALE;
-            break;
-        case "ArrowRight":
-        case "d":
-            cameraOffsetX -= 8 * SCALE;
-            break;
-        case "Enter":
-            window.socket.emit('force-end-turn');
-            selectedTile = null;
-            isAction = false;
-            moveTile = null;
-            break;
-    }
-});
+gameLoop();
 
 function loadUnits(players: Player[]) {
     if (!isAnimating) {
@@ -179,7 +87,52 @@ function loadPlayers(newPlayers: Player[]) {
         else endTurnBtn.disabled = true;
     }
 }
+
+function loadArenaImage(newArena: Arena) {
+    if (!arenaImage) { 
+        arenaImage = new Image();
+        arenaImage.src = `/assets/maps/${newArena.name}.png`;
+        arena = newArena;
+        arenaImage.onload = () => {
+            drawArena();
+        };
+    }
+}
+
+function resizeCanvas() {
+    canvas.width = window.outerWidth;
+    canvas.height = window.innerHeight;
+    draw();
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+window.addEventListener('orientationchange', resizeCanvas);
+
+async function animateMove(tempUnit: Unit, origin: { row: number, col: number }, target: { x: number, y: number, row: number, col: number }) {
+    isAnimating = true;
+    const path = astarPath(origin.row, origin.col, target.row, target.col);
+    const realUnit = units.find(unit => unit.row === tempUnit.row && unit.col === tempUnit.col);
+    if (!realUnit) return;
     
+    for (const tile of path) {
+        if (!isAnimating) break;
+        animatingUnit = realUnit;
+        realUnit.currentStatus = 2;
+        realUnit.sprite.currentFrame = 0;
+        // play footstep sound
+        realUnit.row = tile.y;
+        realUnit.col = tile.x;
+        await sleep(100);
+    }
+
+    isAnimating = false;
+    animatingUnit = null;
+    realUnit.currentStatus = 0;
+    realUnit.sprite.currentFrame = 0;
+}
+
+// -----------Socket Events--------------------------------
+
 window.socket.on('gameState', (gameState) => {
     loadArenaImage(gameState.arena); // move to a game start function in the future to only load once
     loadPlayers(gameState.players);
@@ -229,34 +182,106 @@ window.socket.on('nextRound', (player) => {
     }, 4000);
 });
 
-function gameLoop() {
-    draw();
-    requestAnimationFrame(gameLoop);
+window.socket.on('player-unit-moving', (unit: Unit, origin: {row: number, col: number}, target: { x: number, y: number, row: number, col: number }) => {
+    isAction = true;
+    animateMove(unit, origin, target);
+    moveTile = target;
+    console.log(`Unit ${unit.id} looking to perform an action`);
+});
+
+let isAnimating = false;
+let animatingUnit: Unit | null;
+
+function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-gameLoop();
+// -----------Drawing Functions----------------------------
 
-function loadArenaImage(newArena: Arena) {
-    if (!arenaImage) { 
-        arenaImage = new Image();
-        arenaImage.src = `/assets/maps/${newArena.name}.png`;
-        arena = newArena;
-        arenaImage.onload = () => {
-            drawArena();
-        };
+function drawBackground() {
+    ctx.fillStyle = '#222034';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+}
+
+function drawArena() {
+    if (arenaImage) {
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(arenaImage, (canvas.width - arena!.width * SCALE) / 2 + cameraOffsetX, (canvas.height - arena!.height * SCALE + 16 * SCALE) / 2 + cameraOffsetY, arena!.width * SCALE, arena!.height * SCALE);
     }
 }
 
-function resizeCanvas() {
-    canvas.width = window.outerWidth;
-    canvas.height = window.innerHeight;
-    draw();
+function draw() {
+    if (!gameOver) gameOverUI.style.display = 'none';
+    else gameOverUI.style.display = 'flex';
+    const loading = document.getElementById('loading');
+    if (loading && players.length === 2) loading.style.display = 'none';
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawBackground();
+    drawArena();
+    drawFogOfWarTiles();
+    drawUnits();
+    drawUI();
+    drawInteractionSquares();
+    editHTML();
 }
-resizeCanvas();
-window.addEventListener('resize', resizeCanvas);
-window.addEventListener('orientationchange', resizeCanvas);
 
-let tiles: { x: number, y: number, row: number, col: number}[] = [];
+function drawUI(){
+    drawHoveredTile();
+    drawSelectedTile();
+    drawMovementTiles();
+    drawActionTiles();
+    drawPath();
+    drawHealthBars();
+    drawTileInfo();
+    drawHoveredUnitName();
+}
+
+function editHTML() {
+    if (players.length < 2) return;
+    const player1BG = document.getElementById('player1') as HTMLDivElement;
+    const player2BG = document.getElementById('player2') as HTMLDivElement;
+
+    if (players[0].socket === window.socket.id) {
+        player1BG.classList.add("bg-blue-600");
+        player1BG.classList.remove("bg-red-600");
+        player1BG.classList.add("border-blue-400");
+        player1BG.classList.remove("boarder-red-400");
+        player2BG.classList.add("bg-red-600");
+        player2BG.classList.remove("bg-blue-600");
+        player2BG.classList.add("border-red-400");
+        player2BG.classList.remove("boarder-blue-400");
+    } else {
+        player2BG.classList.add("bg-blue-600");
+        player2BG.classList.remove("bg-red-600");
+        player2BG.classList.add("border-blue-400");
+        player2BG.classList.remove("boarder-red-400");
+        player1BG.classList.add("bg-red-600");
+        player1BG.classList.remove("bg-blue-600");
+        player1BG.classList.add("border-red-400");
+        player1BG.classList.remove("boarder-blue-400");
+    }
+
+    const player1Name = document.getElementById('player1Name') as HTMLDivElement;
+    const player2Name = document.getElementById('player2Name') as HTMLDivElement;
+
+    player1Name.innerHTML = players[0].name;
+    player2Name.innerHTML = players[1].name;
+
+    const player1ProfilePic = document.getElementById('player1ProfilePic') as HTMLImageElement;
+    const player2ProfilePic = document.getElementById('player2ProfilePic') as HTMLImageElement;
+
+    player1ProfilePic.src = `/assets/profileimages/${players[0].profileimage}.png`;
+    player2ProfilePic.src = `/assets/profileimages/${players[1].profileimage}.png`;
+
+    const player1Timer = document.getElementById('player1Time') as HTMLDivElement;
+    const player2Timer = document.getElementById('player2Time') as HTMLDivElement;
+
+    const player1FormattedTime = formatTime(player1Time);
+    const player2FormattedTime = formatTime(player2Time);
+
+    player1Timer.innerHTML = player1FormattedTime;
+    player2Timer.innerHTML = player2FormattedTime;
+}
 
 function drawInteractionSquares() {
     if (!arenaImage) return;
@@ -306,94 +331,6 @@ function drawIsometricTile(x: number, y: number, row: number, col: number) {
     return { x, y, row, col };
 }
 
-window.socket.on('player-unit-moving', (unit: Unit, origin: {row: number, col: number}, target: { x: number, y: number, row: number, col: number }) => {
-    isAction = true;
-    animateMove(unit, origin, target);
-    moveTile = target;
-    console.log(`Unit ${unit.id} looking to perform an action`);
-});
-
-let isAnimating = false;
-let animatingUnit: Unit | null;
-
-function sleep(ms: number) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-async function animateMove(tempUnit: Unit, origin: { row: number, col: number }, target: { x: number, y: number, row: number, col: number }) {
-    isAnimating = true;
-    const path = astarPath(origin.row, origin.col, target.row, target.col);
-    const realUnit = units.find(unit => unit.row === tempUnit.row && unit.col === tempUnit.col);
-    if (!realUnit) return;
-    
-    for (const tile of path) {
-        if (!isAnimating) break;
-        animatingUnit = realUnit;
-        realUnit.currentStatus = 2;
-        realUnit.sprite.currentFrame = 0;
-        // play footstep sound
-        realUnit.row = tile.y;
-        realUnit.col = tile.x;
-        await sleep(100);
-    }
-
-    isAnimating = false;
-    animatingUnit = null;
-    realUnit.currentStatus = 0;
-    realUnit.sprite.currentFrame = 0;
-}
-
-function isTurn(){
-    return players[currentRound % 2].socket === window.socket.id;
-}
-
-function unitCanMove(row: number, col: number): boolean {
-    for (const unit of units) {
-        if (unit.row === row && unit.col === col) {
-            return unit.canMove;
-        }
-    }
-    return false;
-}
-
-function hasUnit(row: number, col: number): boolean {
-    for (const unit of units) {
-        if (unit.row === row && unit.col === col) {
-            return true;
-        }
-    }
-    return false;
-}
-
-function unitIsTeam(row: number, col: number): boolean {
-    for (const unit of units) {
-        if (unit.row === row && unit.col === col) {
-            return unit.owner.socket === window.socket.id;
-        }
-    }
-    return false;
-}
-
-function unitCanBeHealed(row: number, col: number): boolean {
-    for (const unit of units) {
-        if (unit.row === row && unit.col === col) {
-            if (unit.owner.socket !== window.socket.id) return false;
-            return unit.health < unit.maxHealth;
-        }
-    }
-    return false;
-}
-
-function unitCanBeAttacked(row: number, col: number): boolean {
-    for (const unit of units) {
-        if (unit.row === row && unit.col === col) {
-            if (unit.owner.socket === window.socket.id) return false;
-            return unit.health > 0;
-        }
-    }
-    return false;
-}
-
 function drawHoveredTile() {
     if (!hoveredTile) return;
     const frameSize = 32;
@@ -426,17 +363,6 @@ function drawSelectedTile() {
     ctx.drawImage(uiImage, sx, sy, frameSize, frameSize, pos.x, pos.y - 8 * SCALE, frameSize * SCALE, frameSize * SCALE);
 }
 
-function drawUI(){
-    drawHoveredTile();
-    drawSelectedTile();
-    drawMovementTiles();
-    drawActionTiles();
-    drawPath();
-    drawHealthBars();
-    drawTileInfo();
-    drawHoveredUnitName();
-}
-
 function drawTileInfo() {
     if (!arena) return;
     if (!hoveredTile) return;
@@ -445,7 +371,7 @@ function drawTileInfo() {
     const margin = 10;
     const padding = 10;
     const squareX = 0;
-    const squareY = margin;
+    const squareY = margin + (64 * 4);
 
     const terrain: number = arena.tiles[hoveredTile.row][hoveredTile.col];
     const terrainType = tileTypes.find(tile => tile.id === terrain);
@@ -455,8 +381,8 @@ function drawTileInfo() {
     ctx.fillRect(squareX, squareY, bgWidth, bgHeight); // replace with tile info ui back image
 
     ctx.fillStyle = 'white';
-    ctx.font = '24px "Press Start 2P"';
-    ctx.fillText(terrainType.name, squareX + padding, squareY + padding + 34);
+    ctx.font = '42px "VT323"';
+    ctx.fillText(terrainType.name.toUpperCase(), squareX + padding, squareY + padding + 34);
 }
 
 function drawHoveredUnitName() {
@@ -479,7 +405,7 @@ function drawHoveredUnitName() {
     ctx.fillRect(squareX, squareY, bgWidth, bgHeight); // replace with tile info ui back image
 
     ctx.fillStyle = 'white';
-    ctx.font = '24px "Press Start 2P"';
+    ctx.font = '42px "VT323"';
     ctx.fillText(hoveredUnit.name.toUpperCase(), squareX + padding, squareY + padding + 34);
 }
 
@@ -493,12 +419,6 @@ function drawFogOfWarTiles() {
             drawFogOfWarTile(row, col);
         }
     }
-}
-
-function isVisibleTile(row: number, col: number): boolean {
-    const tile = visibleTiles.find(visibleTiles => visibleTiles.row === row && visibleTiles.col === col);
-    if (tile) return true;
-    return false;
 }
 
 function drawFogOfWarTile(row: number, col: number){
@@ -653,118 +573,6 @@ function drawMovementTiles(){
     }
 }
 
-function adjacentTile(row1: number, col1: number, row2: number, col2: number): boolean {
-    return (row1 === row2 && col1 === col2) || 
-           (Math.abs(row1 - row2) === 1 && col1 === col2) || 
-           (Math.abs(col1 - col2) === 1 && row1 === row2);
-}
-
-// A* Pathfinding Algorithm
-function astarPath(startRow: number, startCol: number, endRow: number, endCol: number): { x: number, y: number }[] {
-    if (!arena) return [];
-    const grid = arena.tiles;
-    const openList: Tile[] = [];
-    const closedList: Set<string> = new Set();
-
-    const startTile: Tile = { 
-        x: startCol, 
-        y: startRow, 
-        g: 0, 
-        h: heuristic({ x: startCol, y: startRow, g: 0, h: 0, f: 0, parent: null }, { x: endCol, y: endRow, g: 0, h: 0, f: 0, parent: null }), 
-        f: 0, 
-        parent: null 
-    };
-    const endTile: Tile = { x: endCol, y: endRow, g: 0, h: 0, f: 0, parent: null };
-
-    openList.push(startTile);
-
-    const neighbors = [
-        { x: 0, y: -1 }, { x: 0, y: 1 }, { x: -1, y: 0 }, { x: 1, y: 0 },
-    ];
-
-    while (openList.length > 0) {
-        // Sort openList by F cost (lowest F cost first)
-        openList.sort((a, b) => a.f - b.f);
-        const current = openList.shift()!; // Get the tile with the lowest F cost
-
-        // If we've reached the goal, reconstruct the path
-        if (current.x === endTile.x && current.y === endTile.y) {
-            const path: { x: number, y: number }[] = [];
-            let currentTile: Tile | null = current;
-            while (currentTile) {
-                path.unshift({ x: currentTile.x, y: currentTile.y });
-                currentTile = currentTile.parent;
-            }
-            return path;
-        }
-
-        closedList.add(`${current.x},${current.y}`);
-
-        // Check all neighbors
-        for (const { x: dx, y: dy } of neighbors) {
-            const neighborX = current.x + dx;
-            const neighborY = current.y + dy;
-
-            // Check if the neighbor is within bounds and is not an obstacle (assuming 0 = walkable, 1 = obstacle)
-            if (neighborX >= 0 && neighborX < grid[0].length && neighborY >= 0 && neighborY < grid.length && grid[neighborY][neighborX] !== 0) {
-                const neighbor: Tile = {
-                    x: neighborX,
-                    y: neighborY,
-                    g: current.g + 1, // Assume cost to move to any neighbor is 1
-                    h: heuristic({ x: neighborX, y: neighborY, g: 0, h: 0, f: 0, parent: null }, { x: endCol, y: endRow, g: 0, h: 0, f: 0, parent: null }),
-                    f: 0,
-                    parent: current
-                };                
-
-                if (closedList.has(`${neighbor.x},${neighbor.y}`)) {
-                    continue; // Skip if already evaluated
-                }
-
-                // Check if this neighbor is better (lower f) than any previously evaluated
-                if (!openList.some(tile => tile.x === neighbor.x && tile.y === neighbor.y)) {
-                    neighbor.f = neighbor.g + neighbor.h;
-                    openList.push(neighbor);
-                }
-            }
-        }
-    }
-
-    return []; // No path found
-}
-
-function heuristic(a: Tile, b: Tile): number {
-    return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
-}
-
-// Bresenham's Line Algorithm
-function bresenhamPath(startRow: number, startCol: number, endRow: number, endCol: number) {
-    const path = [];
-    let x = startCol;
-    let y = startRow;
-    const dx = Math.abs(endCol - startCol);
-    const dy = Math.abs(endRow - startRow);
-    const sx = startCol < endCol ? 1 : -1;
-    const sy = startRow < endRow ? 1 : -1;
-    let err = dx - dy;
-
-    while (x !== endCol || y !== endRow) {
-        path.push({ x, y });
-
-        const e2 = err * 2;
-        if (e2 > -dy) {
-            err -= dy;
-            x += sx;
-        }
-        if (e2 < dx) {
-            err += dx;
-            y += sy;
-        }
-    }
-
-    path.push({ y: endRow, x: endCol });
-    return path;
-}
-
 function drawPath(){
     if (!selectedTile) return;
     if (!hoveredTile) return;
@@ -901,16 +709,46 @@ function drawUnits(){
     }
 }
 
-function coordToPosition(row: number, col: number): { x: number, y: number } {
-    for (const tile of tiles) {
-        if (tile.row === row && tile.col === col) {
-            return { x: tile.x, y: tile.y };
-        }
-    }
-    return { x: -9999, y: -9999 };
-}
-
 // -----------Canvas Events Controls-----------------------
+
+window.addEventListener('keydown', (e) => {
+    switch (e.key) {
+        case 'z':
+            if (SCALE !== MIN_SCALE)
+                SCALE -= 0.125;
+            if (SCALE < MIN_SCALE)
+                SCALE = MIN_SCALE;
+            break;
+        case 'x':
+            if (SCALE !== MAX_SCALE) 
+                SCALE += 0.125;
+            if (SCALE > MAX_SCALE)
+                SCALE = MAX_SCALE;
+            break;
+        case "ArrowUp":
+        case "w":
+            cameraOffsetY += 8 * SCALE;
+            break;
+        case "ArrowDown":
+        case "s":
+            cameraOffsetY -= 8 * SCALE;
+            break;
+        case "ArrowLeft":
+        case "a":
+            cameraOffsetX += 8 * SCALE;
+            break;
+        case "ArrowRight":
+        case "d":
+            cameraOffsetX -= 8 * SCALE;
+            break;
+        case "Enter":
+            window.socket.emit('force-end-turn');
+            selectedTile = null;
+            isAction = false;
+            moveTile = null;
+            break;
+    }
+});
 
 let isDragging = false;
 let startX = 0;
@@ -1199,3 +1037,193 @@ endTurnBtn.addEventListener('click', function(e){
     isAction = false;
     moveTile = null;
 });
+
+// ----------------Helpers=========================================================
+
+function formatTime(seconds: number): string {
+    const minutes = Math.floor(seconds / 60); 
+    const remainingSeconds = seconds % 60;
+
+    const formattedMinutes = minutes.toString().padStart(2, '0');
+    const formattedSeconds = remainingSeconds.toString().padStart(2, '0');
+
+    return `${formattedMinutes}:${formattedSeconds}`;
+}
+
+function unitCanMove(row: number, col: number): boolean {
+    for (const unit of units) {
+        if (unit.row === row && unit.col === col) {
+            return unit.canMove;
+        }
+    }
+    return false;
+}
+
+function hasUnit(row: number, col: number): boolean {
+    for (const unit of units) {
+        if (unit.row === row && unit.col === col) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function unitIsTeam(row: number, col: number): boolean {
+    for (const unit of units) {
+        if (unit.row === row && unit.col === col) {
+            return unit.owner.socket === window.socket.id;
+        }
+    }
+    return false;
+}
+
+function unitCanBeHealed(row: number, col: number): boolean {
+    for (const unit of units) {
+        if (unit.row === row && unit.col === col) {
+            if (unit.owner.socket !== window.socket.id) return false;
+            return unit.health < unit.maxHealth;
+        }
+    }
+    return false;
+}
+
+function unitCanBeAttacked(row: number, col: number): boolean {
+    for (const unit of units) {
+        if (unit.row === row && unit.col === col) {
+            if (unit.owner.socket === window.socket.id) return false;
+            return unit.health > 0;
+        }
+    }
+    return false;
+}
+
+function isVisibleTile(row: number, col: number): boolean {
+    const tile = visibleTiles.find(visibleTiles => visibleTiles.row === row && visibleTiles.col === col);
+    if (tile) return true;
+    return false;
+}
+
+function adjacentTile(row1: number, col1: number, row2: number, col2: number): boolean {
+    return (row1 === row2 && col1 === col2) || 
+           (Math.abs(row1 - row2) === 1 && col1 === col2) || 
+           (Math.abs(col1 - col2) === 1 && row1 === row2);
+}
+
+// A* Pathfinding Algorithm
+function astarPath(startRow: number, startCol: number, endRow: number, endCol: number): { x: number, y: number }[] {
+    if (!arena) return [];
+    const grid = arena.tiles;
+    const openList: Tile[] = [];
+    const closedList: Set<string> = new Set();
+
+    const startTile: Tile = { 
+        x: startCol, 
+        y: startRow, 
+        g: 0, 
+        h: heuristic({ x: startCol, y: startRow, g: 0, h: 0, f: 0, parent: null }, { x: endCol, y: endRow, g: 0, h: 0, f: 0, parent: null }), 
+        f: 0, 
+        parent: null 
+    };
+    const endTile: Tile = { x: endCol, y: endRow, g: 0, h: 0, f: 0, parent: null };
+
+    openList.push(startTile);
+
+    const neighbors = [
+        { x: 0, y: -1 }, { x: 0, y: 1 }, { x: -1, y: 0 }, { x: 1, y: 0 },
+    ];
+
+    while (openList.length > 0) {
+        // Sort openList by F cost (lowest F cost first)
+        openList.sort((a, b) => a.f - b.f);
+        const current = openList.shift()!; // Get the tile with the lowest F cost
+
+        // If we've reached the goal, reconstruct the path
+        if (current.x === endTile.x && current.y === endTile.y) {
+            const path: { x: number, y: number }[] = [];
+            let currentTile: Tile | null = current;
+            while (currentTile) {
+                path.unshift({ x: currentTile.x, y: currentTile.y });
+                currentTile = currentTile.parent;
+            }
+            return path;
+        }
+
+        closedList.add(`${current.x},${current.y}`);
+
+        // Check all neighbors
+        for (const { x: dx, y: dy } of neighbors) {
+            const neighborX = current.x + dx;
+            const neighborY = current.y + dy;
+
+            // Check if the neighbor is within bounds and is not an obstacle (assuming 0 = walkable, 1 = obstacle)
+            if (neighborX >= 0 && neighborX < grid[0].length && neighborY >= 0 && neighborY < grid.length && grid[neighborY][neighborX] !== 0) {
+                const neighbor: Tile = {
+                    x: neighborX,
+                    y: neighborY,
+                    g: current.g + 1, // Assume cost to move to any neighbor is 1
+                    h: heuristic({ x: neighborX, y: neighborY, g: 0, h: 0, f: 0, parent: null }, { x: endCol, y: endRow, g: 0, h: 0, f: 0, parent: null }),
+                    f: 0,
+                    parent: current
+                };                
+
+                if (closedList.has(`${neighbor.x},${neighbor.y}`)) {
+                    continue; // Skip if already evaluated
+                }
+
+                // Check if this neighbor is better (lower f) than any previously evaluated
+                if (!openList.some(tile => tile.x === neighbor.x && tile.y === neighbor.y)) {
+                    neighbor.f = neighbor.g + neighbor.h;
+                    openList.push(neighbor);
+                }
+            }
+        }
+    }
+
+    return []; // No path found
+}
+
+function heuristic(a: Tile, b: Tile): number {
+    return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+}
+
+// Bresenham's Line Algorithm
+function bresenhamPath(startRow: number, startCol: number, endRow: number, endCol: number) {
+    const path = [];
+    let x = startCol;
+    let y = startRow;
+    const dx = Math.abs(endCol - startCol);
+    const dy = Math.abs(endRow - startRow);
+    const sx = startCol < endCol ? 1 : -1;
+    const sy = startRow < endRow ? 1 : -1;
+    let err = dx - dy;
+
+    while (x !== endCol || y !== endRow) {
+        path.push({ x, y });
+
+        const e2 = err * 2;
+        if (e2 > -dy) {
+            err -= dy;
+            x += sx;
+        }
+        if (e2 < dx) {
+            err += dx;
+            y += sy;
+        }
+    }
+
+    path.push({ y: endRow, x: endCol });
+    return path;
+}
+
+function coordToPosition(row: number, col: number): { x: number, y: number } {
+    for (const tile of tiles) {
+        if (tile.row === row && tile.col === col) {
+            return { x: tile.x, y: tile.y };
+        }
+    }
+    return { x: -9999, y: -9999 };
+}
+
+function isTurn(){
+    return players[currentRound % 2].socket === window.socket.id;
+}
