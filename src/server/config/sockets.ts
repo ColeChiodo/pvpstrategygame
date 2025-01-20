@@ -21,79 +21,94 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
 
             let gameID: string;
 
-            // Check if the player is already part of a game
-            let existingGameID = Object.keys(games).find(gameID => 
-                games[gameID].players.some(player => player.id === sessionID)
-            );
-            if (!existingGameID) {
-                // find first instance of a game that has less than 2 players, get the game id
-                existingGameID = Object.keys(games).find(gameID => games[gameID].players.length < 2 && games[gameID].privacy === 'public');
-            }
-            
-            if (existingGameID) {
-                gameID = existingGameID;
-            } else {
-                // Create a new game
-                gameID = generateGameId();
-                games[gameID] = initializeGameState(gameID);
-                let gameState = games[gameID];
-                
-                let tick = 0;
-                let interval = setInterval(() => {
-                    if (tick % TICKRATE === 0) {
-                        if (gameState.players.length === 2) {
-                            if (gameState.round % 2 === 0) {
-                                gameState.player1Time -= 1;
-            
-                                if (gameState.player1Time === 0) {
-                                    console.log(`${gameState.players[0].name} ran out of time`);
-                                    winnerChosen(gameID, gameState.players[1]);
-                                    endGame(gameID, interval);
-                                }
-                            } else {
-                                gameState.player2Time -= 1;
-            
-                                if (gameState.player2Time === 0) {
-                                    console.log(`${gameState.players[1].name} ran out of time`);
-                                    winnerChosen(gameID, gameState.players[0]);
-                                    endGame(gameID, interval);
-                                }
-                            }
-
-                            if (gameState.players[0].units.length === 0) {
-                                console.log(`${gameState.players[0].name} has no units left`);
-                                winnerChosen(gameID, gameState.players[1]);
-                                endGame(gameID, interval);
-                            }
-
-                            if (gameState.players[1].units.length === 0) {
-                                console.log(`${gameState.players[1].name} has no units left`);
-                                winnerChosen(gameID, gameState.players[0]);
-                                endGame(gameID, interval);
-                            }
+            socket.on('create-game', (isPrivate: boolean, joinCode: string | null) => {
+                // Check if the player is already part of a game
+                let isValid = true;
+                let existingGameID = Object.keys(games).find(gameID => 
+                    games[gameID].players.some(player => player.id === sessionID)
+                );
+                if (!existingGameID) {
+                    if (!isPrivate) existingGameID = Object.keys(games).find(gameID => games[gameID].players.length < 2 && games[gameID].privacy === 'public');
+                    else if (joinCode) {
+                        const privateCode = "game-" + joinCode.toString();
+                        existingGameID = Object.keys(games).find(gameID => games[gameID].id === privateCode && games[gameID].privacy === 'private');
+                        console.log(existingGameID);
+                        if (!existingGameID) {
+                            socket.emit('invalid-code');
+                            isValid = false;
                         }
                     }
-                    emitGameState(gameID);
-                    tick++;
-                }, 1000 / TICKRATE);
-            }
-
-            const initGameState = games[gameID];
-            
-            if (initGameState.players.length < 2 && !initGameState.players.find(p => p.id === sessionID)) {
-                addPlayerToGame(initGameState, socket);
-                if (initGameState.players.length === 2) {
-                    nextRound();
                 }
-            } else if (initGameState.players.length < 2 && initGameState.players.find(p => p.id === sessionID)) {
-                const player = initGameState.players.find(p => p.id === sessionID);
-                if (player) player.socket = socket.id;
-            } else if (initGameState.players.length === 2) {
-                const player = initGameState.players.find(p => p.id === sessionID);
-                if (player) player.socket = socket.id;
-            }
 
-            emitGameState(gameID);
+                if (isValid){
+                    if (existingGameID) {
+                        gameID = existingGameID;
+                    } else {
+                        // Create a new game
+                        gameID = generateGameId();
+                        const match = gameID.match(/\d+/);
+                        const gameCode = match![0];
+                        socket.emit('game-code', { code: gameCode });
+                        games[gameID] = initializeGameState(gameID, isPrivate);
+                        let gameState = games[gameID];
+                        
+                        let tick = 0;
+                        let interval = setInterval(() => {
+                            if (tick % TICKRATE === 0) {
+                                if (gameState.players.length === 2) {
+                                    if (gameState.round % 2 === 0) {
+                                        gameState.player1Time -= 1;
+                    
+                                        if (gameState.player1Time === 0) {
+                                            console.log(`${gameState.players[0].name} ran out of time`);
+                                            winnerChosen(gameID, gameState.players[1]);
+                                            endGame(gameID, interval);
+                                        }
+                                    } else {
+                                        gameState.player2Time -= 1;
+                    
+                                        if (gameState.player2Time === 0) {
+                                            console.log(`${gameState.players[1].name} ran out of time`);
+                                            winnerChosen(gameID, gameState.players[0]);
+                                            endGame(gameID, interval);
+                                        }
+                                    }
+        
+                                    if (gameState.players[0].units.length === 0) {
+                                        console.log(`${gameState.players[0].name} has no units left`);
+                                        winnerChosen(gameID, gameState.players[1]);
+                                        endGame(gameID, interval);
+                                    }
+        
+                                    if (gameState.players[1].units.length === 0) {
+                                        console.log(`${gameState.players[1].name} has no units left`);
+                                        winnerChosen(gameID, gameState.players[0]);
+                                        endGame(gameID, interval);
+                                    }
+                                }
+                            }
+                            emitGameState(gameID);
+                            tick++;
+                        }, 1000 / TICKRATE);
+                    }
+    
+                    const initGameState = games[gameID];
+                
+                    if (initGameState.players.length < 2 && !initGameState.players.find(p => p.id === sessionID)) {
+                        addPlayerToGame(initGameState, socket);
+                        if (initGameState.players.length === 2) {
+                            nextRound();
+                        }
+                    } else if (initGameState.players.length < 2 && initGameState.players.find(p => p.id === sessionID)) {
+                        const player = initGameState.players.find(p => p.id === sessionID);
+                        if (player) player.socket = socket.id;
+                    } else if (initGameState.players.length === 2) {
+                        const player = initGameState.players.find(p => p.id === sessionID);
+                        if (player) player.socket = socket.id;
+                    }
+                }
+                emitGameState(gameID);
+            });
             
             // Game Logic
             socket.on('player-unit-move', (unitID: number, target: { x: number, y: number, row: number, col: number }) => {
@@ -445,10 +460,10 @@ function isValidAction(unit: Unit, tile: { x: number, y: number, row: number, co
 }
 
 // tile types 0 hole 1 ground 2 hill 3 forest 4 wall
-function initializeGameState(gameID: string): GameState {
+function initializeGameState(gameID: string, isPrivate: boolean): GameState {
     return {
         id: gameID,
-        privacy: 'public',
+        privacy: isPrivate ? "private" : "public",
         players: [] as Player[],
         arena: {
             width: 1024,

@@ -12,7 +12,11 @@ router.get("/home", authenticationMiddleware, (_req, res) => {
 });
 
 router.get("/play", authenticationMiddleware, (_req, res) => {
-    res.render("game", { user: res.locals.user });
+    res.render("game", { user: res.locals.user, isPrivate: false });
+});
+
+router.get("/play/private", authenticationMiddleware, (_req, res) => {
+    res.render("game", { user: res.locals.user, isPrivate: true });
 });
 
 router.get("/register", (_req, res) => {

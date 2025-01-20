@@ -137,6 +137,18 @@ async function animateMove(tempUnit: Unit, origin: { row: number, col: number },
 
 // -----------Socket Events--------------------------------
 
+window.socket.on('game-code', (data: { code: string }) => {
+    console.log(data);
+    const gameCode = document.getElementById('gameCode');
+    if (!gameCode) return;
+
+    gameCode.textContent = data.code;
+});
+
+window.socket.on('invalid-code', () => {
+    alert("Invalid Code. Please try again.");
+});
+
 window.socket.on('gameState', (gameState) => {
     loadArenaImage(gameState.arena); // move to a game start function in the future to only load once
     loadPlayers(gameState.players);
