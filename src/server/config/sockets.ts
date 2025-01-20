@@ -82,6 +82,9 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
             
             if (initGameState.players.length < 2 && !initGameState.players.find(p => p.id === sessionID)) {
                 addPlayerToGame(initGameState, socket);
+                if (initGameState.players.length === 2) {
+                    nextRound();
+                }
             } else if (initGameState.players.length < 2 && initGameState.players.find(p => p.id === sessionID)) {
                 const player = initGameState.players.find(p => p.id === sessionID);
                 if (player) player.socket = socket.id;
@@ -178,6 +181,7 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
                 const unit = player.units.find(u => u.id === unitID);
                 if (!unit) return;
 
+                unit.canMove = false;
                 unit.canAct = false;
 
                 emitGameState(gameID);
@@ -495,7 +499,6 @@ function getPlayerGameState(gameState: GameState, player: Player): GameState {
                     const targetRow = row + i;
                     const targetCol = col + j;
                     if (targetRow >= 0 && targetRow < temp.arena.tiles.length && targetCol >= 0 && targetCol < temp.arena.tiles[0].length) {
-                        // Check the path for tiles that can restrict visibility
                         const path = bresenhamPath(row, col, targetRow, targetCol);
                         let canSee = true;
                         let visibilityPenalty = 0;
@@ -518,7 +521,12 @@ function getPlayerGameState(gameState: GameState, player: Player): GameState {
                         }
 
                         if (canSee && (viewDistance - visibilityPenalty >= 0)) {
-                            visibleTiles.push({ row: row + i, col: col + j });
+                            const newTile = { row: row + i, col: col + j };
+                            const isDuplicate = visibleTiles.some(tile => tile.row === newTile.row && tile.col === newTile.col);
+                        
+                            if (!isDuplicate) {
+                                visibleTiles.push(newTile);
+                            }
                         }
                     }
                 }
@@ -681,7 +689,7 @@ function addPlayerToGame(gameState: GameState, socket: Socket) {
     };
 
     newPlayer.units.push({
-        id: newPlayer.units.length + 1,
+        id: (newPlayer.units.length + 1) + (gameState.players.length === 1 ? 50 : 0),
         row: gameState.players.length === 0 ? 0 : 9,
         col: gameState.players.length === 0 ? 0 : 9,
         name: "melee",
@@ -697,7 +705,7 @@ function addPlayerToGame(gameState: GameState, socket: Socket) {
     });
     
     newPlayer.units.push({
-        id: newPlayer.units.length + 1,
+        id: (newPlayer.units.length + 1) + (gameState.players.length === 1 ? 50 : 0),
         row: gameState.players.length === 0 ? 0 : 9,
         col: gameState.players.length === 0 ? 1 : 8,
         name: "ranged",
@@ -713,7 +721,7 @@ function addPlayerToGame(gameState: GameState, socket: Socket) {
     });
     
     newPlayer.units.push({
-        id: newPlayer.units.length + 1,
+        id: (newPlayer.units.length + 1) + (gameState.players.length === 1 ? 50 : 0),
         row: gameState.players.length === 0 ? 0 : 9,
         col: gameState.players.length === 0 ? 2 : 7,
         name: "mage",
@@ -729,7 +737,7 @@ function addPlayerToGame(gameState: GameState, socket: Socket) {
     });
     
     newPlayer.units.push({
-        id: newPlayer.units.length + 1,
+        id: (newPlayer.units.length + 1) + (gameState.players.length === 1 ? 50 : 0),
         row: gameState.players.length === 0 ? 0 : 9,
         col: gameState.players.length === 0 ? 3 : 6,
         name: "healer",
@@ -745,7 +753,7 @@ function addPlayerToGame(gameState: GameState, socket: Socket) {
     });
     
     newPlayer.units.push({
-        id: newPlayer.units.length + 1,
+        id: (newPlayer.units.length + 1) + (gameState.players.length === 1 ? 50 : 0),
         row: gameState.players.length === 0 ? 1 : 8,
         col: gameState.players.length === 0 ? 0 : 9,
         name: "cavalry",
@@ -761,7 +769,7 @@ function addPlayerToGame(gameState: GameState, socket: Socket) {
     });
     
     newPlayer.units.push({
-        id: newPlayer.units.length + 1,
+        id: (newPlayer.units.length + 1) + (gameState.players.length === 1 ? 50 : 0),
         row: gameState.players.length === 0 ? 1 : 8,
         col: gameState.players.length === 0 ? 1 : 8,
         name: "scout",
@@ -777,7 +785,7 @@ function addPlayerToGame(gameState: GameState, socket: Socket) {
     });
     
     newPlayer.units.push({
-        id: newPlayer.units.length + 1,
+        id: (newPlayer.units.length + 1) + (gameState.players.length === 1 ? 50 : 0),
         row: gameState.players.length === 0 ? 1 : 8,
         col: gameState.players.length === 0 ? 2 : 7,
         name: "tank",

@@ -40,6 +40,8 @@ interface Sprite {
     currentFrame: number;
     framesElapsed: number;
     framesHold: number;
+
+    copy(): Sprite;
 }
 
 interface Tile {

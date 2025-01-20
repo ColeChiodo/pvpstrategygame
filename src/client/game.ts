@@ -1,5 +1,6 @@
 import * as helpers from './helpers';
 import { sprites } from './sprites';
+import { tileTypes } from './tiles';
 
 const MIN_SCALE = 1.0; 
 const MAX_SCALE = 5.0;
@@ -10,13 +11,6 @@ let cameraOffsetY = 75;
 
 let arenaImage: HTMLImageElement | null = null;
 let arena: Arena | null = null;
-
-const tileTypes: TileType[] = [
-    {id: 1, name: 'PLAINS', movement: 1},
-    {id: 2, name: 'HILLS', movement: 2},
-    {id: 3, name: 'FOREST', movement: 1},
-    {id: 4, name: 'WALL', movement: 0},
-]
 
 let uiImage = new Image();
 uiImage.src = '/assets/spritesheets/UI.png';
@@ -38,6 +32,9 @@ let player1Time = 0;
 let player2Time = 0;
 let isAction = false;
 
+let isAnimating = false;
+let animatingUnit: Unit | null;
+
 const endTurnBtn = document.getElementById('endTurnBtn') as HTMLButtonElement;
 const gameOverUI = document.getElementById('gameOver') as HTMLDivElement;
 let gameOver = false;
@@ -52,31 +49,38 @@ function gameLoop() {
 gameLoop();
 
 function loadUnits(players: Player[]) {
-    if (!isAnimating) {
-        units = [];
-        for (const player of players) {
-            for (const unit of player.units) {
+    const updatedOrAddedUnitIds = new Set();
+
+    for (const player of players) {
+        for (const unit of player.units) {
+            const existingUnit = units.find(u => u.id === unit.id);
+
+            if (existingUnit) {
+                if (animatingUnit && animatingUnit.id === unit.id && animatingUnit.owner === player) {
+                    existingUnit.row = unit.row;
+                    existingUnit.col = unit.col;
+                }
+                existingUnit.health = unit.health;
+                existingUnit.canMove = unit.canMove;
+                existingUnit.canAct = unit.canAct;
+                existingUnit.currentStatus = !unit.canMove && !unit.canAct ? 1 : 0;
+
+                updatedOrAddedUnitIds.add(existingUnit.id);
+            } else {
                 unit.owner = player;
-                unit.sprite = sprites.find(sprite => sprite.name === unit.name) || sprites[0];
+                const newSprite = sprites.find(sprite => sprite.name === unit.name) || sprites[0];
+                if (newSprite) unit.sprite = newSprite.copy();
                 unit.currentStatus = unit.canMove || unit.canAct ? 0 : 1;
+
                 units.push(unit);
-            }
-        }
-    } else {
-        if (!animatingUnit) return;
-        units = [];
-        units.push(animatingUnit);
-        for (const player of players) {
-            for (const unit of player.units) {
-                if (unit.id === animatingUnit.id) continue;
-                unit.owner = player;
-                unit.sprite = sprites.find(sprite => sprite.name === unit.name) || sprites[0];
-                unit.currentStatus = unit.canMove || unit.canAct ? 0 : 1;
-                units.push(unit);
+
+                updatedOrAddedUnitIds.add(unit.id);
             }
         }
     }
+    if (!animatingUnit) units = units.filter(unit => updatedOrAddedUnitIds.has(unit.id));
 }
+
 
 function loadPlayers(newPlayers: Player[]) {
     players = [];
@@ -171,6 +175,9 @@ window.socket.on('nextRound', (player) => {
         nextRoundMsg.innerHTML = "YOUR TURN";
         nextTurnBG.classList.add("border-blue-500");
         nextTurnBG.classList.remove("border-red-500");
+        if (document.hidden) {
+            alert('It is now your turn.');
+        }
     }
 
     const nextTurnDiv = document.getElementById("nextTurn") as HTMLDivElement;
@@ -188,13 +195,6 @@ window.socket.on('player-unit-moving', (unit: Unit, origin: {row: number, col: n
     moveTile = target;
     console.log(`Unit ${unit.id} looking to perform an action`);
 });
-
-let isAnimating = false;
-let animatingUnit: Unit | null;
-
-function sleep(ms: number) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
 
 // -----------Drawing Functions----------------------------
 
@@ -1226,4 +1226,8 @@ function coordToPosition(row: number, col: number): { x: number, y: number } {
 
 function isTurn(){
     return players[currentRound % 2].socket === window.socket.id;
+}
+
+function sleep(ms: number) {
+    return new Promise(resolve => setTimeout(resolve, ms));
 }
