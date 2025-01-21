@@ -55,29 +55,29 @@
                      style="image-rendering: pixelated;">
                 <img src="/assets/global/editicon.png" 
                      alt="Edit Icon" 
-                     class="absolute bottom-0 right-0 w-[32px] h-[32px] mb-1 mr-1 cursor-pointer bg-primary hover:bg-blue-500" onclick="openProfilePictures()">
+                     class="absolute bottom-0 right-0 w-[32px] h-[32px] mb-1 mr-1 cursor-pointer bg-primary hover:bg-blue-500" onclick="toggleProfileImage()">
             </div>
         
             <form action="/auth/update-username" method="POST" class="flex flex-col w-full items-center space-x-4 mb-4">
-                <label for="username" class="text-lg text-white text-left w-full ml-4">Username</label>
+                <label for="username" class="text-lg text-white text-left w-full ml-4">Change Username</label>
                 <div class="flex flex-row w-full">
-                    <input type="text" id="username" name="username" value="<%= user.username %>" class="w-full px-2 border-4 border-primary text-black" />
+                    <input type="text" id="username" name="username" value="<%= user.username %>" class="w-full px-2 border-4 border-primary text-black" placeholder="New Username"/>
                     <button type="submit" class="bg-primary text-white font-semibold hover:bg-blue-500 focus:outline-none w-[300px] border-4 border-primary focus:ring-2 focus:ring-primary focus:ring-opacity-50 mr-2">Submit Change</button>
                 </div>
             </form>
         
             <form action="/auth/update-email" method="POST" class="flex flex-col w-full items-center space-x-4 mb-4">
-                <label for="email" class="text-lg text-white text-left w-full ml-4">Email</label>
+                <label for="email" class="text-lg text-white text-left w-full ml-4">Change Email</label>
                 <div class="flex flex-row w-full">
-                    <input type="email" id="email" name="email" value="<%= user.email %>" class="w-full px-2 border-4 border-primary text-black" />
+                    <input type="email" id="email" name="email" value="<%= user.email %>" class="w-full px-2 border-4 border-primary text-black" placeholder="New Email" />
                     <button type="submit" class="bg-primary text-white font-semibold hover:bg-blue-500 focus:outline-none w-[300px] border-4 border-primary focus:ring-2 focus:ring-primary focus:ring-opacity-50 mr-2">Submit Change</button>
                 </div>
             </form>
         
             <form action="/auth/update-password" method="POST" class="flex flex-col w-full items-center space-x-4 mb-4">
-                <label for="password" class="text-lg text-white text-left w-full ml-4">Password</label>
+                <label for="password" class="text-lg text-white text-left w-full ml-4">Change Password</label>
                 <div class="flex flex-row w-full">
-                    <input type="password" id="password" name="password" class="w-full px-2 border-4 border-primary text-black" />
+                    <input type="password" id="password" name="password" class="w-full px-2 border-4 border-primary text-black" autocomplete="new-password" placeholder="New Password"/>
                     <button type="submit" class="bg-primary text-white font-semibold hover:bg-blue-500 focus:outline-none w-[300px] border-4 border-primary focus:ring-2 focus:ring-primary focus:ring-opacity-50 mr-2">Submit Change</button>
                 </div>
             </form>
@@ -87,7 +87,27 @@
             </div>
         </div>
     </div>
+
+    <div id="profileImageWidget" class="bg-black bg-opacity-85 fixed w-screen h-screen top-0 left-0 flex justify-center items-center hidden">
+        <div class="bg-secondary w-1/3 p-4 relative">
+            <button class="absolute top-0 right-8 text-white text-xl font-semibold hover:text-primary p-2 focus:outline-none" onclick="toggleProfileImage()">X</button>
+            <div class="text-xl text-white -mt-2">Change Profile Image</div>
     
+            <!-- Image Grid -->
+            <div class="grid grid-cols-3 gap-4">
+                <% images.forEach(image => { %>
+                    <div class="flex justify-center items-center">
+                        <form action="/auth/update-profile-image" method="POST">
+                            <input type="hidden" name="image" value="<%= image %>">
+                            <button type="submit">
+                                <img src="/assets/profileimages/<%= image %>" alt="<%= image %>" class="w-24 h-24 object-cover cursor-pointer hover:border-4 hover:border-blue-500 hover:outline hover:outline-2 hover:outline-blue-500" style="image-rendering: pixelated;">
+                            </button>
+                        </form>
+                    </div>
+                <% }) %>
+            </div>
+        </div>
+    </div>
 
     <div id="confirmDeleteAccount" class="bg-black bg-opacity-85 fixed w-screen h-screen top-0 left-0 flex justify-center items-center hidden">
         <div class="bg-secondary w-1/3 p-4 relative">
@@ -97,13 +117,13 @@
             <form action="/auth/delete-account" method="POST" class="space-y-4">
                 <div>
                     <label for="email" class="block font-medium">Email</label>
-                    <input type="text" name="email" id="email" required value=""
+                    <input type="text" name="email" id="email" required autocomplete="new-email" value="" placeholder="Enter Email"
                            class="bg-white text-primary mt-1 block w-full border-r-4 px-2 border-b-4 border-primary focus:outline-none focus:ring-2 focus:ring-primary">
                 </div>
     
                 <div>
                     <label for="password" class="block font-medium">Password</label>
-                    <input type="password" name="password" id="password" required value=""
+                    <input type="password" name="password" id="password" required autocomplete="new-password" placeholder="Enter Password"
                         class="bg-white text-primary mt-1 block w-full border-r-4 px-2 border-b-4 border-primary focus:outline-none focus:ring-2 focus:ring-primary">
                 </div>
     
@@ -117,12 +137,28 @@
     </div>
 
     <script>
+        window.onload = function() {
+            const editUser = document.getElementById("editUser");
+            if (!editUser) return;
+
+            if (window.location.pathname === "/home/user") {
+                editUser.classList.toggle("hidden");
+                editUser.classList.toggle("block");
+            }
+        }
+
         function toggleUserPage() {
             const editUser = document.getElementById("editUser");
             if (!editUser) return;
 
             editUser.classList.toggle("hidden");
             editUser.classList.toggle("block");
+
+            if (window.location.pathname === "/home") {
+                history.pushState(null, null, "/home/user");
+            } else {
+                history.pushState(null, null, "/home");
+            }
         }
 
         function toggleAccountDelete() {
@@ -131,6 +167,14 @@
 
             confirmDeleteAccount.classList.toggle("hidden");
             confirmDeleteAccount.classList.toggle("block");
+        }
+
+        function toggleProfileImage() {
+            const profileImageWidget = document.getElementById("profileImageWidget");
+            if (!profileImageWidget) return;
+
+            profileImageWidget.classList.toggle("hidden");
+            profileImageWidget.classList.toggle("block");
         }
     </script>
 </body>

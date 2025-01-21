@@ -101,12 +101,14 @@ router.post("/update-password", async (_req, res) => {
 });
 
 router.post("/update-profile-image", async (_req, res) => {
-    const { image } = _req.body;
+    let selectedImage = _req.body.image;
+    selectedImage = selectedImage.replace(/\.png$/, '');
+    
     // @ts-expect-error
     const userId = _req.session.user._id;
 
     try {
-        const result = await Users.updateProfileImage(userId, image);
+        const result = await Users.updateProfileImage(userId, selectedImage);
         
         // Fetch updated user and update session
         const updatedUser = await Users.findById(userId);
@@ -119,6 +121,7 @@ router.post("/update-profile-image", async (_req, res) => {
         res.redirect("/home/user");
     }
 });
+
 
 
 router.post("/delete-account", async (_req, res) => {

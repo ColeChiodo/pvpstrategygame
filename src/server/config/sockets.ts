@@ -691,9 +691,9 @@ function addPlayerToGame(gameState: GameState, socket: Socket) {
     // @ts-expect-error
     const username = socket.request.session.user.username;
     // @ts-expect-error
-    const profilePic = socket.request.session.user.profileimage;
+    const profilePic = socket.request.session.user.image;
 
-    console.log(`Adding ${username} to game ${gameState.id}`);
+    console.log(`Adding ${username} to game ${gameState.id} with profile image ${profilePic}`);
 
     let newPlayer: Player = {
         id: sessionID,

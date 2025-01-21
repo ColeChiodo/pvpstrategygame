@@ -3,6 +3,9 @@ import authenticationMiddleware from "../middleware/authentication";
 
 const router = express.Router();
 
+const fs = require('fs');
+const path = require('path');
+
 router.get("/", (_req, res) => {
     res.render("landing");
 });
@@ -10,13 +13,35 @@ router.get("/", (_req, res) => {
 router.get("/home", authenticationMiddleware, (req, res) => {
     // @ts-expect-error
     const user = req.session.user;
-    res.render("home", { user: user, showUser: false });
+    const imageDir = path.join(__dirname, '..', '..', 'public', 'assets', 'profileimages');
+
+    fs.readdir(imageDir, (err: any, files: any[]) => {
+        if (err) {
+          return res.status(500).send(`Unable to read image directory`);
+        }
+        
+        // Filter only PNG files
+        const images = files.filter((file: string) => file.endsWith('.png'));
+        
+        res.render('home', { user: user, images });
+    });
 });
 
 router.get("/home/user", authenticationMiddleware, (req, res) => {
     // @ts-expect-error
     const user = req.session.user;
-    res.render("home", { user: user, showUser: true });
+    const imageDir = path.join(__dirname, '..', '..', 'public', 'assets', 'profileimages');
+
+    fs.readdir(imageDir, (err: any, files: any[]) => {
+        if (err) {
+          return res.status(500).send('Unable to read image directory');
+        }
+        
+        // Filter only PNG files
+        const images = files.filter((file: string) => file.endsWith('.png'));
+        
+        res.render('home', { user: user, images });
+    });
 });
 
 router.get("/play", authenticationMiddleware, (req, res) => {
