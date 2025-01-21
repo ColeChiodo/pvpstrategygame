@@ -39,4 +39,105 @@ router.get("/logout", (request, response) => {
     });
 });
 
+router.post("/update-email", async (_req, res) => {
+    const { email } = _req.body;
+    // @ts-expect-error
+    const userId = _req.session.user._id;
+
+    try {
+        const result = await Users.updateEmail(userId, email);
+        
+        // Fetch updated user and update session
+        const updatedUser = await Users.findById(userId);
+        // @ts-expect-error
+        _req.session.user = updatedUser;
+
+        res.redirect("/home/user");
+    } catch (err) {
+        console.error(err);
+        res.redirect("/home/user");
+    }
+});
+
+router.post("/update-username", async (_req, res) => {
+    const { username } = _req.body;
+    // @ts-expect-error
+    const userId = _req.session.user._id;
+
+    try {
+        const result = await Users.updateUsername(userId, username);
+        
+        // Fetch updated user and update session
+        const updatedUser = await Users.findById(userId);
+        // @ts-expect-error
+        _req.session.user = updatedUser;
+
+
+        res.redirect("/home/user");
+    } catch (err) {
+        console.error(err);
+        res.redirect("/home/user");
+    }
+});
+
+router.post("/update-password", async (_req, res) => {
+    const { password } = _req.body;
+    // @ts-expect-error
+    const userId = _req.session.user._id;
+
+    try {
+        const result = await Users.updatePassword(userId, password);
+        
+        // Fetch updated user and update session
+        const updatedUser = await Users.findById(userId);
+        // @ts-expect-error
+        _req.session.user = updatedUser;
+
+        res.redirect("/home/user");
+    } catch (err) {
+        console.error(err);
+        res.redirect("/home/user");
+    }
+});
+
+router.post("/update-profile-image", async (_req, res) => {
+    const { image } = _req.body;
+    // @ts-expect-error
+    const userId = _req.session.user._id;
+
+    try {
+        const result = await Users.updateProfileImage(userId, image);
+        
+        // Fetch updated user and update session
+        const updatedUser = await Users.findById(userId);
+        // @ts-expect-error
+        _req.session.user = updatedUser;
+
+        res.redirect("/home/user");
+    } catch (err) {
+        console.error(err);
+        res.redirect("/home/user");
+    }
+});
+
+
+router.post("/delete-account", async (_req, res) => {
+    const { email, password } = _req.body;
+    // @ts-expect-error
+    const userId = _req.session.user._id;
+
+    try {
+        await Users.deleteAccount(userId, email, password);
+        _req.session.destroy((err) => {
+            if (err) {
+                console.error("Error destroying session:", err);
+            }
+            res.redirect("/");
+        });
+    } catch (err) {
+        console.error(err);
+        res.redirect("/home/user");
+    }
+});
+
 export default router;

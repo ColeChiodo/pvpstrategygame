@@ -7,16 +7,28 @@ router.get("/", (_req, res) => {
     res.render("landing");
 });
 
-router.get("/home", authenticationMiddleware, (_req, res) => {
-    res.render("home", { user: res.locals.user });
+router.get("/home", authenticationMiddleware, (req, res) => {
+    // @ts-expect-error
+    const user = req.session.user;
+    res.render("home", { user: user, showUser: false });
 });
 
-router.get("/play", authenticationMiddleware, (_req, res) => {
-    res.render("game", { user: res.locals.user, isPrivate: false });
+router.get("/home/user", authenticationMiddleware, (req, res) => {
+    // @ts-expect-error
+    const user = req.session.user;
+    res.render("home", { user: user, showUser: true });
 });
 
-router.get("/play/private", authenticationMiddleware, (_req, res) => {
-    res.render("game", { user: res.locals.user, isPrivate: true });
+router.get("/play", authenticationMiddleware, (req, res) => {
+    // @ts-expect-error
+    const user = req.session.user;
+    res.render("game", { user: user, isPrivate: false });
+});
+
+router.get("/play/private", authenticationMiddleware, (req, res) => {
+    // @ts-expect-error
+    const user = req.session.user;
+    res.render("game", { user: user, isPrivate: true });
 });
 
 router.get("/register", (_req, res) => {

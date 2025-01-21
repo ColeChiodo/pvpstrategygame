@@ -18,9 +18,18 @@
 </head>
 <body class="bg-primary text-white flex flex-col items-center justify-center min-h-screen text-md">
 
+    <div id="playerInfo" class="fixed top-0 left-0 w-full h-[100px] bg-transparent text-white flex justify-between items-center px-4 mt-3">
+        <div id="player" class="flex items-center p-3 w-[300px] bg-primary hover:bg-red-500 border-4 border-secondary cursor-pointer" onclick="toggleUserPage()">
+            <img id="ProfilePic" 
+                src="/assets/profileimages/<%= user.image %>.png" 
+                alt="Profile Picture" 
+                class="w-[64px] h-[64px] mr-3" 
+                style="image-rendering: pixelated;">
+            <div id="playerName" class="font-bold text-lg -my-3"><%= user.username %></div>
+        </div>
+    </div>
+
     <div class="bg-secondary p-8 w-full max-w-lg text-center">
-        <h1 class="text-3xl font-bold mb-6">Welcome, <%= user.username %></h1>
-        
         <div class="space-y-4">
             <a href="/play" class="block px-4 py-2 bg-green-400 text-primary font-semibold border-r-4 border-b-4 border-primary hover:bg-green-500 transition focus:outline-none focus:ring-2 focus:ring-primary focus:ring-opacity-50">
                 Public Matchmaking
@@ -34,5 +43,95 @@
         </div>
     </div>
 
+    <div id="editUser" class="bg-black bg-opacity-85 fixed w-screen h-screen top-0 left-0 flex justify-center items-center hidden">
+        <div class="bg-secondary w-1/2 p-4 relative">
+            <button class="absolute top-2 right-8 text-white text-xl font-semibold hover:text-primary p-2 focus:outline-none" onclick="toggleUserPage()">X</button>
+    
+            <div class="relative inline-block hover">
+                <img id="ProfilePic" 
+                     src="/assets/profileimages/<%= user.image %>.png" 
+                     alt="Profile Picture" 
+                     class="w-[128px] h-[128px] ml-2" 
+                     style="image-rendering: pixelated;">
+                <img src="/assets/global/editicon.png" 
+                     alt="Edit Icon" 
+                     class="absolute bottom-0 right-0 w-[32px] h-[32px] mb-1 mr-1 cursor-pointer bg-primary hover:bg-blue-500" onclick="openProfilePictures()">
+            </div>
+        
+            <form action="/auth/update-username" method="POST" class="flex flex-col w-full items-center space-x-4 mb-4">
+                <label for="username" class="text-lg text-white text-left w-full ml-4">Username</label>
+                <div class="flex flex-row w-full">
+                    <input type="text" id="username" name="username" value="<%= user.username %>" class="w-full px-2 border-4 border-primary text-black" />
+                    <button type="submit" class="bg-primary text-white font-semibold hover:bg-blue-500 focus:outline-none w-[300px] border-4 border-primary focus:ring-2 focus:ring-primary focus:ring-opacity-50 mr-2">Submit Change</button>
+                </div>
+            </form>
+        
+            <form action="/auth/update-email" method="POST" class="flex flex-col w-full items-center space-x-4 mb-4">
+                <label for="email" class="text-lg text-white text-left w-full ml-4">Email</label>
+                <div class="flex flex-row w-full">
+                    <input type="email" id="email" name="email" value="<%= user.email %>" class="w-full px-2 border-4 border-primary text-black" />
+                    <button type="submit" class="bg-primary text-white font-semibold hover:bg-blue-500 focus:outline-none w-[300px] border-4 border-primary focus:ring-2 focus:ring-primary focus:ring-opacity-50 mr-2">Submit Change</button>
+                </div>
+            </form>
+        
+            <form action="/auth/update-password" method="POST" class="flex flex-col w-full items-center space-x-4 mb-4">
+                <label for="password" class="text-lg text-white text-left w-full ml-4">Password</label>
+                <div class="flex flex-row w-full">
+                    <input type="password" id="password" name="password" class="w-full px-2 border-4 border-primary text-black" />
+                    <button type="submit" class="bg-primary text-white font-semibold hover:bg-blue-500 focus:outline-none w-[300px] border-4 border-primary focus:ring-2 focus:ring-primary focus:ring-opacity-50 mr-2">Submit Change</button>
+                </div>
+            </form>
+        
+            <div class="mt-12 flex w-full justify-center items-center">
+                <button class="px-4 py-2 bg-red-400 text-primary font-semibold border-b-4 border-secondary hover:bg-red-500 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-opacity-50" onclick="toggleAccountDelete()">Delete Account</button>
+            </div>
+        </div>
+    </div>
+    
+
+    <div id="confirmDeleteAccount" class="bg-black bg-opacity-85 fixed w-screen h-screen top-0 left-0 flex justify-center items-center hidden">
+        <div class="bg-secondary w-1/3 p-4 relative">
+            <button class="absolute top-0 right-8 text-white text-xl font-semibold hover:text-primary p-2 focus:outline-none" onclick="toggleAccountDelete()">X</button>
+            <div class="text-lg text-white">Confirm Account Deletion</div>
+
+            <form action="/auth/delete-account" method="POST" class="space-y-4">
+                <div>
+                    <label for="email" class="block font-medium">Email</label>
+                    <input type="text" name="email" id="email" required value=""
+                           class="bg-white text-primary mt-1 block w-full border-r-4 px-2 border-b-4 border-primary focus:outline-none focus:ring-2 focus:ring-primary">
+                </div>
+    
+                <div>
+                    <label for="password" class="block font-medium">Password</label>
+                    <input type="password" name="password" id="password" required value=""
+                        class="bg-white text-primary mt-1 block w-full border-r-4 px-2 border-b-4 border-primary focus:outline-none focus:ring-2 focus:ring-primary">
+                </div>
+    
+                <div class="flex items-center justify-center">
+                    <button type="submit" class="p-2 bg-red-400 text-primary font-semibold hover:bg-red-500 border-r-4 border-b-4 border-primary focus:outline-none focus:ring-2 focus:ring-primary focus:ring-opacity-50">
+                        Delete Account
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function toggleUserPage() {
+            const editUser = document.getElementById("editUser");
+            if (!editUser) return;
+
+            editUser.classList.toggle("hidden");
+            editUser.classList.toggle("block");
+        }
+
+        function toggleAccountDelete() {
+            const confirmDeleteAccount = document.getElementById("confirmDeleteAccount");
+            if (!confirmDeleteAccount) return;
+
+            confirmDeleteAccount.classList.toggle("hidden");
+            confirmDeleteAccount.classList.toggle("block");
+        }
+    </script>
 </body>
 </html>

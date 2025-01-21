@@ -138,7 +138,6 @@ async function animateMove(tempUnit: Unit, origin: { row: number, col: number },
 // -----------Socket Events--------------------------------
 
 window.socket.on('game-code', (data: { code: string }) => {
-    console.log(data);
     const gameCode = document.getElementById('gameCode');
     if (!gameCode) return;
 
@@ -205,7 +204,6 @@ window.socket.on('player-unit-moving', (unit: Unit, origin: {row: number, col: n
     isAction = true;
     animateMove(unit, origin, target);
     moveTile = target;
-    console.log(`Unit ${unit.id} looking to perform an action`);
 });
 
 // -----------Drawing Functions----------------------------
@@ -658,7 +656,6 @@ function drawActionTiles(){
                     }
                 }
                 if (!actionPerformed){
-                    console.log(`Unit ${unit.id} has no valid actions`);
                     unit.canAct = false;
                     isAction = false;
                     moveTile = null;
@@ -786,14 +783,12 @@ canvas.addEventListener('click', function(event) {
             } else if (!isAction && selectedTile && tile.row === selectedTile.row && tile.col === selectedTile.col) {
                 // move clicked on the same tile to stay
                 const unit = units.find(unit => unit.row === selectedTile!.row && unit.col === selectedTile!.col);
-                console.log(`Staying on: ${tile.row}, ${tile.col}`);
                 window.socket.emit('player-unit-move', unit!.id, tile);
                 break;
             } else if (!isAction && selectedTile && unitIsTeam(selectedTile.row, selectedTile.col)) {
                 // move clicked on another tile to move
                 if (validMoveTiles.find(validTile => validTile.row === tile.row && validTile.col === tile.col)) {
                     const unit = units.find(unit => unit.row === selectedTile!.row && unit.col === selectedTile!.col);
-                    console.log(`Moving to: ${tile.row}, ${tile.col}`);
                     window.socket.emit('player-unit-move', unit!.id, tile);
                 }
                 selectedTile = null;
@@ -801,7 +796,6 @@ canvas.addEventListener('click', function(event) {
                 // action clicked on another unit
                 if (validActionTiles.find(validTile => validTile.row === tile.row && validTile.col === tile.col)) {
                     const unit = units.find(unit => unit.row === moveTile!.row && unit.col === moveTile!.col);
-                    console.log(`Action on: ${tile.row}, ${tile.col}`);
                     window.socket.emit('player-unit-action', unit!.id, tile);
                 }
                 isAction = false;
@@ -811,7 +805,6 @@ canvas.addEventListener('click', function(event) {
                 const unit = units.find(unit => unit.row === moveTile!.row && unit.col === moveTile!.col);
                 isAction = false;
                 moveTile = null;
-                console.log(`Cancel action on: ${tile.row}, ${tile.col}`);
                 window.socket.emit('player-unit-action', unit!.id, tile);
             }
             found = true;
@@ -858,7 +851,6 @@ canvas.addEventListener('mousemove', function(event) {
 
     for (const tile of tiles) {
         if (helpers.isPointInsideTile(clickX, clickY, tile)) {
-            //console.log(`You hovered on: ${tile.row}, ${tile.col}`);
             hoveredTile = tile;
             break;
         }
@@ -898,18 +890,15 @@ canvas.addEventListener('touchstart', function(e) {
         for (const tile of tiles) {
             if (!hoveredTile) break;
             if (helpers.isPointInsideTile(clickX, clickY, tile)) {
-                //console.log(`You clicked on: ${tile.row}, ${tile.col}`);
 
                 if (!selectedTile && unitIsTeam(hoveredTile.row, hoveredTile.col)) {
                     selectedTile = tile;
                 } else if (selectedTile && tile.row === selectedTile.row && tile.col === selectedTile.col) {
                     const unit = units.find(unit => unit.row === selectedTile!.row && unit.col === selectedTile!.col);
-                    console.log(`Staying on: ${tile.row}, ${tile.col}`);
                     window.socket.emit('player-unit-move', unit!.id, tile);
                     break;
                 } else if (selectedTile && unitIsTeam(selectedTile.row, selectedTile.col)) {
                     const unit = units.find(unit => unit.row === selectedTile!.row && unit.col === selectedTile!.col);
-                    console.log(`Moving to: ${tile.row}, ${tile.col}`);
                     window.socket.emit('player-unit-move', unit!.id, tile);
                     selectedTile = null;
                 }
@@ -1018,12 +1007,10 @@ canvas.addEventListener('touchend', function(e) {
                     selectedTile = tile;
                 } else if (selectedTile && tile.row === selectedTile.row && tile.col === selectedTile.col) {
                     const unit = units.find(unit => unit.row === selectedTile!.row && unit.col === selectedTile!.col);
-                    console.log(`Staying on: ${tile.row}, ${tile.col}`);
                     window.socket.emit('player-unit-move', unit!.id, tile);
                     break;
                 } else if (selectedTile && unitIsTeam(selectedTile.row, selectedTile.col)) {
                     const unit = units.find(unit => unit.row === selectedTile!.row && unit.col === selectedTile!.col);
-                    console.log(`Moving to: ${tile.row}, ${tile.col}`);
                     window.socket.emit('player-unit-move', unit!.id, tile);
                     selectedTile = null;
                 }

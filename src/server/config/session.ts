@@ -10,16 +10,16 @@ const sessionSecret = process.env.SESSION_SECRET || 'defaultSecretKey';
 export default function (app: Express): RequestHandler {
     if(sessionMiddleware === undefined) {
         sessionMiddleware = session({
-            secret: sessionSecret, // Change this to a random secret key
-            resave: false,             // Don't save session if unmodified
-            saveUninitialized: false, // Don't save empty sessions
+            secret: sessionSecret,
+            resave: false,
+            saveUninitialized: false,
             store: MongoStore.create({
-              mongoUrl: process.env.DATABASE_URL, // MongoDB URI
-              ttl: 14 * 24 * 60 * 60, // Session expiry time (14 days)
+              mongoUrl: process.env.DATABASE_URL,
+              ttl: 3 * 24 * 60 * 60, // Session expiry time (3 days)
             }),
             cookie: {
-              secure: false, // Set to true if you're using HTTPS
-              maxAge: 1000 * 60 * 60 * 24, // Set cookie expiry time (e.g., 1 day)
+              secure: false,
+              maxAge: 1000 * 60 * 60 * 24,
             }
         });
 

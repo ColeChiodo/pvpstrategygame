@@ -813,7 +813,23 @@ function addPlayerToGame(gameState: GameState, socket: Socket) {
         defense: 2,
         range: 1,
         mobility: 2,
-    });    
+    });
+
+    newPlayer.units.push({
+        id: (newPlayer.units.length + 1) + (gameState.players.length === 1 ? 50 : 0),
+        row: gameState.players.length === 0 ? 1 : 8,
+        col: gameState.players.length === 0 ? 2 : 7,
+        name: "king",
+        action: "attack",
+        canMove: true,
+        canAct: true,
+        health: 4,
+        maxHealth: 4,
+        attack: 3,
+        defense: 1,
+        range: 2,
+        mobility: 3,
+    });
 
     gameState.players.push(newPlayer);
     playerGameMap[sessionID] = gameState.id;
