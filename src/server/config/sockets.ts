@@ -4,7 +4,7 @@ import { Server as SocketIoServer, Socket } from "socket.io";
 
 let io: SocketIoServer | undefined;
 
-const MAX_TIME = 60 * 5; 
+const MAX_TIME = 60 * 10; 
 const TICKRATE = 8;
 
 export default function (server: Server, app: Express, sessionMiddleware: RequestHandler): SocketIoServer {
@@ -28,7 +28,10 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
                     games[gameID].players.some(player => player.id === sessionID)
                 );
                 if (!existingGameID) {
-                    if (!isPrivate) existingGameID = Object.keys(games).find(gameID => games[gameID].players.length < 2 && games[gameID].privacy === 'public');
+                    if (!isPrivate) {
+                        // can replace with much more advance matchmaking algorithm
+                        existingGameID = Object.keys(games).find(gameID => games[gameID].players.length < 2 && games[gameID].privacy === 'public');
+                    }
                     else if (joinCode) {
                         const privateCode = "game-" + joinCode.toString();
                         existingGameID = Object.keys(games).find(gameID => games[gameID].id === privateCode && games[gameID].privacy === 'private');
@@ -82,6 +85,20 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
         
                                     if (gameState.players[1].units.length === 0) {
                                         console.log(`${gameState.players[1].name} has no units left`);
+                                        winnerChosen(gameID, gameState.players[0]);
+                                        endGame(gameID, interval);
+                                    }
+
+                                    const player1King = gameState.players[0].units.find(u => u.name === "king");
+                                    const player2King = gameState.players[1].units.find(u => u.name === "king");
+
+                                    if(!player1King) {
+                                        console.log(`${gameState.players[0].name}'s King is Dead.`);
+                                        winnerChosen(gameID, gameState.players[1]);
+                                        endGame(gameID, interval);
+                                    }
+                                    if(!player2King) {
+                                        console.log(`${gameState.players[1].name}'s King is Dead.`);
                                         winnerChosen(gameID, gameState.players[0]);
                                         endGame(gameID, interval);
                                     }
@@ -233,17 +250,16 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
                 gameState.round += 1;
                 let newPlayer = gameState.players[gameState.round % 2];
 
-                let playerTime = null;
-
                 if (gameState.round % 2 === 0) {
-                    playerTime = gameState.player1Time;
+                    gameState.player1Time += 5;
+                    if (gameState.player1Time > MAX_TIME) {
+                        gameState.player1Time = MAX_TIME;
+                    }
                 } else {
-                    playerTime = gameState.player2Time;
-                }
-
-                playerTime += 5;
-                if (playerTime > MAX_TIME) {
-                    playerTime = MAX_TIME;
+                    gameState.player2Time += 5;
+                    if (gameState.player2Time > MAX_TIME) {
+                        gameState.player2Time = MAX_TIME;
+                    }
                 }
 
                 oldPlayer.units.forEach((unit) => {
@@ -301,6 +317,8 @@ interface Arena {
     height: number;
     name: string;
     tiles: number[][];
+    p1Start: { row: number, col: number };
+    p2Start: { row: number, col: number };
 }
 
 interface Unit {
@@ -468,17 +486,40 @@ function initializeGameState(gameID: string, isPrivate: boolean): GameState {
         arena: {
             width: 1024,
             height: 512,
-            name: 'sample',
-            tiles: [[1, 1, 1, 3, 1, 1, 1, 1, 1, 1],
-                    [1, 1, 1, 4, 1, 1, 1, 1, 1, 1],
-                    [1, 1, 1, 4, 1, 1, 1, 1, 1, 1],
-                    [0, 2, 2, 0, 0, 0, 0, 1, 1, 0],
-                    [0, 1, 1, 0, 0, 0, 0, 1, 1, 0],
-                    [0, 1, 1, 0, 0, 0, 0, 1, 1, 0],
-                    [0, 1, 1, 0, 0, 0, 0, 1, 1, 0],
-                    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-                    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-                    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]],
+            name: 'debug',
+            tiles: [[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 4, 4, 4, 1, 1, 1],
+                    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 4, 1, 1, 1],
+                    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 1, 1, 1, 1, 1, 1, 4, 1, 1, 1, 1, 1, 1, 1, 4, 1, 1, 1],
+                    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 4, 1, 1, 1, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 4, 1, 1, 1],
+                    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 4, 1, 1, 1, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 1, 1, 1, 1, 1, 1, 4, 1, 1, 1, 3, 3, 1, 1, 1, 1, 1, 1],
+                    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 3, 1, 1, 1, 1, 1],
+                    [0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 4, 3, 4, 4, 3, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 4, 1, 1, 4, 1, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 3, 3, 1, 1, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 1, 1, 3, 3, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 1, 4, 1, 1, 4, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 3, 4, 4, 3, 4, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0],
+                    [1, 1, 1, 1, 1, 3, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                    [1, 1, 1, 1, 1, 1, 3, 3, 1, 1, 1, 4, 1, 1, 1, 1, 1, 1, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 1, 1, 1, 4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                    [1, 1, 1, 4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 1, 1, 1, 4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                    [1, 1, 1, 4, 1, 1, 1, 1, 1, 1, 1, 4, 1, 1, 1, 1, 1, 1, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                    [1, 1, 1, 4, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                    [1, 1, 1, 4, 4, 4, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+                ],
+            p1Start: {row: 0, col: 0},
+            p2Start: {row: 29, col: 29},
         } as Arena,
         round: 0,
         player1Time: MAX_TIME,
@@ -705,8 +746,24 @@ function addPlayerToGame(gameState: GameState, socket: Socket) {
 
     newPlayer.units.push({
         id: (newPlayer.units.length + 1) + (gameState.players.length === 1 ? 50 : 0),
-        row: gameState.players.length === 0 ? 0 : 9,
-        col: gameState.players.length === 0 ? 0 : 9,
+        row: gameState.players.length === 0 ? gameState.arena.p1Start.row : gameState.arena.p2Start.row,
+        col: gameState.players.length === 0 ? gameState.arena.p1Start.col : gameState.arena.p2Start.row,
+        name: "king",
+        action: "attack",
+        canMove: true,
+        canAct: true,
+        health: 4,
+        maxHealth: 4,
+        attack: 3,
+        defense: 1,
+        range: 2,
+        mobility: 3,
+    });
+
+    newPlayer.units.push({
+        id: (newPlayer.units.length + 1) + (gameState.players.length === 1 ? 50 : 0),
+        row: gameState.players.length === 0 ? gameState.arena.p1Start.row + 2 : gameState.arena.p2Start.row - 2,
+        col: gameState.players.length === 0 ? gameState.arena.p1Start.col : gameState.arena.p2Start.row,
         name: "melee",
         action: "attack",
         canMove: true,
@@ -721,8 +778,8 @@ function addPlayerToGame(gameState: GameState, socket: Socket) {
     
     newPlayer.units.push({
         id: (newPlayer.units.length + 1) + (gameState.players.length === 1 ? 50 : 0),
-        row: gameState.players.length === 0 ? 0 : 9,
-        col: gameState.players.length === 0 ? 1 : 8,
+        row: gameState.players.length === 0 ? gameState.arena.p1Start.row : gameState.arena.p2Start.row,
+        col: gameState.players.length === 0 ? gameState.arena.p1Start.col + 2 : gameState.arena.p2Start.row - 2,
         name: "ranged",
         action: "attack",
         canMove: true,
@@ -737,8 +794,8 @@ function addPlayerToGame(gameState: GameState, socket: Socket) {
     
     newPlayer.units.push({
         id: (newPlayer.units.length + 1) + (gameState.players.length === 1 ? 50 : 0),
-        row: gameState.players.length === 0 ? 0 : 9,
-        col: gameState.players.length === 0 ? 2 : 7,
+        row: gameState.players.length === 0 ? gameState.arena.p1Start.row + 1 : gameState.arena.p2Start.row - 1,
+        col: gameState.players.length === 0 ? gameState.arena.p1Start.col : gameState.arena.p2Start.row,
         name: "mage",
         action: "attack",
         canMove: true,
@@ -753,8 +810,8 @@ function addPlayerToGame(gameState: GameState, socket: Socket) {
     
     newPlayer.units.push({
         id: (newPlayer.units.length + 1) + (gameState.players.length === 1 ? 50 : 0),
-        row: gameState.players.length === 0 ? 0 : 9,
-        col: gameState.players.length === 0 ? 3 : 6,
+        row: gameState.players.length === 0 ? gameState.arena.p1Start.row : gameState.arena.p2Start.row,
+        col: gameState.players.length === 0 ? gameState.arena.p1Start.col + 1 : gameState.arena.p2Start.row - 1,
         name: "healer",
         action: "heal",
         canMove: true,
@@ -769,8 +826,8 @@ function addPlayerToGame(gameState: GameState, socket: Socket) {
     
     newPlayer.units.push({
         id: (newPlayer.units.length + 1) + (gameState.players.length === 1 ? 50 : 0),
-        row: gameState.players.length === 0 ? 1 : 8,
-        col: gameState.players.length === 0 ? 0 : 9,
+        row: gameState.players.length === 0 ? gameState.arena.p1Start.row + 2 : gameState.arena.p2Start.row - 2,
+        col: gameState.players.length === 0 ? gameState.arena.p1Start.col + 1 : gameState.arena.p2Start.row - 1,
         name: "cavalry",
         action: "attack",
         canMove: true,
@@ -785,8 +842,8 @@ function addPlayerToGame(gameState: GameState, socket: Socket) {
     
     newPlayer.units.push({
         id: (newPlayer.units.length + 1) + (gameState.players.length === 1 ? 50 : 0),
-        row: gameState.players.length === 0 ? 1 : 8,
-        col: gameState.players.length === 0 ? 1 : 8,
+        row: gameState.players.length === 0 ? gameState.arena.p1Start.row + 2 : gameState.arena.p2Start.row - 2,
+        col: gameState.players.length === 0 ? gameState.arena.p1Start.col + 2 : gameState.arena.p2Start.row - 2,
         name: "scout",
         action: "attack",
         canMove: true,
@@ -801,8 +858,8 @@ function addPlayerToGame(gameState: GameState, socket: Socket) {
     
     newPlayer.units.push({
         id: (newPlayer.units.length + 1) + (gameState.players.length === 1 ? 50 : 0),
-        row: gameState.players.length === 0 ? 1 : 8,
-        col: gameState.players.length === 0 ? 2 : 7,
+        row: gameState.players.length === 0 ? gameState.arena.p1Start.row + 1 : gameState.arena.p2Start.row - 1,
+        col: gameState.players.length === 0 ? gameState.arena.p1Start.col + 2 : gameState.arena.p2Start.row - 2,
         name: "tank",
         action: "attack",
         canMove: true,
@@ -813,22 +870,6 @@ function addPlayerToGame(gameState: GameState, socket: Socket) {
         defense: 2,
         range: 1,
         mobility: 2,
-    });
-
-    newPlayer.units.push({
-        id: (newPlayer.units.length + 1) + (gameState.players.length === 1 ? 50 : 0),
-        row: gameState.players.length === 0 ? 1 : 8,
-        col: gameState.players.length === 0 ? 2 : 7,
-        name: "king",
-        action: "attack",
-        canMove: true,
-        canAct: true,
-        health: 4,
-        maxHealth: 4,
-        attack: 3,
-        defense: 1,
-        range: 2,
-        mobility: 3,
     });
 
     gameState.players.push(newPlayer);
