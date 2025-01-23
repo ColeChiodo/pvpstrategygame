@@ -4,7 +4,7 @@ import { Server as SocketIoServer, Socket } from "socket.io";
 
 let io: SocketIoServer | undefined;
 
-const MAX_TIME = 60 * 10; 
+const MAX_TIME = 60 * 5; 
 const TICKRATE = 8;
 
 export default function (server: Server, app: Express, sessionMiddleware: RequestHandler): SocketIoServer {
@@ -318,8 +318,27 @@ interface Arena {
     name: string;
     tiles: number[][];
     heightMap: number[][];
+    obstacles: Obstacle[];
     p1Start: { row: number, col: number };
     p2Start: { row: number, col: number };
+}
+
+interface Obstacle {
+    name: string;
+    row: number;
+    col: number;
+    sprite: Sprite;
+}
+
+interface Sprite {
+    width: number;
+    height: number;
+    name: string;
+    image: string;
+    idleFrames: number;
+    currentFrame: number;
+    framesElapsed: number;
+    framesHold: number;
 }
 
 interface Unit {
@@ -489,9 +508,9 @@ function initializeGameState(gameID: string, isPrivate: boolean): GameState {
             height: 512,
             name: 'debug',
             tiles: [
-                [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-                [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-                [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 4, 4, 4],
+                [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 4, 4, 4],
+                [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 4, 4, 4],
                 [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
                 [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
                 [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
@@ -511,11 +530,11 @@ function initializeGameState(gameID: string, isPrivate: boolean): GameState {
                 [1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 1]
             ],
             heightMap: [
-                [3, 3, 3, 3, 3, 3, 2.5, 2, 2, 2, 2, 2, 2, 3, 3, 3, 5, 5, 5, 5],
-                [3, 3, 3, 3, 3, 3, 2.5, 2, 2, 2, 2, 2, 2, 3, 3, 3, 5, 5, 5, 5],
-                [3, 3, 3, 3, 3, 3, 2.5, 2, 2, 2, 2, 2, 2, 3, 3, 3, 5, 5, 5, 5],
-                [3, 3, 3, 3, 3, 3, 2.5, 2, 2, 2, 2, 2, 2, 2, 2, 2, 5, 5, 5, 5],
-                [3, 3, 3, 3, 3, 3, 2.5, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2],
+                [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3],
+                [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3],
+                [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3],
+                [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3],
+                [3, 3, 3, 3, 3, 3, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5],
                 [2.5, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2],
                 [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2],
                 [2, 2, 2, 2, 2, 2, 2, 1.5, 1.5, 1.5, 2, 2, 2, 1.5, 1.5, 1.5, 2, 2, 2, 2],
@@ -531,6 +550,19 @@ function initializeGameState(gameID: string, isPrivate: boolean): GameState {
                 [2, 2, 2, 1.5, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 1],
                 [2, 2, 2, 1.5, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 1],
                 [2, 2, 2, 1.5, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 1],
+            ],
+            obstacles: [
+                {
+                    name: "example_house",
+                    row: 2, 
+                    col: 19,
+                    sprite: {
+                        width: 96,
+                        height: 96,
+                        name: "example_house",
+                        image: "example_house",
+                    }
+                }
             ],
             p1Start: {row: 0, col: 0},
             p2Start: {row: 19, col: 19},
@@ -699,8 +731,8 @@ function astarPath(startRow: number, startCol: number, endRow: number, endCol: n
             const neighborX = current.x + dx;
             const neighborY = current.y + dy;
 
-            // Check if the neighbor is within bounds and is not an obstacle (assuming 0 = walkable, 1 = obstacle)
-            if (neighborX >= 0 && neighborX < grid[0].length && neighborY >= 0 && neighborY < grid.length && grid[neighborY][neighborX] !== 0) {
+            // Check if the neighbor is within bounds and is not an obstacle (assuming 1 = walkable, 0 = obstacle) and height difference is not >= 1.5
+            if (neighborX >= 0 && neighborX < grid[0].length && neighborY >= 0 && neighborY < grid.length && (grid[neighborY][neighborX] !== 0 && grid[neighborY][neighborX] !== 4) && arena.heightMap[neighborY][neighborX] - arena.heightMap[current.y][current.x] <= 1.5) {
                 const neighbor: Tile = {
                     x: neighborX,
                     y: neighborY,

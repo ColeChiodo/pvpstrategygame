@@ -1,4 +1,6 @@
 class SpriteClass implements Sprite {
+    width: number;
+    height: number;
     name: string;
     image: string;
     idleFrames: number;
@@ -6,7 +8,9 @@ class SpriteClass implements Sprite {
     framesElapsed: number;
     framesHold: number;
 
-    constructor(name: string, image: string, idleFrames: number, currentFrame: number, framesElapsed: number, framesHold: number) {
+    constructor(height: number, width: number, name: string, image: string, idleFrames: number, currentFrame: number, framesElapsed: number, framesHold: number) {
+        this.height = height;
+        this.width = width;
         this.name = name;
         this.image = image;
         this.idleFrames = idleFrames;
@@ -17,6 +21,8 @@ class SpriteClass implements Sprite {
 
     copy(): Sprite {
         return new SpriteClass(
+            this.height,
+            this.width,
             this.name,
             this.image,
             this.idleFrames,
@@ -28,5 +34,5 @@ class SpriteClass implements Sprite {
 }
 
 export const sprites: SpriteClass[] = [
-    new SpriteClass("test", "test", 2, 0, 0, 100),
+    new SpriteClass(32, 32, "test", "test", 2, 0, 0, 100),
 ]; 

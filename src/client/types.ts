@@ -13,8 +13,17 @@ interface Arena {
     name: string;
     tiles: number[][];
     heightMap: number[][];
+    obstacles: Obstacle[];
     p1Start: { row: number, col: number };
     p2Start: { row: number, col: number };
+}
+
+interface Obstacle {
+    name: string;
+    row: number;
+    col: number;
+    sprite: Sprite;
+    currentStatus: number;
 }
 
 interface Unit {
@@ -37,6 +46,8 @@ interface Unit {
 }
 
 interface Sprite {
+    width: number;
+    height: number;
     name: string;
     image: string;
     idleFrames: number;

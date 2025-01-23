@@ -229,10 +229,78 @@ function draw() {
     drawBackground();
     drawArena();
     drawFogOfWarTiles();
-    drawUnits();
+    drawEntities();
     drawUI();
     drawInteractionSquares();
     editHTML();
+}
+
+function drawEntities() {
+    if (!arena) return;
+
+    const entities = [
+        ...arena.obstacles.map(obstacle => ({ type: 'obstacle', entity: obstacle })),
+        ...units.map(unit => ({ type: 'unit', entity: unit }))
+    ];
+
+    entities.sort((a, b) => {
+        if (a.entity.row !== b.entity.row) {
+            return a.entity.row - b.entity.row;
+        }
+    
+        return a.entity.col - b.entity.col;
+    });    
+
+
+    for (const { type, entity } of entities) {
+        const pos = coordToPosition(entity.row, entity.col);
+
+        if (type === 'obstacle') {
+            const obstacle = entity;
+            const frameSize = obstacle.sprite.height;
+            const frameX = 0;
+            const frameY = 0;
+            const sx = frameX * frameSize;
+            const sy = frameY * frameSize;
+
+            ctx.imageSmoothingEnabled = false;
+
+            let obstacleImage = new Image();
+            obstacleImage.src = `/assets/maps/${obstacle.sprite.name}.png`;
+            ctx.drawImage(obstacleImage, sx, sy, frameSize, frameSize, pos.x - 32 * SCALE, pos.y - frameSize * SCALE + (8 * SCALE), frameSize * SCALE, frameSize * SCALE);
+
+            obstacle.sprite.framesElapsed++;
+            if (obstacle.sprite.framesElapsed % obstacle.sprite.framesHold === 0) {
+                if (obstacle.sprite.currentFrame < obstacle.sprite.idleFrames - 1) {
+                    obstacle.sprite.currentFrame++;
+                } else {
+                    obstacle.sprite.currentFrame = 0;
+                }
+            }
+        } else if (type === 'unit') {
+            const unit = entity;
+            const frameSize = 32;
+            const frameX = unit.sprite.currentFrame;
+            const frameY = unit.currentStatus;
+            const sx = frameX * frameSize;
+            const sy = frameY * frameSize;
+
+            ctx.imageSmoothingEnabled = false;
+
+            let unitImage = new Image();
+            unitImage.src = `/assets/spritesheets/units/${unit.sprite.name}.png`;
+            ctx.drawImage(unitImage, sx, sy, frameSize, frameSize, pos.x, pos.y - frameSize * SCALE + (8 * SCALE), frameSize * SCALE, frameSize * SCALE);
+
+            unit.sprite.framesElapsed++;
+            if (unit.sprite.framesElapsed % unit.sprite.framesHold === 0) {
+                if (unit.sprite.currentFrame < unit.sprite.idleFrames - 1) {
+                    unit.sprite.currentFrame++;
+                } else {
+                    unit.sprite.currentFrame = 0;
+                }
+            }
+        }
+    }
 }
 
 function drawUI(){
@@ -503,8 +571,10 @@ function drawMovementTiles(){
                         // Check the path for obstacles or terrain that blocks movement
                         const path = astarPath(row, col, targetRow, targetCol);
                         if (path.length - 1 > mobility) continue;
+                        if (path.length === 0) continue;
                         let canMove = true;
                         let mobilityPenalty = 0;
+                        
                         for (const tile of path) {
                             const terrain: number = arena.tiles[tile.y][tile.x];
 
@@ -519,6 +589,7 @@ function drawMovementTiles(){
                             } else if (terrain === 3) {
                                 
                             } else if (terrain === 4) {
+                                console.log("obstacle detected");
                                 canMove = false;
                                 break;
                             }
@@ -680,42 +751,6 @@ function drawActionTile(row: number, col: number, action: string){
 
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(uiImage, sx, sy, frameSize, frameSize, pos.x, pos.y - 8 * SCALE, frameSize * SCALE, frameSize * SCALE);
-}
-
-function drawUnits(){
-    units.sort((a, b) => {
-        const posA = coordToPosition(a.row, a.col);
-        const posB = coordToPosition(b.row, b.col);
-        return posA.y - posB.y;
-    });
-
-    for (const unit of units){
-        const frameSize = 32;
-
-        const frameX = unit.sprite.currentFrame;
-        const frameY = unit.currentStatus;
-
-        const sx = frameX * frameSize;
-        const sy = frameY * frameSize;
-
-        const pos = coordToPosition(unit.row, unit.col);
-
-        ctx.imageSmoothingEnabled = false;
-
-        let unitImage = new Image();
-        unitImage.src = `/assets/spritesheets/units/${unit.sprite.name}.png`
-        ctx.drawImage(unitImage, sx, sy, frameSize, frameSize, pos.x, pos.y - frameSize * SCALE + (8 * SCALE), frameSize * SCALE, frameSize * SCALE);
-
-        //update the animation of the sprite
-        unit.sprite.framesElapsed++;
-        if (unit.sprite.framesElapsed % unit.sprite.framesHold === 0) {
-            if (unit.sprite.currentFrame < unit.sprite.idleFrames - 1) {
-                unit.sprite.currentFrame++;
-            } else {
-                unit.sprite.currentFrame = 0;
-            }
-        }
-    }
 }
 
 // -----------Canvas Events Controls-----------------------
@@ -1109,6 +1144,7 @@ function adjacentTile(row1: number, col1: number, row2: number, col2: number): b
 }
 
 // A* Pathfinding Algorithm
+// TODO: take into account tile movement weight
 function astarPath(startRow: number, startCol: number, endRow: number, endCol: number): { x: number, y: number }[] {
     if (!arena) return [];
     const grid = arena.tiles;
@@ -1154,8 +1190,8 @@ function astarPath(startRow: number, startCol: number, endRow: number, endCol: n
             const neighborX = current.x + dx;
             const neighborY = current.y + dy;
 
-            // Check if the neighbor is within bounds and is not an obstacle (assuming 0 = walkable, 1 = obstacle)
-            if (neighborX >= 0 && neighborX < grid[0].length && neighborY >= 0 && neighborY < grid.length && grid[neighborY][neighborX] !== 0) {
+            // Check if the neighbor is within bounds and is not an obstacle (assuming 1 = walkable, 0 = obstacle) and height difference is not >= 1.5
+            if (neighborX >= 0 && neighborX < grid[0].length && neighborY >= 0 && neighborY < grid.length && (grid[neighborY][neighborX] !== 0 && grid[neighborY][neighborX] !== 4) && arena.heightMap[neighborY][neighborX] - arena.heightMap[current.y][current.x] <= 1.5) {
                 const neighbor: Tile = {
                     x: neighborX,
                     y: neighborY,
