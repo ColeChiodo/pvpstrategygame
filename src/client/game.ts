@@ -321,7 +321,7 @@ function drawInteractionSquares() {
             if(arena!.tiles[row][col] === 0) continue;
 
             const isoX = (col - row) * tileWidth / 2 + offsetX;
-            const isoY = (col + row) * tileHeight / 2 + offsetY;
+            const isoY = (col + row) * tileHeight / 2 + offsetY - ((getTileHeight(row, col) * 16) * SCALE);
 
             tiles.push(drawIsometricTile(isoX, isoY, row, col));
         }
@@ -1229,4 +1229,9 @@ function isTurn(){
 
 function sleep(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function getTileHeight(row: number, col: number): number{
+    if (!arena) return 0;
+    return arena.heightMap[row][col] - 1;
 }

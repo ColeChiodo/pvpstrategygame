@@ -12,6 +12,9 @@ interface Arena {
     height: number;
     name: string;
     tiles: number[][];
+    heightMap: number[][];
+    p1Start: { row: number, col: number };
+    p2Start: { row: number, col: number };
 }
 
 interface Unit {
