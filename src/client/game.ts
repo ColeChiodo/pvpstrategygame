@@ -34,6 +34,9 @@ let isAction = false;
 
 let isAnimating = false;
 let animatingUnit: Unit | null;
+let animateHealthBar = false;
+let animatingHealthBarUnit: Unit | null = null;
+let healthBarCurrent: number;
 
 const endTurnBtn = document.getElementById('endTurnBtn') as HTMLButtonElement;
 const gameOverUI = document.getElementById('gameOver') as HTMLDivElement;
@@ -201,9 +204,35 @@ window.socket.on('nextRound', (player) => {
 });
 
 window.socket.on('player-unit-moving', (unit: Unit, origin: {row: number, col: number}, target: { x: number, y: number, row: number, col: number }) => {
+    const isUnitVisible = units.find(u => u.row === unit.row && u.col === unit.col);
+    if (!isUnitVisible) return;
+
     isAction = true;
     animateMove(unit, origin, target);
     moveTile = target;
+});
+
+window.socket.on('animate-healthbar', (unit: Unit, healthBefore: number, healthAfter: number) => {
+    const isUnitVisible = units.find(u => u.row === unit.row && u.col === unit.col);
+    if (!isUnitVisible) return;
+
+    const action: string = healthBefore < healthAfter ? "attack" : "heal";
+    // depending on action, play different audio
+
+    animateHealthBar = true;
+    animatingHealthBarUnit = unit;
+    healthBarCurrent = healthBefore;
+    const healthDiff = healthAfter - healthBefore;
+    const healthTick = healthDiff / 5;
+    const interval = setInterval(() => {
+        healthBarCurrent += healthTick;
+    }, 100);
+
+    setTimeout(() => {
+        animateHealthBar = false;
+        animatingHealthBarUnit = null;
+        clearInterval(interval);
+    }, 600);
 });
 
 // -----------Drawing Functions----------------------------
@@ -312,6 +341,7 @@ function drawUI(){
     drawActionTiles();
     drawPath();
     drawHealthBars();
+    drawAnimatingHealthBar();
     drawTileInfo();
     drawHoveredUnitName();
 }
@@ -517,7 +547,7 @@ function drawFogOfWarTile(row: number, col: number) {
 }
 
 function drawHealthBars() {
-    if ((!isAction && !selectedTile)) return;
+    if ((!isAction && !selectedTile || animatingUnit)) return;
     for (const unit of units){
         const pos = coordToPosition(unit.row, unit.col);
         if (pos.x === -9999 || pos.y === -9999) return;
@@ -536,6 +566,25 @@ function drawHealthBars() {
     }
 }
 
+function drawAnimatingHealthBar() {
+    if (!animateHealthBar) return;
+    if (!animatingHealthBarUnit) return;
+    const unit = animatingHealthBarUnit;
+    const pos = coordToPosition(unit.row, unit.col);
+    if (pos.x === -9999 || pos.y === -9999) return;
+
+    const barHeight = 2 * SCALE;
+    const barWidth = 12 * SCALE;
+    const barX = pos.x + barWidth - (2 * SCALE);
+    const barY = pos.y - 16 * SCALE;
+    
+    ctx.fillStyle = '#555';
+    ctx.fillRect(barX, barY, barWidth, barHeight);
+
+    const healthWidth = barWidth * (healthBarCurrent / unit.maxHealth);
+    ctx.fillStyle = '#0f0';
+    ctx.fillRect(barX, barY, healthWidth, barHeight);
+}
 
 function drawMovementTiles() {
     if (!arena) return;

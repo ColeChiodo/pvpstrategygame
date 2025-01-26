@@ -172,23 +172,37 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
                 if (!otherUnit) return;
 
                 if(unit && isValidAction(unit, tile, gameState)) {
+                    let healthBefore: number;
+                    let healthAfter: number;
                     if (sessionID !== otherUnitsOwner.id) {
                         // attack
+                        healthBefore = otherUnit.health;
                         otherUnit.health -= unit.attack * (1 - otherUnit.defense / (otherUnit.defense + 20));
                         console.log(`[${gameID}]: ${player.name}: unit ${unitID} attacking at tile (${tile.row}, ${tile.col}). ${otherUnit.id} has ${otherUnit.health} health remaining.`);
                         if (otherUnit.health <= 0) {
                             otherUnitsOwner.units = otherUnitsOwner.units.filter((unit) => unit.id !== otherUnit.id);
                         }
+                        healthAfter = otherUnit.health;
                     } else {
                         // heal
+                        healthBefore = otherUnit.health;
                         otherUnit.health += unit.attack;
                         if (otherUnit.health > otherUnit.maxHealth) {
                             otherUnit.health = otherUnit.maxHealth;
                         }
                         console.log(`[${gameID}]: ${player.name}: unit ${unitID} healing at tile (${tile.row}, ${tile.col}). ${otherUnit.id} has ${otherUnit.health} health remaining.`);
+                        healthAfter = otherUnit.health;
                     }
+                    
+                    for (let player of gameState.players) {
+                        app.get('io').to(player.socket).emit('animate-healthbar', otherUnit, healthBefore, healthAfter);
+                    }
+
                     unit.canAct = false;
                 }
+
+                
+
                 emitGameState(gameID);
             });
 
@@ -802,14 +816,14 @@ function addPlayerToGame(gameState: GameState, socket: Socket) {
         action: "attack",
         canMove: true,
         canAct: true,
-        health: 4,
-        maxHealth: 4,
-        attack: 3,
-        defense: 1,
+        health: 4 * 10,
+        maxHealth: 4 * 10,
+        attack: 3 * 10,
+        defense: 1 * 10,
         range: 2,
         mobility: 3,
     });
-
+    
     newPlayer.units.push({
         id: (newPlayer.units.length + 1) + (gameState.players.length === 1 ? 50 : 0),
         row: gameState.players.length === 0 ? gameState.arena.p1Start.row + 2 : gameState.arena.p2Start.row - 2,
@@ -818,10 +832,10 @@ function addPlayerToGame(gameState: GameState, socket: Socket) {
         action: "attack",
         canMove: true,
         canAct: true,
-        health: 3,
-        maxHealth: 3,
-        attack: 3,
-        defense: 1,
+        health: 3 * 10,
+        maxHealth: 3 * 10,
+        attack: 3 * 10,
+        defense: 1 * 10,
         range: 1,
         mobility: 2,
     });
@@ -834,10 +848,10 @@ function addPlayerToGame(gameState: GameState, socket: Socket) {
         action: "attack",
         canMove: true,
         canAct: true,
-        health: 2,
-        maxHealth: 2,
-        attack: 2,
-        defense: 0,
+        health: 2 * 10,
+        maxHealth: 2 * 10,
+        attack: 2 * 10,
+        defense: 0 * 10,
         range: 3,
         mobility: 3,
     });
@@ -850,10 +864,10 @@ function addPlayerToGame(gameState: GameState, socket: Socket) {
         action: "attack",
         canMove: true,
         canAct: true,
-        health: 2,
-        maxHealth: 2,
-        attack: 4,
-        defense: 0,
+        health: 2 * 10,
+        maxHealth: 2 * 10,
+        attack: 4 * 10,
+        defense: 0 * 10,
         range: 2,
         mobility: 2,
     });
@@ -866,10 +880,10 @@ function addPlayerToGame(gameState: GameState, socket: Socket) {
         action: "heal",
         canMove: true,
         canAct: true,
-        health: 1,
-        maxHealth: 1,
-        attack: 3,
-        defense: 0,
+        health: 1 * 10,
+        maxHealth: 1 * 10,
+        attack: 3 * 10,
+        defense: 0 * 10,
         range: 2,
         mobility: 4,
     });
@@ -882,10 +896,10 @@ function addPlayerToGame(gameState: GameState, socket: Socket) {
         action: "attack",
         canMove: true,
         canAct: true,
-        health: 2,
-        maxHealth: 2,
-        attack: 2,
-        defense: 1,
+        health: 2 * 10,
+        maxHealth: 2 * 10,
+        attack: 2 * 10,
+        defense: 1 * 10,
         range: 1,
         mobility: 4,
     });
@@ -898,10 +912,10 @@ function addPlayerToGame(gameState: GameState, socket: Socket) {
         action: "attack",
         canMove: true,
         canAct: true,
-        health: 2,
-        maxHealth: 2,
-        attack: 1,
-        defense: 1,
+        health: 2 * 10,
+        maxHealth: 2 * 10,
+        attack: 1 * 10,
+        defense: 1 * 10,
         range: 1,
         mobility: 5,
     });
@@ -914,13 +928,13 @@ function addPlayerToGame(gameState: GameState, socket: Socket) {
         action: "attack",
         canMove: true,
         canAct: true,
-        health: 4,
-        maxHealth: 4,
-        attack: 1,
-        defense: 2,
+        health: 4 * 10,
+        maxHealth: 4 * 10,
+        attack: 1 * 10,
+        defense: 2 * 10,
         range: 1,
         mobility: 2,
-    });
+    });    
 
     gameState.players.push(newPlayer);
     playerGameMap[sessionID] = gameState.id;
