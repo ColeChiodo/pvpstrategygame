@@ -249,7 +249,7 @@ function drawEntities() {
         }
     
         return a.entity.col - b.entity.col;
-    });    
+    });
 
 
     for (const { type, entity } of entities) {
@@ -264,6 +264,7 @@ function drawEntities() {
             const sy = frameY * frameSize;
 
             ctx.imageSmoothingEnabled = false;
+            ctx.globalAlpha = 0.90;
 
             let obstacleImage = new Image();
             obstacleImage.src = `/assets/maps/${obstacle.sprite.name}.png`;
@@ -277,6 +278,7 @@ function drawEntities() {
                     obstacle.sprite.currentFrame = 0;
                 }
             }
+            ctx.globalAlpha = 1.0;
         } else if (type === 'unit') {
             const unit = entity;
             const frameSize = 32;
@@ -499,7 +501,7 @@ function drawFogOfWarTiles() {
     }
 }
 
-function drawFogOfWarTile(row: number, col: number){
+function drawFogOfWarTile(row: number, col: number) {
     const frameSize = 32;
     const highlightFrameX = 4;
     const highlightFrameY = 1;
@@ -514,38 +516,28 @@ function drawFogOfWarTile(row: number, col: number){
     ctx.drawImage(uiImage, sx, sy, frameSize, frameSize, pos.x, pos.y - 8 * SCALE, frameSize * SCALE, frameSize * SCALE);
 }
 
-function drawHealthBars(){
+function drawHealthBars() {
+    if ((!isAction && !selectedTile)) return;
     for (const unit of units){
         const pos = coordToPosition(unit.row, unit.col);
         if (pos.x === -9999 || pos.y === -9999) return;
 
-        const frameSize = 16;
-        const frameX = unitIsTeam(unit.row, unit.col) ? 2 : 4;
-        const frameY = 4;
+        const barHeight = 2 * SCALE;
+        const barWidth = 12 * SCALE;
+        const barX = pos.x + barWidth - (2 * SCALE);
+        const barY = pos.y - 16 * SCALE;
+        
+        ctx.fillStyle = '#555';
+        ctx.fillRect(barX, barY, barWidth, barHeight);
 
-        const sx = frameX * frameSize;
-        const sy = frameY * frameSize;
-
-        let gap = 1 * SCALE;
-        let totalWidth = unit.maxHealth * (frameSize * SCALE / 4) + (unit.maxHealth - 1) * gap;
-        let startX = pos.x - totalWidth / 2;
-
-        for (let i = 0; i < unit.maxHealth; i++) {
-            
-            let xPosition = startX + i * (frameSize * SCALE / 4 + gap) + frameSize * SCALE;
-
-            if (i < unit.health) {
-                ctx.imageSmoothingEnabled = false;
-                ctx.drawImage(uiImage, sx, sy, frameSize, frameSize, xPosition, pos.y - 28 * SCALE, frameSize * SCALE / 4, frameSize * SCALE / 4);
-            } else {
-                ctx.imageSmoothingEnabled = false;
-                ctx.drawImage(uiImage, sx + frameSize, sy, frameSize, frameSize, xPosition, pos.y - 28 * SCALE, frameSize * SCALE / 4, frameSize * SCALE / 4);
-            }
-        }
+        const healthWidth = barWidth * (unit.health / unit.maxHealth);
+        ctx.fillStyle = '#0f0';
+        ctx.fillRect(barX, barY, healthWidth, barHeight);
     }
 }
 
-function drawMovementTiles(){
+
+function drawMovementTiles() {
     if (!arena) return;
     if (selectedTile){
         const unit = units.find(unit => unit.row === selectedTile!.row && unit.col === selectedTile!.col);

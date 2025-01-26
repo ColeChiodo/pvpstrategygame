@@ -365,6 +365,8 @@ interface GameState {
     round: number;
     player1Time: number;
     player2Time: number;
+    player1UltCharge: number;
+    player2UltCharge: number;
     visibleTiles: { row: number, col: number }[];
 }
 
@@ -570,6 +572,8 @@ function initializeGameState(gameID: string, isPrivate: boolean): GameState {
         round: 0,
         player1Time: MAX_TIME,
         player2Time: MAX_TIME,
+        player1UltCharge: 0,
+        player2UltCharge: 0,
         visibleTiles: [{ row: -1, col: -1 }],
     };
 }
