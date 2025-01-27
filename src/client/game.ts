@@ -3,11 +3,11 @@ import { sprites } from './sprites';
 import { tileTypes } from './tiles';
 
 const MIN_SCALE = 1.0; 
-const MAX_SCALE = 5.0;
-export let SCALE = 3.125;
+const MAX_SCALE = 7.0;
+export let SCALE = 2.500;
 
 let cameraOffsetX = 0;
-let cameraOffsetY = 75;
+let cameraOffsetY = 100;
 
 let arenaImage: HTMLImageElement | null = null;
 let arena: Arena | null = null;
@@ -342,7 +342,7 @@ function drawUI(){
     drawPath();
     drawHealthBars();
     drawAnimatingHealthBar();
-    drawTileInfo();
+    //drawTileInfo();
     drawHoveredUnitName();
 }
 
@@ -500,24 +500,44 @@ function drawHoveredUnitName() {
     if (!hoveredTile) return;
     if (!hasUnit(hoveredTile.row, hoveredTile.col)) return;
 
-    const bgHeight = 64;
     const margin = 10;
     const padding = 10;
+    const statLabelHeight = 30;
     const squareX = 0;
-    const squareY = canvas.height - bgHeight - margin - (64 * 4);
+    const squareY = canvas.height - (64 * 5) - margin;
 
     const hoveredUnit = units.find(unit => unit.row === hoveredTile!.row && unit.col === hoveredTile!.col);
     if (!hoveredUnit) return;
 
-    const bgWidth = hoveredUnit.name.length * 24 + 6 * padding;
+    const nameWidth = hoveredUnit.name.length * 24 + 6 * padding;
+    const statsWidth = Math.max(
+        ctx.measureText('HP:' + hoveredUnit.health.toString() + '/' + hoveredUnit.maxHealth.toString()).width,
+        ctx.measureText('Atk:' + hoveredUnit.attack.toString() + ' Def:' + hoveredUnit.defense.toString()).width,
+        ctx.measureText('Rng:' + hoveredUnit.range.toString() + '/' + ' Mob:' + hoveredUnit.mobility.toString()).width,
+    );
+    const bgWidth = Math.max(nameWidth, statsWidth) + 2 * padding;
+
+    const bgHeight = 64 + 3 * statLabelHeight;
 
     ctx.fillStyle = '#45283c';
-    ctx.fillRect(squareX, squareY, bgWidth, bgHeight); // replace with tile info ui back image
+    ctx.fillRect(squareX, squareY, bgWidth, bgHeight);
 
     ctx.fillStyle = 'white';
     ctx.font = '42px "VT323"';
     ctx.fillText(hoveredUnit.name.toUpperCase(), squareX + padding, squareY + padding + 34);
+
+    ctx.font = '24px "VT323"';
+    const statLabels = [
+        `HP:${Math.round(hoveredUnit.health)}/${hoveredUnit.maxHealth}`,
+        `Atk:${hoveredUnit.attack} Def:${hoveredUnit.defense}`,
+        `Rng:${hoveredUnit.range} Mob:${hoveredUnit.mobility}`,
+    ];    
+
+    statLabels.forEach((label, index) => {
+        ctx.fillText(label, squareX + padding, squareY + padding + 34 + (index + 1) * statLabelHeight);
+    });
 }
+
 
 function drawFogOfWarTiles() {
     if (!arena) return;
@@ -695,6 +715,7 @@ function drawMovementTiles() {
     }
 }
 
+// turn into arrow
 function drawPath(){
     if (!selectedTile) return;
     if (!hoveredTile) return;
@@ -840,7 +861,6 @@ let startX = 0;
 let startY = 0;
 
 canvas.addEventListener('click', function(event) {
-    if (isAnimating) isAnimating = false;
     if (!isTurn()) return;
 
     if (players.length != 2) return;
