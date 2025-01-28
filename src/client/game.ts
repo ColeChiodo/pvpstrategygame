@@ -15,6 +15,8 @@ let arena: Arena | null = null;
 let uiImage = new Image();
 uiImage.src = '/assets/spritesheets/UI.png';
 
+const imageCache = new Map<string, HTMLImageElement>();
+
 let players: Player[] = [];
 let units: Unit[] = [];
 let tiles: { x: number, y: number, row: number, col: number}[] = [];
@@ -264,22 +266,20 @@ function draw() {
     editHTML();
 }
 
-function drawEntities() {
+function drawEntities(): void {
     if (!arena) return;
 
     const entities = [
-        ...arena.obstacles.map(obstacle => ({ type: 'obstacle', entity: obstacle })),
-        ...units.map(unit => ({ type: 'unit', entity: unit }))
+        ...arena.obstacles.map(obstacle => ({ type: 'obstacle' as const, entity: obstacle })),
+        ...units.map(unit => ({ type: 'unit' as const, entity: unit }))
     ];
 
     entities.sort((a, b) => {
         if (a.entity.row !== b.entity.row) {
             return a.entity.row - b.entity.row;
         }
-    
         return a.entity.col - b.entity.col;
     });
-
 
     for (const { type, entity } of entities) {
         const pos = coordToPosition(entity.row, entity.col);
@@ -295,8 +295,7 @@ function drawEntities() {
             ctx.imageSmoothingEnabled = false;
             ctx.globalAlpha = 0.90;
 
-            let obstacleImage = new Image();
-            obstacleImage.src = `/assets/maps/${obstacle.sprite.name}.png`;
+            const obstacleImage = loadImage(obstacle.sprite.name, `/assets/maps/${obstacle.sprite.name}.png`);
             ctx.drawImage(obstacleImage, sx, sy, frameSize, frameSize, pos.x - 32 * SCALE, pos.y - frameSize * SCALE + (8 * SCALE), frameSize * SCALE, frameSize * SCALE);
 
             obstacle.sprite.framesElapsed++;
@@ -318,8 +317,7 @@ function drawEntities() {
 
             ctx.imageSmoothingEnabled = false;
 
-            let unitImage = new Image();
-            unitImage.src = `/assets/spritesheets/units/${unit.sprite.name}.png`;
+            const unitImage = loadImage(unit.sprite.name, `/assets/spritesheets/units/${unit.sprite.name}.png`);
             ctx.drawImage(unitImage, sx, sy, frameSize, frameSize, pos.x, pos.y - frameSize * SCALE + (8 * SCALE), frameSize * SCALE, frameSize * SCALE);
 
             unit.sprite.framesElapsed++;
@@ -346,42 +344,47 @@ function drawUI(){
     drawHoveredUnitName();
 }
 
+let editHTMLOnce = true;
 function editHTML() {
     if (players.length < 2) return;
-    const player1BG = document.getElementById('player1') as HTMLDivElement;
-    const player2BG = document.getElementById('player2') as HTMLDivElement;
-
-    if (players[0].socket === window.socket.id) {
-        player1BG.classList.add("bg-blue-600");
-        player1BG.classList.remove("bg-red-600");
-        player1BG.classList.add("border-blue-400");
-        player1BG.classList.remove("boarder-red-400");
-        player2BG.classList.add("bg-red-600");
-        player2BG.classList.remove("bg-blue-600");
-        player2BG.classList.add("border-red-400");
-        player2BG.classList.remove("boarder-blue-400");
-    } else {
-        player2BG.classList.add("bg-blue-600");
-        player2BG.classList.remove("bg-red-600");
-        player2BG.classList.add("border-blue-400");
-        player2BG.classList.remove("boarder-red-400");
-        player1BG.classList.add("bg-red-600");
-        player1BG.classList.remove("bg-blue-600");
-        player1BG.classList.add("border-red-400");
-        player1BG.classList.remove("boarder-blue-400");
+    if (editHTMLOnce) {
+        const player1BG = document.getElementById('player1') as HTMLDivElement;
+        const player2BG = document.getElementById('player2') as HTMLDivElement;
+    
+        if (players[0].socket === window.socket.id) {
+            player1BG.classList.add("bg-blue-600");
+            player1BG.classList.remove("bg-red-600");
+            player1BG.classList.add("border-blue-400");
+            player1BG.classList.remove("boarder-red-400");
+            player2BG.classList.add("bg-red-600");
+            player2BG.classList.remove("bg-blue-600");
+            player2BG.classList.add("border-red-400");
+            player2BG.classList.remove("boarder-blue-400");
+        } else {
+            player2BG.classList.add("bg-blue-600");
+            player2BG.classList.remove("bg-red-600");
+            player2BG.classList.add("border-blue-400");
+            player2BG.classList.remove("boarder-red-400");
+            player1BG.classList.add("bg-red-600");
+            player1BG.classList.remove("bg-blue-600");
+            player1BG.classList.add("border-red-400");
+            player1BG.classList.remove("boarder-blue-400");
+        }
+    
+        const player1Name = document.getElementById('player1Name') as HTMLDivElement;
+        const player2Name = document.getElementById('player2Name') as HTMLDivElement;
+    
+        player1Name.innerHTML = players[0].name;
+        player2Name.innerHTML = players[1].name;
+    
+        const player1ProfilePic = document.getElementById('player1ProfilePic') as HTMLImageElement;
+        const player2ProfilePic = document.getElementById('player2ProfilePic') as HTMLImageElement;
+    
+        player1ProfilePic.src = `/assets/profileimages/${players[0].profileimage}.png`;
+        player2ProfilePic.src = `/assets/profileimages/${players[1].profileimage}.png`;
+    
+        editHTMLOnce = false;
     }
-
-    const player1Name = document.getElementById('player1Name') as HTMLDivElement;
-    const player2Name = document.getElementById('player2Name') as HTMLDivElement;
-
-    player1Name.innerHTML = players[0].name;
-    player2Name.innerHTML = players[1].name;
-
-    const player1ProfilePic = document.getElementById('player1ProfilePic') as HTMLImageElement;
-    const player2ProfilePic = document.getElementById('player2ProfilePic') as HTMLImageElement;
-
-    player1ProfilePic.src = `/assets/profileimages/${players[0].profileimage}.png`;
-    player2ProfilePic.src = `/assets/profileimages/${players[1].profileimage}.png`;
 
     const player1Timer = document.getElementById('player1Time') as HTMLDivElement;
     const player2Timer = document.getElementById('player2Time') as HTMLDivElement;
@@ -1331,4 +1334,13 @@ function sleep(ms: number) {
 function getTileHeight(row: number, col: number): number{
     if (!arena) return 0;
     return arena.heightMap[row][col] - 1;
+}
+
+function loadImage(name: string, src: string): HTMLImageElement {
+    if (!imageCache.has(name)) {
+        const img = new Image();
+        img.src = src;
+        imageCache.set(name, img);
+    }
+    return imageCache.get(name)!;
 }
