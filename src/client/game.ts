@@ -44,11 +44,17 @@ let healthBarCurrent: number;
 const endTurnBtn = document.getElementById('endTurnBtn') as HTMLButtonElement;
 const gameOverUI = document.getElementById('gameOver') as HTMLDivElement;
 let gameOver = false;
+
 const canvas = document.getElementById('gameCanvas') as HTMLCanvasElement;
 const ctx = canvas.getContext('2d')!;
 
+let gamepadIndex: number | null = null;
+let lastInputTime: Record<number, number> = {};
+const INPUT_DELAY = 200;
+
 function gameLoop() {
     draw();
+    gamepadHandler();
     requestAnimationFrame(gameLoop);
 }
 
@@ -129,7 +135,10 @@ async function animateMove(tempUnit: Unit, origin: { row: number, col: number },
         animatingUnit = realUnit;
         realUnit.currentStatus = 2;
         realUnit.sprite.currentFrame = 0;
+
         // play footstep sound
+
+
         realUnit.row = tile.y;
         realUnit.col = tile.x;
         await sleep(100);
@@ -1145,7 +1154,64 @@ canvas.addEventListener('touchend', function(e) {
     }
 });
 
+// ---------------GAMEPAD CONTROLS-------------------------------------------------
+
+window.addEventListener('gamepadconnected', (event: GamepadEvent) => {
+    console.log(`Gamepad connected: ${event.gamepad.id}`);
+    gamepadIndex = event.gamepad.index;
+});
+
+window.addEventListener('gamepaddisconnected', (event: GamepadEvent) => {
+    console.log(`Gamepad disconnected: ${event.gamepad.id}`);
+    if (gamepadIndex === event.gamepad.index) {
+        gamepadIndex = null;
+    }
+});
+
+function gamepadHandler(): void {
+    const gamepads = navigator.getGamepads();
+    if (gamepadIndex === null || !gamepads[gamepadIndex]) return;
+    const gamepad = gamepads[gamepadIndex];
+    if (!gamepad) return;
+
+    const currentTime = Date.now();
+    const deadzone = 0.2;
+    const moveSpeed = 8 * SCALE;
+
+    if (gamepad.buttons[9].pressed) {
+        if (!lastInputTime[9] || currentTime - lastInputTime[9] > INPUT_DELAY) {
+            lastInputTime[9] = currentTime;
+            window.socket.emit('force-end-turn');
+            selectedTile = null;
+            isAction = false;
+            moveTile = null;
+        }
+    }
+
+    if (gamepad.buttons[4].pressed) {
+        if (SCALE !== MIN_SCALE) SCALE -= 0.125;
+        if (SCALE < MIN_SCALE) SCALE = MIN_SCALE;
+    }
+
+    if (gamepad.buttons[5].pressed) {
+        if (SCALE !== MAX_SCALE) SCALE += 0.125;
+        if (SCALE > MAX_SCALE) SCALE = MAX_SCALE;
+    }
+
+    const horizontal: number = gamepad.axes[2];
+    const vertical: number = gamepad.axes[3];
+
+    if (Math.abs(horizontal) > deadzone) {
+        cameraOffsetX -= horizontal * moveSpeed;
+    }
+
+    if (Math.abs(vertical) > deadzone) {
+        cameraOffsetY -= vertical * moveSpeed;
+    }
+}
+
 // ---------------UI EVENTS--------------------------------------------------------
+
 endTurnBtn.addEventListener('click', function(e){
     window.socket.emit('force-end-turn');
     selectedTile = null;
