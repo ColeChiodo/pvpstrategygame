@@ -21,7 +21,9 @@ const register = async (email: string, username: string, password: string) => {
         email,
         username,
         password: hash,
-        image: "default"
+        image: "default",
+        totalGames: 0,
+        totalWins: 0,
     });
 
     return user.save();
@@ -148,4 +150,32 @@ const findById = async (userId: string) => {
     }
 };
 
-export default { register, login, deleteAccount, updateEmail, updateUsername, updatePassword, updateProfileImage, findById };
+const incrementGamesPlayed = async (userId: string) => {
+    console.log("Incrementing Games Played");
+
+    const user = await User.findById(userId);
+    if (!user) {
+        throw new Error("User not found.");
+    }
+
+    user.totalGames += 1;
+    await user.save();
+
+    return { message: "Games incremented successfully." };
+};
+
+const incrementGamesWon = async (userId: string) => {
+    console.log("Incrementing Games Played");
+
+    const user = await User.findById(userId);
+    if (!user) {
+        throw new Error("User not found.");
+    }
+
+    user.totalWins += 1;
+    await user.save();
+
+    return { message: "Wins incremented successfully." };
+};
+
+export default { register, login, deleteAccount, updateEmail, updateUsername, updatePassword, updateProfileImage, findById, incrementGamesPlayed, incrementGamesWon };

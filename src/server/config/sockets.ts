@@ -2,10 +2,13 @@ import { Server } from "http";
 import type { Express, RequestHandler } from "express";
 import { Server as SocketIoServer, Socket } from "socket.io";
 
+require('dotenv').config();
+const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
+
 let io: SocketIoServer | undefined;
 const zlib = require('zlib');
 
-const MAX_TIME = 60 * 10; 
+const MAX_TIME = 60 * 0.05; 
 const TICKRATE = 1;
 
 export default function (server: Server, app: Express, sessionMiddleware: RequestHandler): SocketIoServer {
@@ -320,14 +323,51 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
                 }
             }
 
-            function winnerChosen(gameID: string, winner: Player) {
+            async function winnerChosen(gameID: string, winner: Player) {
                 const gameState = games[gameID];
                 if (!gameState) return;
+            
                 for (let player of gameState.players) {
                     app.get('io').to(player.socket).emit('gameOver', winner);
+                    try {
+                        const response = await fetch(`${baseUrl}/games/increment-games-played`, {
+                            method: 'PATCH',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ userID: player.userID }),
+                        });
+                
+                        if (!response.ok) {
+                            throw new Error(`Error: ${response.statusText}`);
+                        }
+                
+                        const data = await response.json();
+                        console.log('PATCH response:', data);
+                    } catch (error) {
+                        console.error('Error making PATCH request:', error);
+                    }
+                }
+            
+                try {
+                    const response = await fetch(`${baseUrl}/games/increment-games-won`, {
+                        method: 'PATCH',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ userID: winner.userID }),
+                    });
+            
+                    if (!response.ok) {
+                        throw new Error(`Error: ${response.statusText}`);
+                    }
+            
+                    const data = await response.json();
+                    console.log('PATCH response:', data);
+                } catch (error) {
+                    console.error('Error making PATCH request:', error);
                 }
             }
-            
         });
 
         io.engine.use(sessionMiddleware);
@@ -338,6 +378,7 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
 
 interface Player {
     id: string;
+    userID: string;
     socket: string;
     name: string;
     profileimage: string;
@@ -815,11 +856,14 @@ function addPlayerToGame(gameState: GameState, socket: Socket) {
     const username = socket.request.session.user.username;
     // @ts-expect-error
     const profilePic = socket.request.session.user.image;
+    // @ts-expect-error
+    const userID = socket.request.session.user._id;
 
-    console.log(`Adding ${username} to game ${gameState.id} with profile image ${profilePic}`);
+    console.log(`Adding ${username} to game ${gameState.id}`);
 
     let newPlayer: Player = {
         id: sessionID,
+        userID: userID,
         socket: socket.id,
         name: username,
         profileimage: profilePic ? profilePic : "default",
