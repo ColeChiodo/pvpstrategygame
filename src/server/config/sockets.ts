@@ -145,7 +145,16 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
                 if (unit && isValidMove(unit, target, gameState)) {
                     const origin: {row: number, col: number} = {row: unit.row, col: unit.col};
                     for (let player of gameState.players) {
-                        app.get('io').to(player.socket).emit('player-unit-moving', unit, origin, target);
+                        const data = {unit: unit, origin: origin, target: target};
+                        const serializedData = JSON.stringify(data);
+
+                        zlib.deflate(serializedData, (err: any, compressedData: any) => {
+                            if (err) {
+                                console.error('Compression error:', err);
+                                return;
+                            }
+                            app.get('io').to(player.socket).emit('player-unit-moving', compressedData);
+                        });
                     }
                     unit.row = target.row;
                     unit.col = target.col;

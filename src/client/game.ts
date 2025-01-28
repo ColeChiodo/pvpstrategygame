@@ -214,13 +214,21 @@ window.socket.on('nextRound', (player) => {
     }, 4000);
 });
 
-window.socket.on('player-unit-moving', (unit: Unit, origin: {row: number, col: number}, target: { x: number, y: number, row: number, col: number }) => {
-    const isUnitVisible = units.find(u => u.row === unit.row && u.col === unit.col);
+window.socket.on('player-unit-moving', (compressedData) => {
+    let data: any;
+    try {
+        const decompressed = inflate(compressedData, { to: 'string' });
+
+        data = JSON.parse(decompressed);
+    } catch (err) {
+        console.error('Error inflating or parsing the game state:', err);
+    }
+    const isUnitVisible = units.find(u => u.row === data.unit.row && u.col === data.unit.col);
     if (!isUnitVisible) return;
 
     isAction = true;
-    animateMove(unit, origin, target);
-    moveTile = target;
+    animateMove(data.unit, data.origin, data.target);
+    moveTile = data.target;
 });
 
 window.socket.on('animate-healthbar', (unit: Unit, healthBefore: number, healthAfter: number) => {
