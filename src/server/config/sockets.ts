@@ -3,9 +3,10 @@ import type { Express, RequestHandler } from "express";
 import { Server as SocketIoServer, Socket } from "socket.io";
 
 let io: SocketIoServer | undefined;
+const zlib = require('zlib');
 
-const MAX_TIME = 60 * 5; 
-const TICKRATE = 8;
+const MAX_TIME = 60 * 10; 
+const TICKRATE = 1;
 
 export default function (server: Server, app: Express, sessionMiddleware: RequestHandler): SocketIoServer {
     if(io === undefined) {
@@ -193,7 +194,7 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
                         console.log(`[${gameID}]: ${player.name}: unit ${unitID} healing at tile (${tile.row}, ${tile.col}). ${otherUnit.id} has ${otherUnit.health} health remaining.`);
                         healthAfter = otherUnit.health;
                     }
-                    
+
                     for (let player of gameState.players) {
                         app.get('io').to(player.socket).emit('animate-healthbar', otherUnit, healthBefore, healthAfter);
                     }
@@ -298,7 +299,15 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
                 if (!gameState) return;
                 for (let player of gameState.players) {
                     let playerGameState = getPlayerGameState(gameState, player);
-                    app.get('io').to(player.socket).emit('gameState', playerGameState);
+                    const serializedData = JSON.stringify(playerGameState);
+
+                    zlib.deflate(serializedData, (err: any, compressedData: any) => {
+                        if (err) {
+                            console.error('Compression error:', err);
+                            return;
+                        }
+                        app.get('io').to(player.socket).emit('gameState', compressedData);
+                    });
                 }
             }
 

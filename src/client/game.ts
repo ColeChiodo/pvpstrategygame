@@ -1,6 +1,7 @@
 import * as helpers from './helpers';
 import { sprites } from './sprites';
 import { tileTypes } from './tiles';
+import { inflate } from 'pako';
 
 const MIN_SCALE = 1.0; 
 const MAX_SCALE = 7.0;
@@ -153,7 +154,15 @@ window.socket.on('invalid-code', () => {
     alert("Invalid Code. Please try again.");
 });
 
-window.socket.on('gameState', (gameState) => {
+window.socket.on('gameState', (compressedData) => {
+    let gameState;
+    try {
+        const decompressed = inflate(compressedData, { to: 'string' });
+
+        gameState = JSON.parse(decompressed);
+    } catch (err) {
+        console.error('Error inflating or parsing the game state:', err);
+    }
     loadArenaImage(gameState.arena); // move to a game start function in the future to only load once
     loadPlayers(gameState.players);
     loadUnits(gameState.players);
