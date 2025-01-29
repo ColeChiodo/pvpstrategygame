@@ -3,12 +3,14 @@ import { sprites } from './sprites';
 import { tileTypes } from './tiles';
 import { inflate } from 'pako';
 
+var isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
 const MIN_SCALE = 1.0; 
 const MAX_SCALE = 7.0;
-export let SCALE = 2.500;
+export let SCALE = isMobile ? 1.0 : 2.500;
 
-let cameraOffsetX = 0;
-let cameraOffsetY = 100;
+let cameraOffsetX = isMobile ? window.innerHeight > window.innerWidth ? 0 : -35 : 0;
+let cameraOffsetY = isMobile ? window.innerHeight > window.innerWidth ? 0 : 35 : 100;
 
 let arenaImage: HTMLImageElement | null = null;
 let arena: Arena | null = null;
@@ -533,7 +535,6 @@ function drawHoveredUnitInfo() {
     const padding = 10;
     const statLabelHeight = 30;
     const squareX = 0;
-    const squareY = canvas.height - (64 * 5) - margin;
 
     const hoveredUnit = units.find(unit => unit.row === hoveredTile!.row && unit.col === hoveredTile!.col);
     if (!hoveredUnit) return;
@@ -547,6 +548,7 @@ function drawHoveredUnitInfo() {
 
     const bgWidth = Math.max(nameWidth, statsWidth) + 2 * padding;
     const bgHeight = 64 + 3 * statLabelHeight;
+    const squareY = isMobile ? canvas.height - bgHeight : canvas.height - (64 * 5) - margin;
 
     ctx.fillStyle = '#45283c';
     ctx.fillRect(squareX, squareY, bgWidth, bgHeight);

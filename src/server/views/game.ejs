@@ -20,26 +20,26 @@
 <body class="bg-primary text-md">
     <canvas id="gameCanvas" class="fixed top-0 left-0"></canvas>
 
-    <div id="playerInfo" class="fixed top-0 left-0 w-full h-[100px] bg-transparent text-white flex justify-between items-center px-4 pointer-events-none mt-3">
-        <div id="player2" class="flex items-center p-3 w-[300px] border-4">
+    <div id="playerInfo" class="fixed top-0 left-0 w-full h-[36px] md:h-[100px] bg-transparent text-white flex justify-between items-center px-4 pointer-events-none mt-3">
+        <div id="player2" class="flex items-center p-3 w-[150px] md:w-[300px] border-4">
             <img id="player2ProfilePic" src="/assets/profileimages/default.png" 
                  alt="Player 2 Profile Picture" 
-                 class="w-[64px] h-[64px] mr-3" 
+                 class="w-[32px] h-[32px] md:w-[64px] md:h-[64px] mr-3" 
                  style="image-rendering: pixelated;">
             <div class="text-left text-primary">
-                <div id="player2Name" class="font-bold text-lg -my-3">Player 1</div>
-                <div id="player2Time" class="-my-3">00:00</div>
+                <div id="player2Name" class="font-bold text-sm md:text-lg -my-3">Player 1</div>
+                <div id="player2Time" class="-my-3 text-xs md:text-md">00:00</div>
             </div>
         </div>
 
-        <div id="player1" class="flex items-center p-3 w-[300px] justify-end text-right border-4">
+        <div id="player1" class="flex items-center p-3 w-[150px] md:w-[300px] justify-end text-right border-4">
             <div class="text-right mr-3 text-primary">
-                <div id="player1Name" class="font-bold text-lg -my-3">Player 2</div>
-                <div id="player1Time" class="-my-3">00:00</div>
+                <div id="player1Name" class="font-bold text-sm md:text-lg -my-3">Player 2</div>
+                <div id="player1Time" class="-my-3 text-xs md:text-md">00:00</div>
             </div>
             <img id="player1ProfilePic" src="/assets/profileimages/default.png" 
                  alt="Player 1 Profile Picture" 
-                 class="w-[64px] h-[64px]" 
+                 class="w-[32px] h-[32px] md:w-[64px] md:h-[64px]" 
                  style="image-rendering: pixelated;">
         </div>
     </div>
