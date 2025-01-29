@@ -40,6 +40,7 @@ mongoose.connect(process.env.DATABASE_URL!)
 
     app.use((_request, _response, next) => {
         next(httpErrors(404));
+        _response.render("404", { title: "404 - Page Not Found" });
     });
 
     server.listen(PORT as number, '0.0.0.0' as string, () => {

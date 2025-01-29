@@ -10,6 +10,10 @@ router.get("/", (_req, res) => {
     res.render("landing");
 });
 
+router.get("/patch-notes", (_req, res) => {
+    res.render("patch-notes");
+});
+
 router.get("/home", authenticationMiddleware, (req, res) => {
     // @ts-expect-error
     const user = req.session.user;

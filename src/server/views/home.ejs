@@ -17,30 +17,43 @@
     </style>
 </head>
 <body class="bg-primary text-white flex flex-col items-center justify-center min-h-screen text-md">
-
-    <div id="playerInfo" class="fixed top-0 left-0 w-full h-[100px] bg-transparent text-white flex justify-between items-center px-4 mt-3">
-        <div id="player" class="flex items-center p-3 w-[300px] bg-primary hover:bg-red-500 border-4 border-secondary cursor-pointer" onclick="toggleUserPage()">
-            <img id="ProfilePic" 
-                src="/assets/profileimages/<%= user.image %>.png" 
-                alt="Profile Picture" 
-                class="w-[64px] h-[64px] mr-3" 
-                style="image-rendering: pixelated;">
-            <div id="playerName" class="font-bold text-lg -my-3"><%= user.username %></div>
-        </div>
-    </div>
-
-    <div class="bg-secondary p-8 w-full max-w-lg text-center">
-        <div class="space-y-4">
-            <a href="/play" class="block px-4 py-2 bg-green-400 text-primary font-semibold border-r-4 border-b-4 border-primary hover:bg-green-500 transition focus:outline-none focus:ring-2 focus:ring-primary focus:ring-opacity-50">
-                Public Matchmaking
-            </a>
-            <a href="/play/private" class="block px-4 py-2 bg-blue-400 text-primary font-semibold border-r-4 border-b-4 border-primary hover:bg-blue-500 transition focus:outline-none focus:ring-2 focus:ring-primary focus:ring-opacity-50">
-                Private Match
-            </a>
-            <a href="/auth/logout" class="block px-4 py-2 bg-red-400 text-primary font-semibold border-r-4 border-b-4 border-primary hover:bg-red-500 transition focus:outline-none focus:ring-2 focus:ring-primary focus:ring-opacity-50">
-                Logout
-            </a>
-        </div>
+    <div class="flex flex-col sm:w-screen md:w-1/2">
+        <div class="flex flex-row justify-between items-end w-full">
+            <div id="playerInfo" class="top-0 left-0 h-[100px] bg-transparent text-white flex items-center">
+                <div id="player" class="flex items-center p-3 w-[300px] bg-primary hover:bg-red-500 border-4 border-secondary cursor-pointer" onclick="toggleUserPage()">
+                    <img id="ProfilePic" 
+                        src="/assets/profileimages/<%= user.image %>.png" 
+                        alt="Profile Picture" 
+                        class="w-[64px] h-[64px] mr-3" 
+                        style="image-rendering: pixelated;">
+                    <div id="playerName" class="font-bold text-lg -my-3"><%= user.username %></div>
+                </div>
+            </div>
+            <a id="patchNoteBtn" href="/patch-notes" class="ml-auto text-right hover:underline hidden md:block">Patch Notes</a>
+        </div>  
+        
+        <div class="flex sm:flex-col md:flex-row justify-between items-center w-full">
+            <div class="w-full h-full hidden md:block">
+                
+            </div>
+            <div class="p-8 w-full max-w-lg text-center">
+                <div class="space-y-4">
+                    <div class="bg-secondary w-full">
+                        <h1>Public Matchmaking</h1>
+                        <p><%= user.totalWins %>W-<%= user.totalGames - user.totalWins %>L</p>
+                        <a href="/play" class="block px-4 py-2 bg-green-400 text-primary font-semibold border-primary hover:bg-green-500 transition focus:outline-none focus:ring-2 focus:ring-primary focus:ring-opacity-50">
+                            Find Game
+                        </a>
+                    </div>
+                    <div class="bg-secondary w-full">
+                        Private Match
+                        <a href="/play/private" class="block px-4 py-2 bg-blue-400 text-primary font-semibold hover:bg-blue-500 transition focus:outline-none focus:ring-2 focus:ring-primary focus:ring-opacity-50">
+                            Join/Create
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>  
     </div>
 
     <div id="editUser" class="bg-black bg-opacity-85 fixed w-screen h-screen top-0 left-0 flex justify-center items-center hidden">
@@ -81,9 +94,15 @@
                     <button type="submit" class="bg-primary text-white font-semibold hover:bg-blue-500 focus:outline-none w-[300px] border-4 border-primary focus:ring-2 focus:ring-primary focus:ring-opacity-50 mr-2">Submit Change</button>
                 </div>
             </form>
-        
-            <div class="mt-12 flex w-full justify-center items-center">
-                <button class="px-4 py-2 bg-red-400 text-primary font-semibold border-b-4 border-secondary hover:bg-red-500 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-opacity-50" onclick="toggleAccountDelete()">Delete Account</button>
+            
+            <div class="flex flex-row justify-between w-full pl-3">
+                <a href="/auth/logout" class="px-4 py-2 bg-red-400 text-primary font-semibold border-r-4 border-b-4 border-primary hover:bg-red-500 transition focus:outline-none focus:ring-2 focus:ring-primary focus:ring-opacity-50">
+                    Logout
+                </a>
+                <button class="px-4 py-2 bg-red-400 text-primary font-semibold border-r-4 border-b-4 border-primary hover:bg-red-500 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-opacity-50" 
+                    onclick="toggleAccountDelete()">
+                    Delete Account
+                </button>
             </div>
         </div>
     </div>
@@ -93,7 +112,6 @@
             <button class="absolute top-0 right-8 text-white text-xl font-semibold hover:text-primary p-2 focus:outline-none" onclick="toggleProfileImage()">X</button>
             <div class="text-xl text-white -mt-2">Change Profile Image</div>
     
-            <!-- Image Grid -->
             <div class="grid grid-cols-3 gap-4">
                 <% images.forEach(image => { %>
                     <div class="flex justify-center items-center">

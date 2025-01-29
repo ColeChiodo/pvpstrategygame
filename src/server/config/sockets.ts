@@ -8,7 +8,7 @@ const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
 let io: SocketIoServer | undefined;
 const zlib = require('zlib');
 
-const MAX_TIME = 60 * 0.05; 
+const MAX_TIME = 60 * 10; 
 const TICKRATE = 1;
 
 export default function (server: Server, app: Express, sessionMiddleware: RequestHandler): SocketIoServer {
@@ -329,6 +329,7 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
             
                 for (let player of gameState.players) {
                     app.get('io').to(player.socket).emit('gameOver', winner);
+                    if (gameState.privacy === "private") continue;
                     try {
                         const response = await fetch(`${baseUrl}/games/increment-games-played`, {
                             method: 'PATCH',
@@ -348,7 +349,8 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
                         console.error('Error making PATCH request:', error);
                     }
                 }
-            
+                
+                if (gameState.privacy === "private") return;
                 try {
                     const response = await fetch(`${baseUrl}/games/increment-games-won`, {
                         method: 'PATCH',
