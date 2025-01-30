@@ -1,5 +1,6 @@
 import express from "express";
 import authenticationMiddleware from "../middleware/authentication";
+import { Users } from "../database";
 
 const router = express.Router();
 
@@ -14,9 +15,17 @@ router.get("/patch-notes", (_req, res) => {
     res.render("patch-notes");
 });
 
-router.get("/home", authenticationMiddleware, (req, res) => {
+router.get("/home", authenticationMiddleware, async (req, res) => {
     // @ts-expect-error
-    const user = req.session.user;
+    let user = req.session.user;
+    try {
+        const updatedUser = await Users.findById(user._id);
+        // @ts-expect-error
+        req.session.user = updatedUser;
+        req.session.save();
+    } catch (err) {
+        console.error(err);
+    }
     const imageDir = path.join(__dirname, '..', '..', 'public', 'assets', 'profileimages');
 
     fs.readdir(imageDir, (err: any, files: any[]) => {
@@ -31,9 +40,17 @@ router.get("/home", authenticationMiddleware, (req, res) => {
     });
 });
 
-router.get("/home/user", authenticationMiddleware, (req, res) => {
+router.get("/home/user", authenticationMiddleware, async (req, res) => {
     // @ts-expect-error
     const user = req.session.user;
+    try {
+        const updatedUser = await Users.findById(user._id);
+        // @ts-expect-error
+        req.session.user = updatedUser;
+        req.session.save();
+    } catch (err) {
+        console.error(err);
+    }
     const imageDir = path.join(__dirname, '..', '..', 'public', 'assets', 'profileimages');
 
     fs.readdir(imageDir, (err: any, files: any[]) => {

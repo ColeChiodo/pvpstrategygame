@@ -24,6 +24,7 @@ const register = async (email: string, username: string, password: string) => {
         image: "default",
         totalGames: 0,
         totalWins: 0,
+        xp: 0,
     });
 
     return user.save();
@@ -178,4 +179,22 @@ const incrementGamesWon = async (userId: string) => {
     return { message: "Wins incremented successfully." };
 };
 
-export default { register, login, deleteAccount, updateEmail, updateUsername, updatePassword, updateProfileImage, findById, incrementGamesPlayed, incrementGamesWon };
+const incrementXP = async (userId: string, didWin: boolean) => {
+    console.log("Incrementing Games Played");
+
+    const user = await User.findById(userId);
+    if (!user) {
+        throw new Error("User not found.");
+    }
+
+    const baseXP = 50;
+    const winXP = 120;
+    const loseXP = 30;
+
+    user.xp += didWin ? baseXP + winXP : baseXP + loseXP;
+    await user.save();
+
+    return { message: "XP incremented successfully." };
+};
+
+export default { register, login, deleteAccount, updateEmail, updateUsername, updatePassword, updateProfileImage, findById, incrementGamesPlayed, incrementGamesWon, incrementXP };

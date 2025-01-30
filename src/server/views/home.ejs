@@ -20,17 +20,23 @@
     <div class="flex flex-col sm:w-screen md:w-1/2">
         <div class="flex flex-row justify-between items-end w-full">
             <div id="playerInfo" class="top-0 left-0 h-[100px] bg-transparent text-white flex items-center">
-                <div id="player" class="flex items-center p-3 w-[300px] bg-primary hover:bg-red-500 border-4 border-secondary cursor-pointer" onclick="toggleUserPage()">
-                    <img id="ProfilePic" 
-                        src="/assets/profileimages/<%= user.image %>.png" 
-                        alt="Profile Picture" 
-                        class="w-[64px] h-[64px] mr-3" 
-                        style="image-rendering: pixelated;">
-                    <div id="playerName" class="font-bold text-lg -my-3"><%= user.username %></div>
+                <div id="player" class="relative flex items-center p-3 w-[300px] bg-primary hover:bg-red-500 border-4 border-secondary cursor-pointer" onclick="toggleUserPage()">
+                    <div class="flex">
+                        <img id="ProfilePic" 
+                            src="/assets/profileimages/<%= user.image %>.png" 
+                            alt="Profile Picture" 
+                            class="w-[64px] h-[64px] mr-3" 
+                            style="image-rendering: pixelated;">
+                    </div>
+                    <div class="flex flex-row justify-between w-full px-3">
+                        <div id="playerName" class="font-bold text-lg"><%= user.username %></div>
+                        <div class="text-lg text-right"><%= Math.floor(user.xp / 1275) + 1 %></div>
+                    </div>
                 </div>
             </div>
             <a id="patchNoteBtn" href="/patch-notes" class="ml-auto text-right hover:underline hidden md:block">Patch Notes</a>
-        </div>  
+        </div>
+         
         
         <div class="flex sm:flex-col md:flex-row justify-between items-center w-full">
             <div class="w-full h-full hidden md:block">

@@ -8,7 +8,7 @@ const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
 let io: SocketIoServer | undefined;
 const zlib = require('zlib');
 
-const MAX_TIME = 60 * 10; 
+const MAX_TIME = 60 * .10; 
 const TICKRATE = 1;
 
 export default function (server: Server, app: Express, sessionMiddleware: RequestHandler): SocketIoServer {
@@ -337,6 +337,24 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
                                 'Content-Type': 'application/json',
                             },
                             body: JSON.stringify({ userID: player.userID }),
+                        });
+                
+                        if (!response.ok) {
+                            throw new Error(`Error: ${response.statusText}`);
+                        }
+                
+                        const data = await response.json();
+                        console.log('PATCH response:', data);
+                    } catch (error) {
+                        console.error('Error making PATCH request:', error);
+                    }
+                    try {
+                        const response = await fetch(`${baseUrl}/games/increment-xp`, {
+                            method: 'PATCH',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ userID: player.userID, didWin: winner.userID === player.userID }),
                         });
                 
                         if (!response.ok) {
