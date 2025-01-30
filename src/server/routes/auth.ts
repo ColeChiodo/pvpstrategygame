@@ -25,6 +25,7 @@ router.post("/login", async (_req, res) => {
         const user = await Users.login(credential, password);
         // @ts-expect-error
         _req.session.user = user;
+        _req.session.save();
         res.redirect("/home");
     } catch(err) {
         console.error(err);
@@ -51,7 +52,6 @@ router.post("/update-email", async (_req, res) => {
         const updatedUser = await Users.findById(userId);
         // @ts-expect-error
         _req.session.user = updatedUser;
-        _req.session.save();
 
         res.redirect("/home/user");
     } catch (err) {
@@ -72,7 +72,7 @@ router.post("/update-username", async (_req, res) => {
         const updatedUser = await Users.findById(userId);
         // @ts-expect-error
         _req.session.user = updatedUser;
-        _req.session.save();
+
 
         res.redirect("/home/user");
     } catch (err) {
@@ -93,7 +93,6 @@ router.post("/update-password", async (_req, res) => {
         const updatedUser = await Users.findById(userId);
         // @ts-expect-error
         _req.session.user = updatedUser;
-        _req.session.save();
 
         res.redirect("/home/user");
     } catch (err) {
@@ -116,7 +115,6 @@ router.post("/update-profile-image", async (_req, res) => {
         const updatedUser = await Users.findById(userId);
         // @ts-expect-error
         _req.session.user = updatedUser;
-        _req.session.save();
 
         res.redirect("/home/user");
     } catch (err) {

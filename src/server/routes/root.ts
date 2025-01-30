@@ -19,9 +19,9 @@ router.get("/home", authenticationMiddleware, async (req, res) => {
     // @ts-expect-error
     let user = req.session.user;
     try {
-        const updatedUser = await Users.findById(user._id);
+        user = await Users.findById(user._id);
         // @ts-expect-error
-        req.session.user = updatedUser;
+        req.session.user = user;
         req.session.save();
     } catch (err) {
         console.error(err);
@@ -42,11 +42,11 @@ router.get("/home", authenticationMiddleware, async (req, res) => {
 
 router.get("/home/user", authenticationMiddleware, async (req, res) => {
     // @ts-expect-error
-    const user = req.session.user;
+    let user = req.session.user;
     try {
-        const updatedUser = await Users.findById(user._id);
+        user = await Users.findById(user._id);
         // @ts-expect-error
-        req.session.user = updatedUser;
+        req.session.user = user;
         req.session.save();
     } catch (err) {
         console.error(err);

@@ -18,7 +18,7 @@ export default function (app: Express): RequestHandler {
               ttl: 3 * 24 * 60 * 60, // Session expiry time (3 days)
             }),
             cookie: {
-              secure: true,
+              secure: false,
               maxAge: 1000 * 60 * 60 * 24,
             }
         });
