@@ -34,7 +34,20 @@
                     </div>
                 </div>
             </div>
-            <div class="text-lg">Money: <%= user.currency %></div>
+            <div class="flex flex-row">
+                <div id="displayPremiumCurrency" class="text-lg">Premium: <%= user.premium_currency %></div>
+                <div class="bg-primary hover:bg-red-500 border-4 border-secondary cursor-pointer"
+                     onclick="togglePaymentScreen()">
+                    +
+                </div>
+            </div>
+            <div class="flex flex-row">
+                <div id="displayCurrency" class="text-lg">Money: <%= user.currency %></div>
+                <div class="bg-primary hover:bg-red-500 border-4 border-secondary cursor-pointer"
+                     onclick="toggleConversionScreen()">
+                    +
+                </div>
+            </div>
             <a id="patchNoteBtn" href="/patch-notes" class="ml-auto text-right hover:underline hidden md:block">Patch Notes</a>
         </div>
          
@@ -184,6 +197,67 @@
             } else {
                 history.pushState(null, null, "/home");
             }
+        }
+
+        function togglePaymentScreen() {
+            const userId = '<%= user._id %>';
+            const amount = 100;
+
+            fetch('/account/increment-premium-currency', {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    userID: userId,
+                    amount: amount
+                })
+            })
+            .then(response => {
+                if (response.ok) {
+                    return response.json();
+                } else {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+            })
+            .then(data => {
+                document.getElementById('displayPremiumCurrency').textContent = `Premium: ${data.newPremium}`;
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while processing your request.');
+            });
+        }
+
+        function toggleConversionScreen() {
+            const userId = '<%= user._id %>';
+            const amount = 100;
+
+            fetch('/account/convert-premium-currency', {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    userID: userId,
+                    amount: amount
+                })
+            })
+            .then(response => {
+                if (response.ok) {
+                    return response.json();
+                } else {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+            })
+            .then(data => {
+                document.getElementById('displayPremiumCurrency').textContent = `Premium: ${data.newPremium}`;
+                document.getElementById('displayCurrency').textContent = `Money: ${data.newCurrency}`;
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while processing your request.');
+            });
         }
 
         function toggleAccountDelete() {

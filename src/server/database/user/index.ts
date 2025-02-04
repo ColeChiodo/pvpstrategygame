@@ -26,6 +26,7 @@ const register = async (email: string, username: string, password: string) => {
         totalWins: 0,
         xp: 0,
         currency: 0,
+        premium_currency: 0,
     });
 
     return user.save();
@@ -204,7 +205,6 @@ const incrementXP = async (userId: string, didWin: boolean) => {
 };
 
 const incrementCurrency = async (userId: string, amount: number) => {
-
     const user = await User.findById(userId);
     if (!user) {
         throw new Error("User not found.");
@@ -216,4 +216,41 @@ const incrementCurrency = async (userId: string, amount: number) => {
     return { message: "Currency incremented successfully." };
 };
 
-export default { register, login, deleteAccount, updateEmail, updateUsername, updatePassword, updateProfileImage, findById, incrementGamesPlayed, incrementGamesWon, incrementXP };
+const incrementPremiumCurrency = async (userId: string, amount: number) => {
+    const user = await User.findById(userId);
+    if (!user) {
+        throw new Error("User not found.");
+    }
+
+    user.premium_currency += amount;
+    await user.save();
+
+    return { 
+        message: "Premium Currency converted successfully.",
+        newPremium: user.premium_currency.toString(),
+    };
+};
+
+const convertPremiumCurrency = async (userId: string, amount: number) => {
+    const user = await User.findById(userId);
+    if (!user) {
+        throw new Error("User not found.");
+    }
+
+    if (user.premium_currency - amount < 0) {
+        throw new Error("Not Enough Premium Currency.");
+    }
+
+    user.premium_currency -= amount;
+    user.currency += amount;
+    await user.save();
+
+    return { 
+        message: "Premium Currency converted successfully.",
+        newPremium: user.premium_currency.toString(),
+        newCurrency: user.currency.toString(),
+    };
+};
+
+export default { register, login, deleteAccount, updateEmail, updateUsername, updatePassword, updateProfileImage, 
+    findById, incrementGamesPlayed, incrementGamesWon, incrementXP, incrementPremiumCurrency, convertPremiumCurrency };

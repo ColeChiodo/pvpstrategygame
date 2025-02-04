@@ -9,6 +9,7 @@ interface IUser extends Document {
   totalWins: number;
   xp: number;
   currency: number;
+  premium_currency: number;
 }
 
 const userSchema: Schema = new Schema({
@@ -20,6 +21,7 @@ const userSchema: Schema = new Schema({
   totalWins: { type: Number, required: true },
   xp: { type: Number, required: true },
   currency: { type: Number, required: true },
+  premium_currency: { type: Number, required: true },
 });
 
 const User = mongoose.model<IUser>('User', userSchema);

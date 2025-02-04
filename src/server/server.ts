@@ -37,6 +37,7 @@ mongoose.connect(process.env.DATABASE_URL!)
     app.use("/", routes.home);
     app.use("/auth", routes.auth);
     app.use("/games", routes.games);
+    app.use("/account", routes.account);
 
     app.use((_request, _response, next) => {
         next(httpErrors(404));

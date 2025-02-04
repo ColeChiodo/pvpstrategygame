@@ -349,7 +349,7 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
                         console.error('Error making PATCH request:', error);
                     }
                     try {
-                        const response = await fetch(`${baseUrl}/games/increment-xp`, {
+                        const response = await fetch(`${baseUrl}/account/increment-xp`, {
                             method: 'PATCH',
                             headers: {
                                 'Content-Type': 'application/json',
