@@ -4,6 +4,7 @@ declare global {
   interface Window {
     socket: Socket;
     gameID: number;
+    gainNode: GainNode;
   }
 }
 

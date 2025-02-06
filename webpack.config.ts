@@ -11,6 +11,7 @@ const config = {
         main: path.join(process.cwd(), "src", "client", "main.ts"),
         game: path.join(process.cwd(), "src", "client", "game.ts"),
         tailwind: path.join(process.cwd(), "src", "client", "tailwind.ts"),
+        audiosliderhandler: path.join(process.cwd(), "src", "client", "audiosliderhandler.ts"),
     },
     mode,
     output: {

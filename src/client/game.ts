@@ -19,6 +19,7 @@ let uiImage = new Image();
 uiImage.src = '/assets/spritesheets/UI.png';
 
 const imageCache = new Map<string, HTMLImageElement>();
+const audioCache = new Map<string, HTMLAudioElement>();
 
 let players: Player[] = [];
 let units: Unit[] = [];
@@ -138,8 +139,7 @@ async function animateMove(tempUnit: Unit, origin: { row: number, col: number },
         realUnit.currentStatus = 2;
         realUnit.sprite.currentFrame = 0;
 
-        // play footstep sound
-
+        playSound('step', `/assets/audio/sfx/step.wav`);
 
         realUnit.row = tile.y;
         realUnit.col = tile.x;
@@ -246,8 +246,14 @@ window.socket.on('animate-healthbar', (unit: Unit, healthBefore: number, healthA
     const isUnitVisible = units.find(u => u.row === unit.row && u.col === unit.col);
     if (!isUnitVisible) return;
 
-    const action: string = healthBefore < healthAfter ? "attack" : "heal";
-    // depending on action, play different audio
+    const action: string = healthBefore > healthAfter ? "attack" : "heal";
+
+    if (action === "attack") {
+        playSound(action, `/assets/audio/sfx/bonk.wav`);
+    } else if (action === "heal") {
+        playSound(action, `/assets/audio/sfx/powerup.wav`);
+    }
+
 
     animateHealthBar = true;
     animatingHealthBarUnit = unit;
@@ -378,6 +384,8 @@ function editHTML() {
     if (editHTMLOnce) {
         const player1BG = document.getElementById('player1') as HTMLDivElement;
         const player2BG = document.getElementById('player2') as HTMLDivElement;
+        const p1ReactIcon = document.getElementById('p1ReactIcon') as HTMLDivElement;
+        const p2ReactIcon = document.getElementById('p2ReactIcon') as HTMLDivElement;
     
         if (players[0].socket === window.socket.id) {
             player1BG.classList.add("bg-blue-600");
@@ -388,6 +396,8 @@ function editHTML() {
             player2BG.classList.remove("bg-blue-600");
             player2BG.classList.add("border-red-400");
             player2BG.classList.remove("boarder-blue-400");
+
+            p2ReactIcon.style.display = 'none';
         } else {
             player2BG.classList.add("bg-blue-600");
             player2BG.classList.remove("bg-red-600");
@@ -397,6 +407,8 @@ function editHTML() {
             player1BG.classList.remove("bg-blue-600");
             player1BG.classList.add("border-red-400");
             player1BG.classList.remove("boarder-blue-400");
+
+            p1ReactIcon.style.display = 'none';
         }
     
         const player1Name = document.getElementById('player1Name') as HTMLDivElement;
@@ -1280,3 +1292,27 @@ function loadImage(name: string, src: string): HTMLImageElement {
     }
     return imageCache.get(name)!;
 }
+
+function loadAudio(name: string, src: string): HTMLAudioElement {
+    if (!audioCache.has(name)) {
+        const audio = new Audio(src);
+        audioCache.set(name, audio);
+    }
+    return audioCache.get(name)!;
+}
+
+const audioContext = new AudioContext();
+const gainNode = audioContext.createGain();
+gainNode.gain.value = 0.5; // Default volume
+gainNode.connect(audioContext.destination);
+
+function playSound(name: string, src: string) {
+    const audio = loadAudio(name, src);
+    const track = audioContext.createMediaElementSource(audio);
+    track.connect(gainNode);
+    
+    audio.currentTime = 0;
+    audio.play();
+}
+
+window.gainNode = gainNode;
