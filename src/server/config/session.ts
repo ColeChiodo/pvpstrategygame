@@ -19,7 +19,7 @@ export default function (app: Express): RequestHandler {
             }),
             cookie: {
               secure: false,
-              sameSite: "none",
+              //sameSite: "none",
               maxAge: 1000 * 60 * 60 * 24,
             }
         });

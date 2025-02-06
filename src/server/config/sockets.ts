@@ -8,7 +8,7 @@ const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
 let io: SocketIoServer | undefined;
 const zlib = require('zlib');
 
-const MAX_TIME = 60 * .10; 
+const MAX_TIME = 60 * 10; 
 const TICKRATE = 1;
 
 export default function (server: Server, app: Express, sessionMiddleware: RequestHandler): SocketIoServer {
