@@ -44,64 +44,15 @@
         </div>
     </div>
 
-    <div id="reaction" class="fixed top-24 left-0 w-full h-[36px] md:h-[100px] bg-transparent text-white flex justify-between items-center px-4 mt-3 pointer-events-none">
-        <div id="p2React" class="flex items-center p-3 w-[150px] md:w-[300px]">  
-            <img id="p2ReactIcon"
-                src="/assets/global/reactionb.svg" 
-                alt="Bomb Icon" 
-                class="w-16 h-16 transition-all duration-300 hover:invert pointer-events-auto"
-                onclick="displayReactionMenu(0)">
-        </div>
-        <div id="p1React" class="flex items-center p-3 w-[150px] md:w-[300px] justify-end">
-            <img id="p1ReactIcon"
-                src="/assets/global/reactionb.svg" 
-                alt="Bomb Icon" 
-                class="w-16 h-16 transition-all duration-300 hover:invert pointer-events-auto"
-                onclick="displayReactionMenu(1)">
-        </div>
-    </div>
+    <%- include('partials/reaction') %>
     
-    <div id="endTurn" class="fixed bottom-4 left-4 flex items-center justify-center flex-col p-4">
-        <div id="volumeControl" class="relative flex items-center group">
-            <img id="volumeIcon" 
-                src="/assets/global/audio.png" 
-                alt="Volume Icon"
-                class="w-10 h-10 cursor-pointer transition-all duration-300 group-hover:scale-110"
-                onclick="toggleMute()">
-
-            <input type="range" id="volumeSlider" 
-                min="0" max="1" step="0.01" value="0.5"
-                class="absolute left-12 w-32 opacity-0 scale-x-0 transition-all duration-300 group-hover:opacity-100 group-hover:scale-x-100 origin-left p-2 bg-gray-700 rounded-lg">
-        </div>
-    </div>
+    <%- include('partials/volume') %>
 
     <div id="endTurn" class="fixed bottom-0 right-0 flex items-center justify-center flex-col p-4">
         <button id="endTurnBtn" class="mt-3 bg-red-500 text-primary p-2 border-r-4 border-b-4 border-primary hover:bg-red-600 transition h-16 w-32 text-md lg:h-32 lg:w-64 lg:text-lg disabled:bg-gray-500">End Turn</button>
     </div>
 
-    <div id="loading" class="fixed w-full h-screen min-h-screen bg-black bg-opacity-85 flex items-center justify-center top-0 left-0 flex-col">
-        <% if(!isPrivate) { %>
-            <img src="https://media.tenor.com/UDC3OVGA1jcAAAAi/icon.gif" alt="Loading" class="object-contain max-w-16 max-h-16"> <!--replace loading gif with custom-->
-            <div class="text-white mt-2">Finding Opponent...</div>
-            <div id="matchmakingTimer" class="text-white mt-3">00:00</div>
-            <button id="quitMatchmakingBtn" class="mt-3 bg-red-500 text-primary p-2 border-r-4 border-b-4 border-primary hover:bg-red-600 transition" onclick="window.location.href='/home';">Exit Matchmaking</button>
-        <% } else if(isPrivate) { %>
-            <div id="privateMatchOptions" class="flex flex-col items-center">
-                <button id="createMatchBtn" class="bg-green-500 text-white p-2 border-r-4 border-b-4 border-green-600 hover:bg-green-600 transition mb-3" onclick="handlePrivateMatch('create')">Create Match</button>
-                <button id="joinMatchBtn" class="bg-blue-500 text-white p-2 border-r-4 border-b-4 border-blue-600 hover:bg-blue-600 transition" onclick="handlePrivateMatch('join')">Join Match</button>
-            </div>
-    
-            <div id="gameDetails" class="hidden text-center">
-                <div class="text-white text-lg">Game Code: <span id="gameCode"></span></div>
-                <button id="copyCodeBtn" class="mt-3 bg-blue-500 text-white p-2 border-r-4 border-b-4 border-primary hover:bg-blue-600 transition w-[300px]" onclick="copyGameCode()">Copy Game Code</button>
-            </div>
-
-            <div id="joinForm" class="hidden text-center">
-                <input type="text" id="joinCodeInput" class="p-2 mb-3 border rounded" placeholder="Enter Game Code" />
-                <button id="joinSubmitBtn" class="bg-blue-500 text-white p-2 border-r-4 border-b-4 border-primary hover:bg-blue-600 transition w-[100px]" onclick="submitJoinCode()">Join</button>
-            </div>
-        <% } %>
-    </div>
+    <%- include('partials/loading') %>
 
     <div id="nextTurn" class="fixed w-full h-screen flex items-center justify-center top-full left-0 transition-all duration-700 ease-in-out pointer-events-none">
         <div id="nextTurnBG" class="w-1/3 h-[100px] bg-black bg-opacity-85 -skew-x-12 border-t-4 border-b-4 border-red-500 border-opacity-85 items-center justify-center flex pointer-events-none"> <!--replace with bg image-->
@@ -194,6 +145,16 @@
 
             reactionMenu.classList.toggle("hidden");
             reactionMenu.classList.toggle("block");
+        }
+
+        emoteTimeout = false;
+        function emoteClicked(src) {
+            if (emoteTimeout) return;
+            emoteTimeout = true;
+            window.socket.emit('display-emote', src, window.socket.id);
+            setTimeout(() => {
+                emoteTimeout = false;
+            }, 6500);
         }
     </script>
 </body>

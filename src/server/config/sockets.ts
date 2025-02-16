@@ -256,7 +256,15 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
                     let interval = setInterval(() => {}, 9999);
                     endGame(gameID, interval);
                 }
-                
+            });
+
+            socket.on("display-emote", (src: string, sid: string) => {
+                const gameID = getGameIdForPlayer(sessionID); 
+                const gameState = games[gameID];
+                if (!gameState) return;
+                for (let player of gameState.players) {
+                    app.get('io').to(player.socket).emit('display-emote', src, sid);
+                }
             });
 
             function endGame(gameID: string, interval: NodeJS.Timeout) {

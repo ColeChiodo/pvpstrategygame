@@ -271,6 +271,46 @@ window.socket.on('animate-healthbar', (unit: Unit, healthBefore: number, healthA
     }, 600);
 });
 
+window.socket.on('display-emote', (src: string, sid: string) => {
+    if (players[0].socket === sid) {
+        let p2Emote = document.getElementById('p2Emote');
+        if (!p2Emote) return;
+        let emoteImg = loadImage(src+'2', src);
+        p2Emote.appendChild(emoteImg);
+        emoteImg.classList.value = "w-24 h-24 transition-all duration-500 opacity-0";
+        setTimeout(() => {
+            emoteImg.classList.toggle('opacity-0');
+            emoteImg.classList.toggle('opacity-95');
+            // play sound for emote
+            setTimeout(() => {
+                emoteImg.classList.toggle('opacity-0');
+                emoteImg.classList.toggle('opacity-95');
+                setTimeout(() => {
+                    p2Emote.removeChild(emoteImg)
+                }, 500);
+            }, 5000);
+        }, 100);
+    } else if (players[1].socket === sid) {
+        let p1Emote = document.getElementById('p1Emote');
+        if (!p1Emote) return;
+        let emoteImg = loadImage(src+'1', src);
+        p1Emote.appendChild(emoteImg);
+        emoteImg.classList.value = "w-24 h-24 transition-all duration-500 opacity-0";
+        setTimeout(() => {
+            emoteImg.classList.toggle('opacity-0');
+            emoteImg.classList.toggle('opacity-95');
+            // play sound for emote
+            setTimeout(() => {
+                emoteImg.classList.toggle('opacity-0');
+                emoteImg.classList.toggle('opacity-95');
+                setTimeout(() => {
+                    p1Emote.removeChild(emoteImg)
+                }, 500);
+            }, 5000);
+        }, 100);
+    }
+});
+
 // -----------Drawing Functions----------------------------
 
 function drawBackground() {
@@ -396,8 +436,6 @@ function editHTML() {
             player2BG.classList.remove("bg-blue-600");
             player2BG.classList.add("border-red-400");
             player2BG.classList.remove("boarder-blue-400");
-
-            p2ReactIcon.style.display = 'none';
         } else {
             player2BG.classList.add("bg-blue-600");
             player2BG.classList.remove("bg-red-600");
@@ -407,8 +445,6 @@ function editHTML() {
             player1BG.classList.remove("bg-blue-600");
             player1BG.classList.add("border-red-400");
             player1BG.classList.remove("boarder-blue-400");
-
-            p1ReactIcon.style.display = 'none';
         }
     
         const player1Name = document.getElementById('player1Name') as HTMLDivElement;
