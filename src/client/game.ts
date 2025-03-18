@@ -427,7 +427,7 @@ function drawEntities(): void {
             const sy = frameY * frameSize;
 
             ctx.imageSmoothingEnabled = false;
-            ctx.globalAlpha = 0.90;
+            ctx.globalAlpha = 0.75;
 
             const obstacleImage = loadImage(obstacle.sprite.name, `/assets/maps/${obstacle.sprite.name}.png`);
             ctx.drawImage(obstacleImage, sx, sy, frameSize, frameSize, pos.x - 32 * SCALE, pos.y - frameSize * SCALE + (8 * SCALE), frameSize * SCALE, frameSize * SCALE);
