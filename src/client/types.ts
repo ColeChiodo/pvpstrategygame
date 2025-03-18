@@ -51,9 +51,12 @@ interface Sprite {
     name: string;
     image: string;
     idleFrames: number;
+    walkFrames: number;
+    actionFrames: number;
     currentFrame: number;
     framesElapsed: number;
     framesHold: number;
+    direction: number;
 
     copy(): Sprite;
 }

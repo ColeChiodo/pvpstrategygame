@@ -132,18 +132,62 @@ async function animateMove(tempUnit: Unit, origin: { row: number, col: number },
     const path = astarPath(origin.row, origin.col, target.row, target.col);
     const realUnit = units.find(unit => unit.row === tempUnit.row && unit.col === tempUnit.col);
     if (!realUnit) return;
+
+    realUnit.sprite.currentFrame = 0;
     
+    let lastTile: { x: number, y: number } = {x: origin.col, y: origin.row};
     for (const tile of path) {
+        console.log(lastTile, tile)
         if (!isAnimating) break;
         animatingUnit = realUnit;
+
         realUnit.currentStatus = 2;
-        realUnit.sprite.currentFrame = 0;
 
         playSound('step', `/assets/audio/sfx/step.wav`);
 
         realUnit.row = tile.y;
         realUnit.col = tile.x;
+
+        if (realUnit.row == lastTile.y) {
+            
+            if (realUnit.col > lastTile.x) {
+                realUnit.sprite.direction = 1; 
+            } else if (realUnit.col < lastTile.x) {
+                realUnit.sprite.direction = -1; 
+            }
+        } else if (realUnit.col == lastTile.x) {
+            
+            if (realUnit.row > lastTile.y) {
+                realUnit.sprite.direction = -1; 
+            } else if (realUnit.row < lastTile.y) {
+                realUnit.sprite.direction = 1;
+            }
+        }
+
+        lastTile = tile;
         await sleep(100);
+    }
+
+    isAnimating = false;
+    animatingUnit = null;
+    realUnit.currentStatus = 0;
+    realUnit.sprite.currentFrame = 0;
+}
+
+async function animateAction(tempUnit: Unit) {
+    isAnimating = true;
+    const realUnit = units.find(unit => unit.row === tempUnit.row && unit.col === tempUnit.col);
+    if (!realUnit) return;
+
+    animatingUnit = realUnit;
+
+    realUnit.sprite.currentFrame = 0;
+    
+    while (realUnit.sprite.currentFrame < realUnit.sprite.actionFrames) {
+        animatingUnit = realUnit;
+        realUnit.currentStatus = 3;
+        realUnit.sprite.currentFrame++;
+        await sleep(realUnit.sprite.framesHold);
     }
 
     isAnimating = false;
@@ -240,6 +284,22 @@ window.socket.on('player-unit-moving', (compressedData) => {
     isAction = true;
     animateMove(data.unit, data.origin, data.target);
     moveTile = data.target;
+});
+
+window.socket.on('player-unit-acting', (compressedData) => {
+    let data: any;
+    try {
+        const decompressed = inflate(compressedData, { to: 'string' });
+
+        data = JSON.parse(decompressed);
+    } catch (err) {
+        console.error('Error inflating or parsing the game state:', err);
+    }
+    const isUnitVisible = units.find(u => u.row === data.unit.row && u.col === data.unit.col);
+    if (!isUnitVisible) return;
+
+    isAction = false;
+    animateAction(data.unit);
 });
 
 window.socket.on('animate-healthbar', (unit: Unit, healthBefore: number, healthAfter: number) => {
@@ -388,16 +448,31 @@ function drawEntities(): void {
             const frameY = unit.currentStatus;
             const sx = frameX * frameSize;
             const sy = frameY * frameSize;
+            const direction = unit.sprite.direction;
+
+            if (unit.name === "scout") {
+                console.log(direction)
+            }
 
             ctx.imageSmoothingEnabled = false;
 
             const unitImage = loadImage(unit.sprite.name, `/assets/spritesheets/units/${unit.sprite.name}.png`);
-            ctx.drawImage(unitImage, sx, sy, frameSize, frameSize, pos.x, pos.y - frameSize * SCALE + (8 * SCALE), frameSize * SCALE, frameSize * SCALE);
+            ctx.save();
+            if (direction === -1) {
+                // Flip horizontally
+                ctx.scale(-1, 1);
+                ctx.drawImage(unitImage, sx, sy, frameSize, frameSize, -(pos.x + frameSize * SCALE), pos.y - frameSize * SCALE + (2 * SCALE), frameSize * SCALE, frameSize * SCALE);
+            } else {
+                ctx.drawImage(unitImage, sx, sy, frameSize, frameSize, pos.x, pos.y - frameSize * SCALE + (2 * SCALE), frameSize * SCALE, frameSize * SCALE);
+            }
+            ctx.restore();
 
             unit.sprite.framesElapsed++;
             if (unit.sprite.framesElapsed % unit.sprite.framesHold === 0) {
-                if (unit.sprite.currentFrame < unit.sprite.idleFrames - 1) {
+                if (unit.sprite.currentFrame < unit.sprite.idleFrames - 1 && (unit.currentStatus === 0 || unit.currentStatus === 1)) {
                     unit.sprite.currentFrame++;
+                } else if (unit.sprite.currentFrame < unit.sprite.walkFrames - 1 && unit.currentStatus === 2) {
+                } else if (unit.sprite.currentFrame < unit.sprite.actionFrames - 1 && unit.currentStatus === 3) {
                 } else {
                     unit.sprite.currentFrame = 0;
                 }

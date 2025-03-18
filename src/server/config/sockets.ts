@@ -207,14 +207,22 @@ export default function (server: Server, app: Express, sessionMiddleware: Reques
                         healthAfter = otherUnit.health;
                     }
 
+                    unit.canAct = false;
+
                     for (let player of gameState.players) {
+                        let data = {unit: unit};
+                        let serializedData = JSON.stringify(data);
+
+                        zlib.deflate(serializedData, (err: any, compressedData: any) => {
+                            if (err) {
+                                console.error('Compression error:', err);
+                                return;
+                            }
+                            app.get('io').to(player.socket).emit('player-unit-acting', compressedData);
+                        });
                         app.get('io').to(player.socket).emit('animate-healthbar', otherUnit, healthBefore, healthAfter);
                     }
-
-                    unit.canAct = false;
                 }
-
-                
 
                 emitGameState(gameID);
             });
