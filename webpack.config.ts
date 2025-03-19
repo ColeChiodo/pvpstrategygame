@@ -12,6 +12,7 @@ const config = {
         game: path.join(process.cwd(), "src", "client", "game.ts"),
         tailwind: path.join(process.cwd(), "src", "client", "tailwind.ts"),
         audiosliderhandler: path.join(process.cwd(), "src", "client", "audiosliderhandler.ts"),
+        imageparallax: path.join(process.cwd(), "src", "client", "imageparallax.ts"),
     },
     mode,
     output: {
