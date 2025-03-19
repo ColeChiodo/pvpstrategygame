@@ -11,78 +11,84 @@
 <body class="bg-primary flex flex-col items-center justify-start min-h-screen overflow-x-auto text-md">
 
     <div id="main" class="bg-secondary w-screen h-screen flex items-center justify-center overflow-hidden">
-        <div id="paralaxed" class="relative w-full h-full">
-            <img id="bg-image" src="/assets/landing/tempbackground.png"
-                 alt="Paralaxed Sci-fi Cityscape Background"
-                 class="absolute top-0 left-0 h-screen w-auto object-cover"
-                 style="image-rendering: pixelated; z-index: 1;">
+        <div id="paralaxed" class="relative w-full h-screen overflow-hidden">
+            <img id="5" src="/assets/landing/5.png" class="parallax-layer absolute top-0 left-0 h-screen md:w-screen md:h-auto object-cover" style="image-rendering: pixelated; z-index: 1;">
+            <img id="4" src="/assets/landing/4.png" class="parallax-layer absolute top-0 left-0 h-screen md:w-screen md:h-auto object-cover" style="image-rendering: pixelated; z-index: 1;">
+            <img id="3" src="/assets/landing/3.png" class="parallax-layer absolute top-0 left-0 h-screen md:w-screen md:h-auto object-cover" style="image-rendering: pixelated; z-index: 1;">
+            <img id="2" src="/assets/landing/2.png" class="parallax-layer absolute top-0 left-0 h-screen md:w-screen md:h-auto object-cover" style="image-rendering: pixelated; z-index: 1;">
+            <img id="1" src="/assets/landing/1.png" class="parallax-layer absolute top-0 left-0 h-screen md:w-screen md:h-auto object-cover" style="image-rendering: pixelated; z-index: 1;">
     
-            <img id="distant-image" src="/assets/landing/tempdistant.png"
-                 alt="Paralaxed Sci-fi Cityscape Distant"
-                 class="absolute top-0 left-0 h-screen w-auto object-cover"
-                 style="image-rendering: pixelated; z-index: 2;">
-    
-            <img id="near-image" src="/assets/landing/tempnear.png"
-                 alt="Paralaxed Sci-fi Cityscape Near"
-                 class="absolute top-0 left-0 h-screen w-auto object-cover"
-                 style="image-rendering: pixelated; z-index: 3;">
-    
-            <img id="foreground-image" src="/assets/landing/tempforeground.png"
-                 alt="Paralaxed Sci-fi Cityscape Foreground"
-                 class="absolute top-0 left-0 h-screen w-auto object-cover"
-                 style="image-rendering: pixelated; z-index: 4;">
-                
             <div id="titleAndPlay" class="absolute inset-0 flex flex-col items-center justify-center text-center text-white z-10">
-                <img src="/assets/landing/title.png" alt="Game Title" class="w-[500px]" style="image-rendering: pixelated;">
-                <div class="space-y-4">
-                    <a href="/home" class="-mt-8 block m-4 px-6 py-3 bg-green-400 text-primary hover:bg-green-500 transition border-r-4 border-b-4 border-primary">PLAY NOW</a>
-                </div>
+                <img src="/assets/landing/title.png" alt="Game Title" style="image-rendering: pixelated; z-index: 1;" class="w-[500px]">
+                <a href="/home" class="mt-4 px-6 py-3 bg-green-500 text-white font-bold border-b-4 border-r-4 border-green-700 transition hover:bg-green-600">
+                    PLAY NOW
+                </a>
             </div>
         </div>
-    </div>     
+    </div>
     
-    <div id="second" class="bg-primary sm:w-screen md:w-1/2 flex justify-center p-4 flex-col">
+    <div id="second" class="w-screen md:w-1/2 flex flex-col justify-center p-6 space-y-8">
+        <img id="0" src="/assets/landing/0.png" class="absolute top-0 md:top-auto md:bottom-0 left-0 h-screen md:w-screen md:h-auto object-cover" style="image-rendering: pixelated; z-index: 1;" data-speed="0.6">
+
         <div class="flex flex-col lg:flex-row">
-            <div class="flex flex-col">
+            <div class="flex flex-col align-center justify-center">
                 <p class="text-white text-4xl font-bold">{GAME TITLE}</p>
                 <p class="text-white mb-4">Turn Based Player-Versus-Player Strategy Tactics Game. Take Control of several units to defeat you opponent.</p>
             </div>
-            <img src="/assets/landing/example.png"
+            <img src="/assets/landing/action.png"
             alt="Example Game Scene"
-            class="object-cover"
+            class="object-cover w-full"
             style="image-rendering: pixelated;">
         </div>
 
         <div class="flex flex-col lg:flex-row">
-            <img src="/assets/landing/example.png"
+            <img src="/assets/landing/fighting.png"
             alt="Example Game Scene"
-            class="object-cover"
+            class="object-cover w-full"
             style="image-rendering: pixelated;">
-            <div class="flex flex-col">
+            <div class="flex flex-col align-center justify-center">
                 <p class="text-white text-4xl mt-4 font-bold">Play Against Others</p>
                 <p class="text-white mb-4">Match up against players from around the world, or create a private match for you and your friends.</p>
             </div>
         </div>
+
+        <div class="flex flex-col lg:flex-row">
+            <div class="flex flex-col align-center justify-center">
+                <p class="text-white text-4xl font-bold">Protect The King</p>
+                <p class="text-white mb-4">Best your opponent by defeating their King while you keep your own safe.</p>
+            </div>
+            <img src="/assets/landing/protect_the_king.png"
+            alt="Example Game Scene"
+            class="object-cover w-full"
+            style="image-rendering: pixelated;">
+        </div>
+
         <div class="flex items-center justify-center">
-            <a href="/home" class="block m-4 px-6 py-3 bg-green-400 text-primary hover:bg-green-500 transition border-r-4 border-b-4 border-primary text-center w-full lg:w-1/4">PLAY NOW</a>
+            <a href="/home" class="mt-4 px-6 py-3 bg-green-500 text-white font-bold border-b-4 border-r-4 border-green-700 transition hover:bg-green-600">
+                PLAY NOW
+            </a>
         </div>
     </div>
 
     <script>
-        const bgImage = document.getElementById('bg-image');
-        const distantImage = document.getElementById('distant-image');
-        const nearImage = document.getElementById('near-image');
+        const layer5 = document.getElementById('5');
+        const layer4 = document.getElementById('4');
+        const layer3 = document.getElementById('3');
+        const layer2 = document.getElementById('2');
+        const layer1 = document.getElementById('1');
+        const layer0 = document.getElementById('0');
         const titleAndPlay = document.getElementById('titleAndPlay');
 
         function handleParallax() {
             const scrollY = window.scrollY;
 
-            bgImage.style.transform = `translateY(${scrollY * 0.3}px)`; // Slow movement for background
-            distantImage.style.transform = `translateY(${scrollY * 0.5}px)`; // Faster for distant layer
-            nearImage.style.transform = `translateY(${scrollY * 0.7}px)`; // Even faster for near layer
-            //titleAndPlay.style.transform = `translateY(${scrollY * 0.9}px)`; // Fastest for foreground
+            layer5.style.transform = `translateY(${scrollY * 0.9}px)`;
+            layer4.style.transform = `translateY(${scrollY * 0.7}px)`;
+            layer3.style.transform = `translateY(${scrollY * 0.5}px)`;
+            layer2.style.transform = `translateY(${scrollY * 0.3}px)`;
+            layer1.style.transform = `translateY(${scrollY * 0.3}px)`;
         }
-
+        
         window.addEventListener('scroll', handleParallax);
     </script>
 

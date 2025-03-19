@@ -7,8 +7,8 @@ module.exports = {
         pixel: ['"Rubik"', 'serif'],
       },
       colors: {
-        'primary': '#222034',
-        'secondary': '#45283c',
+        'primary': '#0f0f2b',
+        'secondary': '#222034',
       },
       fontSize: {
         xs: '10px',
