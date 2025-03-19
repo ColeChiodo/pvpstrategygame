@@ -249,12 +249,12 @@ window.socket.on('nextRound', (player) => {
 
     if (player.socket !== window.socket.id){
         nextRoundMsg.innerHTML = "ENEMY TURN";
-        nextTurnBG.classList.add("border-red-500");
-        nextTurnBG.classList.remove("border-blue-500");
+        nextTurnBG.classList.add("border-amber-500");
+        nextTurnBG.classList.remove("border-cyan-500");
     } else {
         nextRoundMsg.innerHTML = "YOUR TURN";
-        nextTurnBG.classList.add("border-blue-500");
-        nextTurnBG.classList.remove("border-red-500");
+        nextTurnBG.classList.add("border-cyan-500");
+        nextTurnBG.classList.remove("border-amber-500");
         if (document.hidden) {
             alert('It is now your turn.');
         }
@@ -374,7 +374,7 @@ window.socket.on('display-emote', (src: string, sid: string) => {
 // -----------Drawing Functions----------------------------
 
 function drawBackground() {
-    ctx.fillStyle = '#222034';
+    ctx.fillStyle = '#0f0f2b';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 }
 
@@ -491,6 +491,7 @@ function drawUI(){
     drawAnimatingHealthBar();
     //drawTileInfo();
     drawHoveredUnitInfo();
+    // draw selected unit info
 }
 
 let editHTMLOnce = true;
@@ -499,27 +500,25 @@ function editHTML() {
     if (editHTMLOnce) {
         const player1BG = document.getElementById('player1') as HTMLDivElement;
         const player2BG = document.getElementById('player2') as HTMLDivElement;
-        const p1ReactIcon = document.getElementById('p1ReactIcon') as HTMLDivElement;
-        const p2ReactIcon = document.getElementById('p2ReactIcon') as HTMLDivElement;
     
         if (players[0].socket === window.socket.id) {
-            player1BG.classList.add("bg-blue-600");
-            player1BG.classList.remove("bg-red-600");
-            player1BG.classList.add("border-blue-400");
-            player1BG.classList.remove("boarder-red-400");
-            player2BG.classList.add("bg-red-600");
-            player2BG.classList.remove("bg-blue-600");
-            player2BG.classList.add("border-red-400");
-            player2BG.classList.remove("boarder-blue-400");
+            player1BG.classList.add("bg-cyan-600");
+            player1BG.classList.remove("bg-amber-600");
+            player1BG.classList.add("border-cyan-400");
+            player1BG.classList.remove("boarder-amber-400");
+            player2BG.classList.add("bg-amber-600");
+            player2BG.classList.remove("bg-cyan-600");
+            player2BG.classList.add("border-amber-400");
+            player2BG.classList.remove("boarder-cyan-400");
         } else {
-            player2BG.classList.add("bg-blue-600");
-            player2BG.classList.remove("bg-red-600");
-            player2BG.classList.add("border-blue-400");
-            player2BG.classList.remove("boarder-red-400");
-            player1BG.classList.add("bg-red-600");
-            player1BG.classList.remove("bg-blue-600");
-            player1BG.classList.add("border-red-400");
-            player1BG.classList.remove("boarder-blue-400");
+            player2BG.classList.add("bg-cyan-600");
+            player2BG.classList.remove("bg-amber-600");
+            player2BG.classList.add("border-cyan-400");
+            player2BG.classList.remove("boarder-amber-400");
+            player1BG.classList.add("bg-amber-600");
+            player1BG.classList.remove("bg-cyan-600");
+            player1BG.classList.add("border-amber-400");
+            player1BG.classList.remove("boarder-cyan-400");
         }
     
         const player1Name = document.getElementById('player1Name') as HTMLDivElement;
@@ -673,7 +672,7 @@ function drawHoveredUnitInfo() {
     const bgHeight = 64 + 3 * statLabelHeight;
     const squareY = isMobile ? canvas.height - bgHeight : canvas.height - (64 * 5) - margin;
 
-    ctx.fillStyle = '#45283c';
+    ctx.fillStyle = '#222034';
     ctx.fillRect(squareX, squareY, bgWidth, bgHeight);
 
     ctx.fillStyle = 'white';
@@ -689,7 +688,7 @@ function drawHoveredUnitInfo() {
     ctx.imageSmoothingEnabled = false;
 
     const unitImage = loadImage(hoveredUnit.sprite.name, `/assets/spritesheets/units/${hoveredUnit.sprite.name}.png`);
-    ctx.drawImage(unitImage, sx, sy, frameSize, frameSize, squareX + bgWidth - padding - 64, squareY + padding, frameSize * 2, frameSize * 2);
+    ctx.drawImage(unitImage, sx, sy, frameSize, frameSize, squareX + bgWidth - padding - 64, squareY + padding - (16 * 5), frameSize * 4, frameSize * 4);
 
     ctx.font = '24px "VT323"';
     const statLabels = [
