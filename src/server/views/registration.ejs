@@ -17,11 +17,11 @@
 <body class="bg-primary flex items-center justify-center min-h-screen text-md">
     <div id="main" class="bg-secondary w-screen h-screen flex items-center justify-center overflow-hidden">
         <div id="paralaxed" class="relative w-full h-screen overflow-hidden">
-            <img id="1" src="/assets/global/bgs/nature/nature_5/1.png" class="parallax-layer absolute top-0 left-0 h-screen xl:w-screen xl:h-auto object-cover" style="image-rendering: pixelated; z-index: 1;">
-            <img id="2" src="/assets/global/bgs/nature/nature_5/2.png" class="parallax-layer absolute top-0 left-0 h-screen xl:w-screen xl:h-auto object-cover" style="image-rendering: pixelated; z-index: 1;">
-            <img id="3" src="/assets/global/bgs/nature/nature_5/3.png" class="parallax-layer absolute top-0 left-0 h-screen xl:w-screen xl:h-auto object-cover" style="image-rendering: pixelated; z-index: 1;">
-            <img id="4" src="/assets/global/bgs/nature/nature_5/4.png" class="parallax-layer absolute top-0 left-0 h-screen xl:w-screen xl:h-auto object-cover" style="image-rendering: pixelated; z-index: 1;">
-            <img id="4" src="/assets/global/bgs/nature/nature_5/5.png" class="parallax-layer absolute top-0 left-0 h-screen xl:w-screen xl:h-auto object-cover" style="image-rendering: pixelated; z-index: 1;">
+            <img id="7" src="/assets/global/bgs/nature/nature_5/1.png" class="parallax-layer absolute top-0 left-0 h-screen xl:w-screen xl:h-auto object-cover" style="image-rendering: pixelated; z-index: 1;">
+            <img id="6" src="/assets/global/bgs/nature/nature_5/2.png" class="parallax-layer absolute top-0 left-0 h-screen xl:w-screen xl:h-auto object-cover" style="image-rendering: pixelated; z-index: 1;">
+            <img id="5" src="/assets/global/bgs/nature/nature_5/3.png" class="parallax-layer absolute top-0 left-0 h-screen xl:w-screen xl:h-auto object-cover" style="image-rendering: pixelated; z-index: 1;">
+            <img id="3" src="/assets/global/bgs/nature/nature_5/4.png" class="parallax-layer absolute top-0 left-0 h-screen xl:w-screen xl:h-auto object-cover" style="image-rendering: pixelated; z-index: 1;">
+            <img id="1" src="/assets/global/bgs/nature/nature_5/5.png" class="parallax-layer absolute top-0 left-0 h-screen xl:w-screen xl:h-auto object-cover" style="image-rendering: pixelated; z-index: 1;">
     
             <div id="contents" class="absolute inset-0 flex flex-col items-center justify-center text-center text-white z-10 overflow-scroll">
                 <div class="bg-secondary p-8 w-full max-w-md text-white rounded-xl border-b-4 border-r-4 border-primary">
@@ -106,7 +106,7 @@
         function validateElements() {
             const submit = document.getElementById("submit");
             const terms = document.getElementById("terms").checked;
-            
+
             if (validateUsername() &&
                 validateEmail() &&
                 validatePassword() &&
