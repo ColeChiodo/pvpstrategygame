@@ -15,34 +15,49 @@
     <script src="/js/tailwind.js"></script>
 </head>
 <body class="bg-primary flex items-center justify-center min-h-screen text-lg">
+    <div id="main" class="bg-secondary w-screen h-screen flex items-center justify-center overflow-hidden">
+        <div id="paralaxed" class="relative w-full h-screen overflow-hidden">
+            <img id="1" src="/assets/global/bgs/clouds/Clouds_3/1.png" class="parallax-layer absolute top-0 left-0 h-screen xl:w-screen xl:h-auto object-cover" style="image-rendering: pixelated; z-index: 1;">
+            <img id="2" src="/assets/global/bgs/clouds/Clouds_3/2.png" class="parallax-layer absolute top-0 left-0 h-screen xl:w-screen xl:h-auto object-cover" style="image-rendering: pixelated; z-index: 1;">
+            <img id="3" src="/assets/global/bgs/clouds/Clouds_3/3.png" class="parallax-layer absolute top-0 left-0 h-screen xl:w-screen xl:h-auto object-cover" style="image-rendering: pixelated; z-index: 1;">
+            <img id="4" src="/assets/global/bgs/clouds/Clouds_3/4.png" class="parallax-layer absolute top-0 left-0 h-screen xl:w-screen xl:h-auto object-cover" style="image-rendering: pixelated; z-index: 1;">
+    
+            <div id="contents" class="absolute inset-0 flex flex-col items-center justify-center text-center text-white z-10">
+                <div class="bg-secondary p-8 w-full max-w-md text-white rounded-xl border-b-4 border-r-4 border-primary">
+                    <h1 class="text-3xl font-bold mb-6 text-center">Login</h1>
+                    
+                    <form action="/auth/login" method="POST" class="space-y-4">
+                        <div>
+                            <input type="text" name="credential" id="credential" required placeholder="Username or Email"
+                                   class="bg-white text-black block w-full px-4 py-2 border-r-4 border-b-4 border-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary">
+                        </div>
+            
+                        <div>
+                            <input type="password" name="password" id="password" required placeholder="Password"
+                                class="bg-white text-black block w-full px-4 py-2 border-r-4 border-b-4 border-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary">
+                        </div>
+            
+                        <div>
+                            <button type="submit" class="w-full rounded-lg px-6 py-3 bg-emerald-500 text-white font-bold border-b-4 border-r-4 border-emerald-700 transition hover:bg-emerald-600">
+                                Login
+                            </button>
+                        </div>
+                    </form>
 
-    <div class="bg-secondary p-8 w-full max-w-md text-white">
-        <h1 class="text-3xl font-bold mb-6 text-center">Login</h1>
-        
-        <form action="/auth/login" method="POST" class="space-y-4">
-            <div>
-                <label for="credential" class="block font-medium">Username or Email</label>
-                <input type="text" name="credential" id="credential" required 
-                       class="bg-white text-primary mt-1 block w-full px-4 py-2 border-r-4 border-b-4 border-primary focus:outline-none focus:ring-2 focus:ring-primary">
+                    <div class="inline-flex items-center justify-center w-full my-4">
+                        <hr class="w-full h-px my-8 bg-white">
+                        <span class="absolute px-3 font-lg -translate-x-1/2 left-1/2 bg-secondary">or</span>
+                    </div>
+                    
+                    <form action="/register" method="GET" class="mb-4">
+                        <button type="submit" class="w-full rounded-lg px-6 py-3 bg-cyan-600 text-white font-bold border-b-4 border-r-4 border-cyan-800 transition hover:bg-cyan-700">
+                            Create An Account
+                        </button>
+                    </form>
+                </div>
             </div>
-
-            <div>
-                <label for="password" class="block font-medium">Password</label>
-                <input type="password" name="password" id="password" required
-                    class="bg-white text-primary mt-1 block w-full px-4 py-2 border-r-4 border-b-4 border-primary focus:outline-none focus:ring-2 focus:ring-primary">
-            </div>
-
-            <div>
-                <button type="submit" class="w-full py-2 bg-green-400 text-primary font-semibold hover:bg-green-500 border-r-4 border-b-4 border-primary focus:outline-none focus:ring-2 focus:ring-primary focus:ring-opacity-50">
-                    Login
-                </button>
-            </div>
-        </form>
-
-        <div class="mt-4 text-center">
-            <a href="/register" class="text-sm text-blue-500 hover:text-blue-700">Don't have an account? Register</a>
         </div>
     </div>
-
+    <script src="/js/imageparallax.js"></script>
 </body>
 </html>

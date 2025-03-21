@@ -3,18 +3,19 @@ import { Users } from "../database";
 
 const router = express.Router();
 
-router.post("/register", (_req, res) => {
-    const { username, email, password, confirmPassword } = _req.body;
+router.post("/register", async (_req, res) => {
+    const { username, email, password } = _req.body;
 
     try {
-        const user = Users.register(email, username, password);
+        const user = await Users.register(email, username, password);
+
         // @ts-expect-error 
         _req.session.user = user;
         
-        res.redirect("/login");
-    } catch(err) {
+        res.status(200).json({ message: 'Registration successful' });
+    } catch (err: any) {
         console.error(err);
-        res.redirect("/register");
+        res.status(400).json({ error: err.message });
     }
 });
 

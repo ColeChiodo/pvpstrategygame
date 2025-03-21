@@ -19,6 +19,7 @@
   "author": "Cole Chiodo",
   "license": "ISC",
   "dependencies": {
+    "@types/bad-words": "^3.0.3",
     "@types/bcrypt": "^5.0.2",
     "@types/connect-livereload": "^0.6.3",
     "@types/connect-mongo": "^3.1.6",
@@ -46,6 +47,7 @@
     "express-flash": "^0.0.2",
     "express-session": "^1.18.1",
     "http-errors": "^2.0.0",
+    "leo-profanity": "^1.7.0",
     "lint-staged": "^15.2.10",
     "livereload": "^0.9.3",
     "mongodb": "^6.12.0",

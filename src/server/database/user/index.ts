@@ -9,6 +9,11 @@ const register = async (email: string, username: string, password: string) => {
         throw new Error("Email already in use.");
     }
 
+    var filter = require('leo-profanity');
+    if (filter.check(username)) {
+        throw new Error("Username contains profanity.");
+    }
+
     const existingUserByUsername = await User.findOne({ username });
     if (existingUserByUsername) {
         throw new Error("Username already in use.");
