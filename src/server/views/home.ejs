@@ -13,75 +13,8 @@
     <title>Home | Fortezza Tactics Online</title>
     <link rel="icon" type="image/png" href="/assets/global/favicon.ico">
     <script src="/js/tailwind.js"></script>
-    <style>
-        html, body {
-            height: 100%;
-            margin: 0;
-            padding: 0;
-            overflow-x: hidden;
-        }
-    </style>
 </head>
-<body class="bg-primary text-white flex flex-col items-center justify-center min-h-screen text-md">
-    <div class="flex flex-col sm:w-screen md:w-1/2">
-        <div class="flex flex-row justify-between items-end w-full">
-            <div id="playerInfo" class="top-0 left-0 h-[100px] bg-transparent text-white flex items-center">
-                <div id="player" class="relative flex items-center p-3 w-[300px] bg-primary hover:bg-red-500 border-4 border-secondary cursor-pointer" onclick="toggleUserPage()">
-                    <div class="flex">
-                        <img id="ProfilePic" 
-                            src="/assets/profileimages/<%= user.image %>.png" 
-                            alt="Profile Picture" 
-                            class="w-[64px] h-[64px] mr-3" 
-                            style="image-rendering: pixelated;">
-                    </div>
-                    <div class="flex flex-row justify-between w-full px-3">
-                        <div id="playerName" class="font-bold text-lg"><%= user.username %></div>
-                        <div class="text-lg text-right"><%= Math.floor(user.xp / 1275) + 1 %></div>
-                    </div>
-                </div>
-            </div>
-            <div class="flex flex-row">
-                <div id="displayPremiumCurrency" class="text-lg">Premium: <%= user.premium_currency %></div>
-                <div class="bg-primary hover:bg-red-500 border-4 border-secondary cursor-pointer"
-                     onclick="togglePaymentScreen()">
-                    +
-                </div>
-            </div>
-            <div class="flex flex-row">
-                <div id="displayCurrency" class="text-lg">Money: <%= user.currency %></div>
-                <div class="bg-primary hover:bg-red-500 border-4 border-secondary cursor-pointer"
-                     onclick="toggleConversionScreen()">
-                    +
-                </div>
-            </div>
-            <a id="patchNoteBtn" href="/patch-notes" class="ml-auto text-right hover:underline hidden md:block">Patch Notes</a>
-        </div>
-         
-        
-        <div class="flex sm:flex-col md:flex-row justify-between items-center w-full">
-            <div class="w-full h-full hidden md:block">
-                
-            </div>
-            <div class="p-8 w-full max-w-lg text-center">
-                <div class="space-y-4">
-                    <div class="bg-secondary w-full">
-                        <h1>Public Matchmaking</h1>
-                        <p><%= user.totalWins %>W-<%= user.totalGames - user.totalWins %>L</p>
-                        <a href="/play" class="block px-4 py-2 bg-green-400 text-primary font-semibold border-primary hover:bg-green-500 transition focus:outline-none focus:ring-2 focus:ring-primary focus:ring-opacity-50">
-                            Find Game
-                        </a>
-                    </div>
-                    <div class="bg-secondary w-full">
-                        Private Match
-                        <a href="/play/private" class="block px-4 py-2 bg-blue-400 text-primary font-semibold hover:bg-blue-500 transition focus:outline-none focus:ring-2 focus:ring-primary focus:ring-opacity-50">
-                            Join/Create
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>  
-    </div>
-
+<!-- 
     <div id="editUser" class="bg-black bg-opacity-85 fixed w-screen h-screen top-0 left-0 flex justify-center items-center hidden">
         <div class="bg-secondary w-1/2 p-4 relative">
             <button class="absolute top-2 right-8 text-white text-xl font-semibold hover:text-primary p-2 focus:outline-none" onclick="toggleUserPage()">X</button>
@@ -179,7 +112,110 @@
             </form>
         </div>
     </div>
+</body> -->
 
+<body class="bg-primary flex items-center justify-center min-h-screen text-lg">
+    <div id="main" class="bg-secondary w-screen h-screen flex items-center justify-center overflow-hidden">
+        <div id="paralaxed" class="relative w-full h-screen overflow-hidden">
+            <div class="bg-black bg-opacity-85 absolute top-0 left-0 w-screen h-screen z-10"></div>
+            <img id="7" src="/assets/global/bgs/clouds/Clouds_4/1.png" class="parallax-layer absolute top-0 left-0 h-screen xl:w-screen xl:h-auto object-cover" style="image-rendering: pixelated; z-index: 1;">
+            <img id="5" src="/assets/global/bgs/clouds/Clouds_4/2.png" class="parallax-layer absolute top-0 left-0 h-screen xl:w-screen xl:h-auto object-cover" style="image-rendering: pixelated; z-index: 1;">
+            <img id="3" src="/assets/global/bgs/clouds/Clouds_4/3.png" class="parallax-layer absolute top-0 left-0 h-screen xl:w-screen xl:h-auto object-cover" style="image-rendering: pixelated; z-index: 1;">
+            <img id="2" src="/assets/global/bgs/clouds/Clouds_4/4.png" class="parallax-layer absolute top-0 left-0 h-screen xl:w-screen xl:h-auto object-cover" style="image-rendering: pixelated; z-index: 1;">
+
+            <div id="contents" class="absolute inset-0 flex flex-col items-center justify-center text-center text-white z-10 overflow-scroll">
+                <div class="bg-secondary p-8 w-full sm:w-auto text-white rounded-xl border-b-4 border-r-4 border-primary">
+                    <div id="title" class="w-full h-auto flex flex-col justify-center items-center">
+                        <img src="/assets/landing/title.png" alt="Game Title" style="image-rendering: pixelated; z-index: 1;" class="w-[200px] -mt-5 -mb-16 bg-secondary">
+                        <hr class="w-full h-px my-8 bg-white">
+                    </div>
+
+                    <div id="top-row" class="w-full flex flex-col sm:flex-row sm:justify-between sm:space-x-32">
+                        <div id="playerInfo" class="top-0 left-0 h-[100px] bg-transparent text-white flex items-center">
+                            <div id="player" class="relative flex items-center p-3 w-full sm:min-w-[300px] bg-primary transition rounded-lg hover:border-cyan-600 border-4 border-primary cursor-pointer" onclick="toggleUserPage()">
+                                <div class="flex">
+                                    <img id="ProfilePic" 
+                                        src="/assets/profileimages/<%= user.image %>.png" 
+                                        alt="Profile Picture" 
+                                        class="w-[64px] h-[64px] mr-3" 
+                                        style="image-rendering: pixelated;">
+                                </div>
+                                <div class="flex flex-row justify-between w-full px-3">
+                                    <div id="playerName" class="font-bold text-lg"><%= user.username %></div>
+                                    <div class="text-lg text-right"><%= Math.floor(user.xp / 1275) + 1 %></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-col justify-center align-center sm:align-right sm:space-y-4 gap-4 sm:gap-0">
+                            <div class="flex flex-row hover:cursor-pointer bg-primary bg-opacity-85 transition hover:bg-opacity-85 border-b-4 border-white rounded-lg hover:border-cyan-600 justify-center px-2" onclick="togglePaymentScreen()">
+                                <div id="displayPremiumCurrency" class="text-lg">Premium: <%= user.premium_currency %></div>
+                            </div>
+
+                            <div class="flex flex-row hover:cursor-pointer bg-primary bg-opacity-85 transition hover:bg-opacity-85 border-b-4 border-white rounded-lg hover:border-cyan-600 justify-center px-2" onclick="toggleConversionScreen()">
+                                <div id="displayCurrency" class="text-lg">Currency: <%= user.currency %></div>
+                            </div>
+                        </div>
+                        
+                    </div>
+
+                    <div id="middle-row" class="my-8">
+                        <div class="flex flex-col justify-center w-full space-y-4">
+                            <div class="flex flex-col bg-primary bg-opacity-75 w-full rounded-lg border-primary border-4 p-4 space-y-4">
+                                <div class="w-full flex flex-col sm:flex-row justify-between">
+                                    <h1 class="text-3xl">Public Match</h1>
+                                    <a href="/play" class="rounded-lg px-6 py-3 bg-cyan-600 text-white font-bold border-b-4 border-r-4 border-cyan-800 transition hover:bg-cyan-700">
+                                        Find Game
+                                    </a>
+                                </div>
+                                <div class="w-full flex flex-row justify-between items-center px-4">
+                                    <div class="flex justify-left">
+                                        <img src="/assets/global/fight.png" class="w-[100px] h-[100px]">
+                                    </div>
+                                    
+                                    <div class="flex flex-row sm:space-x-32">
+                                        <div class="flex flex-col">
+                                            <p class="text-lg"><%= user.totalWins %>-<%= user.totalGames - user.totalWins %></p>
+                                            <p class="text-md text-gray-500">W-L</p>
+                                        </div>
+
+                                        <div class="flex flex-col">
+                                            <p class="text-lg"><%= user.totalWins %></p>
+                                            <p class="text-md text-gray-500">Streak</p>
+                                        </div>
+                                    </div>
+                                    
+                                </div>
+                            </div>
+
+                            <div class="flex flex-col bg-primary bg-opacity-75 w-full rounded-lg border-primary border-4 p-4 space-y-4">
+                                <div class="w-full flex flex-col sm:flex-row justify-between">
+                                    <h1 class="text-3xl">Private Match</h1>
+                                    <a href="/play/private" class="rounded-lg px-6 py-3 bg-emerald-600 text-white font-bold border-b-4 border-r-4 border-emerald-800 transition hover:bg-emerald-700">
+                                        Join/Create
+                                    </a>
+                                </div>
+                                <div class="w-full flex flex-row justify-left px-4">
+                                    <img src="/assets/global/hand_shake.png" class="w-[100px] h-[100px]">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="bottom-row" class="w-full flex flex-col sm:flex-row sm:justify-between text-md sm:items-end">
+                        <p>&copy; 2025 Cole Chiodo.</p>
+                        <div class="flex flex-col sm:justify-right sm:text-right sm:align-right">
+                            <a id="patchNoteBtn" href="/patch-notes" target="_blank" class="underline hover:underline sm:no-underline">View Patch Notes</a>
+                            <div class="">v0.0.1</div>
+                        </div>
+                        
+                    </div>
+                    
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="/js/imageparallax.js"></script>
     <script>
         window.onload = function() {
             const editUser = document.getElementById("editUser");
