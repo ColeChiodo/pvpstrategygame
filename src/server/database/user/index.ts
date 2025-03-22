@@ -29,6 +29,7 @@ const register = async (email: string, username: string, password: string) => {
         image: "default",
         totalGames: 0,
         totalWins: 0,
+        win_streak: 0,
         xp: 0,
         currency: 0,
         premium_currency: 0,
@@ -117,7 +118,12 @@ const updateUsername = async (userId: string, newUsername: string) => {
         throw new Error("User not found.");
     }
 
-    const existingUserByUsername = await User.findOne({ username: newUsername });
+    var filter = require('leo-profanity');
+    if (filter.check(newUsername)) {
+        throw new Error("Username contains profanity.");
+    }
+
+    const existingUserByUsername = await User.findOne({ newUsername });
     if (existingUserByUsername) {
         throw new Error("Username already in use.");
     }
@@ -181,9 +187,38 @@ const incrementGamesWon = async (userId: string) => {
     }
 
     user.totalWins += 1;
+    incrementWinStreak(userId);
     await user.save();
 
     return { message: "Wins incremented successfully." };
+};
+
+const incrementWinStreak = async (userId: string) => {
+    console.log("Incrementing Win Streak Played");
+
+    const user = await User.findById(userId);
+    if (!user) {
+        throw new Error("User not found.");
+    }
+
+    user.win_streak += 1;
+    await user.save();
+
+    return { message: "Win Streak incremented successfully." };
+};
+
+const resetWinStreak = async (userId: string) => {
+    console.log("Resetting Win Streak Played");
+
+    const user = await User.findById(userId);
+    if (!user) {
+        throw new Error("User not found.");
+    }
+
+    user.win_streak = 0;
+    await user.save();
+
+    return { message: "Win Streak reset successfully." };
 };
 
 const incrementXP = async (userId: string, didWin: boolean) => {
@@ -193,17 +228,21 @@ const incrementXP = async (userId: string, didWin: boolean) => {
         throw new Error("User not found.");
     }
 
-    const oldLvl = Math.floor(user.xp / 1275) + 1;
+    const oldLvl = Math.floor(user.xp / 420) + 1;
     const baseXP = 50;
     const winXP = 120;
     const loseXP = 30;
 
     user.xp += didWin ? baseXP + winXP : baseXP + loseXP;
     await user.save();
-    const newLvl = Math.floor(user.xp / 1275) + 1;
+    const newLvl = Math.floor(user.xp / 420) + 1;
 
     if (newLvl !== oldLvl) {
         incrementCurrency(userId, 100);
+    }
+
+    if (!didWin){
+        resetWinStreak(userId);
     }
 
     return { message: "XP incremented successfully." };
@@ -257,5 +296,5 @@ const convertPremiumCurrency = async (userId: string, amount: number) => {
     };
 };
 
-export default { register, login, deleteAccount, updateEmail, updateUsername, updatePassword, updateProfileImage, 
+export default { register, login, deleteAccount, updateEmail, updateUsername, updatePassword, updateProfileImage,
     findById, incrementGamesPlayed, incrementGamesWon, incrementXP, incrementPremiumCurrency, convertPremiumCurrency };

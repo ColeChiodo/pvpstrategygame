@@ -7,6 +7,7 @@ interface IUser extends Document {
   image: string;
   totalGames: number;
   totalWins: number;
+  win_streak:number;
   xp: number;
   currency: number;
   premium_currency: number;
@@ -19,6 +20,7 @@ const userSchema: Schema = new Schema({
   image: { type: String, required: true },
   totalGames: { type: Number, required: true },
   totalWins: { type: Number, required: true },
+  win_streak: { type: Number, required: true },
   xp: { type: Number, required: true },
   currency: { type: Number, required: true },
   premium_currency: { type: Number, required: true },

@@ -14,106 +14,6 @@
     <link rel="icon" type="image/png" href="/assets/global/favicon.ico">
     <script src="/js/tailwind.js"></script>
 </head>
-<!-- 
-    <div id="editUser" class="bg-black bg-opacity-85 fixed w-screen h-screen top-0 left-0 flex justify-center items-center hidden">
-        <div class="bg-secondary w-1/2 p-4 relative">
-            <button class="absolute top-2 right-8 text-white text-xl font-semibold hover:text-primary p-2 focus:outline-none" onclick="toggleUserPage()">X</button>
-    
-            <div class="relative inline-block hover">
-                <img id="ProfilePic" 
-                     src="/assets/profileimages/<%= user.image %>.png" 
-                     alt="Profile Picture" 
-                     class="w-[128px] h-[128px] ml-2" 
-                     style="image-rendering: pixelated;">
-                <img src="/assets/global/editicon.png" 
-                     alt="Edit Icon" 
-                     class="absolute bottom-0 right-0 w-[32px] h-[32px] mb-1 mr-1 cursor-pointer bg-primary hover:bg-blue-500" onclick="toggleProfileImage()">
-            </div>
-        
-            <form action="/auth/update-username" method="POST" class="flex flex-col w-full items-center space-x-4 mb-4">
-                <label for="username" class="text-lg text-white text-left w-full ml-4">Change Username</label>
-                <div class="flex flex-row w-full">
-                    <input type="text" id="username" name="username" value="<%= user.username %>" class="w-full px-2 border-4 border-primary text-black" placeholder="New Username"/>
-                    <button type="submit" class="bg-primary text-white font-semibold hover:bg-blue-500 focus:outline-none w-[300px] border-4 border-primary focus:ring-2 focus:ring-primary focus:ring-opacity-50 mr-2">Submit Change</button>
-                </div>
-            </form>
-        
-            <form action="/auth/update-email" method="POST" class="flex flex-col w-full items-center space-x-4 mb-4">
-                <label for="email" class="text-lg text-white text-left w-full ml-4">Change Email</label>
-                <div class="flex flex-row w-full">
-                    <input type="email" id="email" name="email" value="<%= user.email %>" class="w-full px-2 border-4 border-primary text-black" placeholder="New Email" />
-                    <button type="submit" class="bg-primary text-white font-semibold hover:bg-blue-500 focus:outline-none w-[300px] border-4 border-primary focus:ring-2 focus:ring-primary focus:ring-opacity-50 mr-2">Submit Change</button>
-                </div>
-            </form>
-        
-            <form action="/auth/update-password" method="POST" class="flex flex-col w-full items-center space-x-4 mb-4">
-                <label for="password" class="text-lg text-white text-left w-full ml-4">Change Password</label>
-                <div class="flex flex-row w-full">
-                    <input type="password" id="password" name="password" class="w-full px-2 border-4 border-primary text-black" autocomplete="new-password" placeholder="New Password"/>
-                    <button type="submit" class="bg-primary text-white font-semibold hover:bg-blue-500 focus:outline-none w-[300px] border-4 border-primary focus:ring-2 focus:ring-primary focus:ring-opacity-50 mr-2">Submit Change</button>
-                </div>
-            </form>
-            
-            <div class="flex flex-row justify-between w-full pl-3">
-                <a href="/auth/logout" class="px-4 py-2 bg-red-400 text-primary font-semibold border-r-4 border-b-4 border-primary hover:bg-red-500 transition focus:outline-none focus:ring-2 focus:ring-primary focus:ring-opacity-50">
-                    Logout
-                </a>
-                <button class="px-4 py-2 bg-red-400 text-primary font-semibold border-r-4 border-b-4 border-primary hover:bg-red-500 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-opacity-50" 
-                    onclick="toggleAccountDelete()">
-                    Delete Account
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <div id="profileImageWidget" class="bg-black bg-opacity-85 fixed w-screen h-screen top-0 left-0 flex justify-center items-center hidden">
-        <div class="bg-secondary w-1/3 p-4 relative">
-            <button class="absolute top-0 right-8 text-white text-xl font-semibold hover:text-primary p-2 focus:outline-none" onclick="toggleProfileImage()">X</button>
-            <div class="text-xl text-white -mt-2">Change Profile Image</div>
-    
-            <div class="grid grid-cols-3 gap-4">
-                <% images.forEach(image => { %>
-                    <div class="flex justify-center items-center">
-                        <form action="/auth/update-profile-image" method="POST">
-                            <input type="hidden" name="image" value="<%= image %>">
-                            <button type="submit">
-                                <img src="/assets/profileimages/<%= image %>" alt="<%= image %>" class="w-24 h-24 object-cover cursor-pointer hover:border-4 hover:border-blue-500 hover:outline hover:outline-2 hover:outline-blue-500" style="image-rendering: pixelated;">
-                            </button>
-                        </form>
-                    </div>
-                <% }) %>
-            </div>
-        </div>
-    </div>
-
-    <div id="confirmDeleteAccount" class="bg-black bg-opacity-85 fixed w-screen h-screen top-0 left-0 flex justify-center items-center hidden">
-        <div class="bg-secondary w-1/3 p-4 relative">
-            <button class="absolute top-0 right-8 text-white text-xl font-semibold hover:text-primary p-2 focus:outline-none" onclick="toggleAccountDelete()">X</button>
-            <div class="text-lg text-white">Confirm Account Deletion</div>
-
-            <form action="/auth/delete-account" method="POST" class="space-y-4">
-                <div>
-                    <label for="email" class="block font-medium">Email</label>
-                    <input type="text" name="email" id="email" required autocomplete="new-email" value="" placeholder="Enter Email"
-                           class="bg-white text-primary mt-1 block w-full border-r-4 px-2 border-b-4 border-primary focus:outline-none focus:ring-2 focus:ring-primary">
-                </div>
-    
-                <div>
-                    <label for="password" class="block font-medium">Password</label>
-                    <input type="password" name="password" id="password" required autocomplete="new-password" placeholder="Enter Password"
-                        class="bg-white text-primary mt-1 block w-full border-r-4 px-2 border-b-4 border-primary focus:outline-none focus:ring-2 focus:ring-primary">
-                </div>
-    
-                <div class="flex items-center justify-center">
-                    <button type="submit" class="p-2 bg-red-400 text-primary font-semibold hover:bg-red-500 border-r-4 border-b-4 border-primary focus:outline-none focus:ring-2 focus:ring-primary focus:ring-opacity-50">
-                        Delete Account
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-</body> -->
-
 <body class="bg-primary flex items-center justify-center min-h-screen text-lg">
     <div id="main" class="bg-secondary w-screen h-screen flex items-center justify-center overflow-hidden">
         <div id="paralaxed" class="relative w-full h-screen overflow-hidden">
@@ -132,7 +32,7 @@
 
                     <div id="top-row" class="w-full flex flex-col sm:flex-row sm:justify-between sm:space-x-32">
                         <div id="playerInfo" class="top-0 left-0 h-[100px] bg-transparent text-white flex items-center">
-                            <div id="player" class="relative flex items-center p-3 w-full sm:min-w-[300px] bg-primary transition rounded-lg hover:border-cyan-600 border-4 border-primary cursor-pointer" onclick="toggleUserPage()">
+                            <div id="player" class="relative flex items-center p-3 w-full sm:min-w-[300px] bg-primary bg-opacity-75 transition rounded-lg hover:border-cyan-600 border-4 border-primary cursor-pointer" onclick="toggleUserPage()">
                                 <div class="flex">
                                     <img id="ProfilePic" 
                                         src="/assets/profileimages/<%= user.image %>.png" 
@@ -142,18 +42,21 @@
                                 </div>
                                 <div class="flex flex-row justify-between w-full px-3">
                                     <div id="playerName" class="font-bold text-lg"><%= user.username %></div>
-                                    <div class="text-lg text-right"><%= Math.floor(user.xp / 1275) + 1 %></div>
+                                    <div class="text-lg text-right"><%= Math.floor(user.xp / 420) + 1 %></div>
                                 </div>
                             </div>
                         </div>
 
-                        <div class="flex flex-col justify-center align-center sm:align-right sm:space-y-4 gap-4 sm:gap-0">
-                            <div class="flex flex-row hover:cursor-pointer bg-primary bg-opacity-85 transition hover:bg-opacity-85 border-b-4 border-white rounded-lg hover:border-cyan-600 justify-center px-2" onclick="togglePaymentScreen()">
+                        <div class="flex flex-col justify-start align-center sm:align-right sm:space-y-4 gap-4 sm:gap-0">
+                            <!-- <div class="flex flex-row hover:cursor-pointer bg-primary bg-opacity-85 transition hover:bg-opacity-85 border-b-4 border-white rounded-lg hover:border-cyan-600 justify-center px-2" onclick="togglePaymentScreen()">
                                 <div id="displayPremiumCurrency" class="text-lg">Premium: <%= user.premium_currency %></div>
-                            </div>
+                            </div> -->
 
-                            <div class="flex flex-row hover:cursor-pointer bg-primary bg-opacity-85 transition hover:bg-opacity-85 border-b-4 border-white rounded-lg hover:border-cyan-600 justify-center px-2" onclick="toggleConversionScreen()">
-                                <div id="displayCurrency" class="text-lg">Currency: <%= user.currency %></div>
+                            <div class="flex flex-row hover:cursor-pointer items-center gap-2 bg-primary bg-opacity-75 transition border-4 border-primary rounded-lg hover:border-cyan-600 justify-center px-2" 
+                                 > <!-- onclick="toggleConversionScreen()"> -->
+                                <div id="displayCurrency" class="text-lg"><%= user.currency %></div>
+                                <img src="https://www.svgrepo.com/show/405199/gem-stone.svg"
+                                     class="w-[20px] h-[20px]">
                             </div>
                         </div>
                         
@@ -162,7 +65,7 @@
                     <div id="middle-row" class="my-8">
                         <div class="flex flex-col justify-center w-full space-y-4">
                             <div class="flex flex-col bg-primary bg-opacity-75 w-full rounded-lg border-primary border-4 p-4 space-y-4">
-                                <div class="w-full flex flex-col sm:flex-row justify-between">
+                                <div class="w-full flex flex-col sm:flex-row justify-between sm:gap-4">
                                     <h1 class="text-3xl">Public Match</h1>
                                     <a href="/play" class="rounded-lg px-6 py-3 bg-cyan-600 text-white font-bold border-b-4 border-r-4 border-cyan-800 transition hover:bg-cyan-700">
                                         Find Game
@@ -180,7 +83,7 @@
                                         </div>
 
                                         <div class="flex flex-col">
-                                            <p class="text-lg"><%= user.totalWins %></p>
+                                            <p class="text-lg"><%= user.win_streak | 0 %></p>
                                             <p class="text-md text-gray-500">Streak</p>
                                         </div>
                                     </div>
@@ -189,7 +92,7 @@
                             </div>
 
                             <div class="flex flex-col bg-primary bg-opacity-75 w-full rounded-lg border-primary border-4 p-4 space-y-4">
-                                <div class="w-full flex flex-col sm:flex-row justify-between">
+                                <div class="w-full flex flex-col sm:flex-row justify-between sm:gap-4">
                                     <h1 class="text-3xl">Private Match</h1>
                                     <a href="/play/private" class="rounded-lg px-6 py-3 bg-emerald-600 text-white font-bold border-b-4 border-r-4 border-emerald-800 transition hover:bg-emerald-700">
                                         Join/Create
@@ -213,6 +116,134 @@
                     
                 </div>
             </div>
+
+            <div id="editUser" class="bg-black bg-opacity-85 absolute inset-0 flex flex-col items-center justify-center text-center text-white z-10 overflow-scroll">
+                <div class="flex flex-col gap-3 bg-secondary p-8 w-full sm:w-auto text-white rounded-xl border-b-4 border-r-4 border-primary">
+                    <div class="w-full flex flex-row justify-between items-start">
+                        <div class="relative inline-block hover">
+                            <img id="ProfilePic" 
+                                 src="/assets/profileimages/<%= user.image %>.png" 
+                                 alt="Profile Picture" 
+                                 class="w-[128px] h-[128px]" 
+                                 style="image-rendering: pixelated;">
+                            <img src="/assets/global/editicon.png" 
+                                 alt="Edit Icon" 
+                                 class="absolute bottom-0 right-0 w-[32px] h-[32px] mb-1 mr-1 cursor-pointer bg-primary hover:bg-blue-500" onclick="toggleProfileImage()">
+                        </div>
+                        
+                        <button class="text-white text-xl font-semibold hover:text-primary px-2 focus:outline-none" onclick="toggleUserPage()">X</button>
+                    </div>
+
+                    <div id="submit_error" class="hidden bg-amber-100 border border-amber-400 text-amber-700 px-4 py-3 rounded relative text-sm" role="alert">
+                        <strong class="font-bold">Error:</strong>
+                        <span id="submit_error_msg" class="block sm:inline"></span>
+                    </div>
+                    
+                    <form id="username-form" class="gap-2 flex flex-col w-full items-center p-4 bg-primary bg-opacity-75 border-4 rounded-lg border-primary">
+                        <label for="username" class="text-lg text-white font-bold text-left w-full ml-4">Change Username</label>
+                        <div class="flex flex-col sm:flex-row w-full gap-2 items-end">
+                            <input type="text" name="username" id="username" required placeholder="New Username" value="<%= user.username %>" oninput="validateUsername()"
+                                   class="bg-white text-black block w-full px-4 py-2 border-r-4 border-b-4 border-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary">
+                            <button id="username-submit" type="submit" class="cursor-not-allowed w-full rounded-lg px-6 py-2 bg-gray-500 text-white font-bold border-b-4 border-r-4 border-gray-700 transition hover:bg-gray-600">
+                                Submit Change
+                            </button>
+                        </div>
+                        <div id="error-username" class="hidden w-full bg-amber-100 border-l-4 border-amber-500 text-amber-700 p-4 text-left text-sm" role="alert">
+                            <p class="font-bold">Username Error</p>
+                            <p>Usernames must be between 3-16 characters.</p>
+                            <p class="font-bold">The Following is NOT allowed:</p>
+                            <p>Spaces or special characters (@, $, %, &, *, etc).</p>
+                            <p>Names deemed offensive or inappropriate.</p>
+                        </div>
+                    </form>
+
+                    <form id="email-form" method="POST" class="gap-2 flex flex-col w-full items-center p-4 bg-primary bg-opacity-75 border-4 rounded-lg border-primary">
+                        <label for="email" class="text-lg text-white font-bold text-left w-full ml-4">Change Email</label>
+                        <div class="flex flex-col sm:flex-row w-full gap-2 items-end">
+                            <input type="text" name="email" id="email" required placeholder="New Email" value="<%= user.email %>" oninput="validateEmail()"
+                                   class="bg-white text-black block w-full px-4 py-2 border-r-4 border-b-4 border-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary">
+                            <button id="email-submit" type="submit" class="cursor-not-allowed w-full rounded-lg px-6 py-2 bg-gray-500 text-white font-bold border-b-4 border-r-4 border-gray-700 transition hover:bg-gray-600">
+                                Submit Change
+                            </button>
+                        </div>
+                        <div id="error-email" class="hidden w-full bg-amber-100 border-l-4 border-amber-500 text-amber-700 p-4 text-left text-sm" role="alert">
+                            <p class="font-bold">Email Error</p>
+                            <p>Email is not in the proper form (yourname@example.com)</p>
+                        </div>
+                    </form>
+
+                    <form id="password-form" method="POST" class="gap-2 flex flex-col w-full items-center p-4 bg-primary bg-opacity-75 border-4 rounded-lg border-primary">
+                        <label for="password" class="text-lg text-white font-bold text-left w-full ml-4">Change Password</label>
+                        <div class="flex flex-col sm:flex-row w-full gap-2 items-end">
+                            <input type="password" name="password" id="password" required placeholder="New Password" autocomplete="new-password" oninput="validatePassword()"
+                                   class="bg-white text-black block w-full px-4 py-2 border-r-4 border-b-4 border-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary">
+                            <button id="password-submit" type="submit" class="cursor-not-allowed w-full rounded-lg px-6 py-2 bg-gray-500 text-white font-bold border-b-4 border-r-4 border-gray-700 transition hover:bg-gray-600">
+                                Submit Change
+                            </button>
+                        </div>
+                        <div id="error-password" class="hidden w-full bg-amber-100 border-l-4 border-amber-500 text-amber-700 p-4 text-left text-sm" role="alert">
+                            <p class="font-bold">Password Error</p>
+                            <p>Passwords must be at least 6 characters long.</p>
+                            <p> passwords can include letters, numbers, and special characters.</p>
+                        </div>
+                    </form>
+                    
+                    <div class="flex flex-col sm:flex-row gap-16 justify-between w-full">
+                        <a href="/auth/logout" class="rounded-lg px-6 py-2 bg-amber-600 text-white font-bold border-b-4 border-r-4 border-amber-800 transition hover:bg-amber-700">
+                            Logout
+                        </a>
+                        <button class="rounded-lg px-6 py-2 bg-rose-600 text-white font-bold border-b-4 border-r-4 border-rose-800 transition hover:bg-rose-700" 
+                            onclick="toggleAccountDelete()">
+                            Delete Account
+                        </button>
+                    </div>
+                </div>
+            </div>
+        
+            <div id="profileImageWidget" class="bg-black bg-opacity-85 absolute inset-0 flex flex-col items-center justify-center text-center text-white z-10 overflow-scroll hidden">
+                <div class="flex flex-col gap-3 bg-secondary p-8 w-full sm:w-auto text-white rounded-xl border-b-4 border-r-4 border-primary">
+                    <button class="flex justify-end text-white text-xl font-semibold hover:text-primary focus:outline-none" onclick="toggleProfileImage()">X</button>
+                    <div class="flex justify-start text-xl font-bold text-white">Change Profile Image</div>
+            
+                    <div class="grid grid-cols-3 gap-4">
+                        <% images.forEach(image => { %>
+                            <div class="flex justify-center items-center">
+                                <form action="/auth/update-profile-image" method="POST">
+                                    <input type="hidden" name="image" value="<%= image %>">
+                                    <button type="submit">
+                                        <img src="/assets/profileimages/<%= image %>" alt="<%= image %>" class="w-24 h-24 object-cover cursor-pointer hover:border-4 hover:border-blue-500 hover:outline hover:outline-2 hover:outline-blue-500" style="image-rendering: pixelated;">
+                                    </button>
+                                </form>
+                            </div>
+                        <% }) %>
+                    </div>
+                </div>
+            </div>
+        
+            <div id="confirmDeleteAccount" class="bg-black bg-opacity-85 absolute inset-0 flex flex-col items-center justify-center text-center text-white z-10 overflow-scroll hidden">
+                <div class="flex flex-col gap-3 bg-secondary p-8 w-full sm:w-auto text-white rounded-xl border-b-4 border-r-4 border-primary">
+                    <button class="flex justify-end text-white text-xl font-semibold hover:text-primary focus:outline-none" onclick="toggleAccountDelete()">X</button>
+                    <div class="w-full bg-amber-100 border-l-4 border-amber-500 text-amber-700 p-4 text-left text-lg" role="alert">
+                        <p class="font-bold text-xl">Confirm Delete</p>
+                        <p>You are about to delete your account.</p>
+                        <p>Once you do that, you can NOT undo it.</p>
+                        <p>If you still want to continue, confirm your credentials.</p>
+                    </div>
+
+                    <form action="/auth/delete-account" method="POST" class="space-y-4">
+                        <div class="flex flex-col w-full gap-2 items-end">
+                            <input type="text" name="email" id="email" required autocomplete="new-email" value="" placeholder="Enter Email"
+                                   class="bg-white text-black block w-full px-4 py-2 border-r-4 border-b-4 border-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary">
+                            <input type="password" name="password" id="password" required autocomplete="new-password" placeholder="Enter Password"
+                                   class="bg-white text-black block w-full px-4 py-2 border-r-4 border-b-4 border-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary">
+                        </div>
+
+                        <button type="submit" class="rounded-lg px-6 py-2 bg-rose-600 text-white font-bold border-b-4 border-r-4 border-rose-800 transition hover:bg-rose-700">
+                            Confirm Account Deletion
+                        </button>
+                    </form>
+                </div>
+            </div>
         </div>
     </div>
     <script src="/js/imageparallax.js"></script>
@@ -221,7 +252,7 @@
             const editUser = document.getElementById("editUser");
             if (!editUser) return;
 
-            if (window.location.pathname === "/home/user") {
+            if (window.location.pathname === "/home") {
                 editUser.classList.toggle("hidden");
                 editUser.classList.toggle("block");
             }
@@ -317,6 +348,236 @@
             profileImageWidget.classList.toggle("hidden");
             profileImageWidget.classList.toggle("block");
         }
+
+        function validateUsername() {
+            let val = document.getElementById('username').value;
+            if (!val) return false;
+
+            let result = true;
+
+            if (val.length < 3 || val.length > 16) result = false;
+            if(containsSpecialCharacters(val)) result = false;
+
+            const error_message = document.getElementById("error-username");
+            if (!result) {
+                error_message.classList.remove("hidden");
+            } else {
+                if (!error_message.classList.contains("hidden")) {
+                    error_message.classList.add("hidden");
+                }
+            }
+
+            const submit = document.getElementById("username-submit");
+
+            if (result) {
+                submit.classList.add("hover:bg-emerald-600");
+                submit.classList.add("border-emerald-700");
+                submit.classList.add("bg-emerald-500");
+                submit.classList.remove("cursor-not-allowed");
+                submit.classList.remove("hover:bg-gray-600");
+                submit.classList.remove("border-gray-700");
+                submit.classList.remove("bg-gray-500");
+                
+            } else {
+                submit.classList.remove("hover:bg-emerald-600");
+                submit.classList.remove("border-emerald-700");
+                submit.classList.remove("bg-emerald-500");
+                submit.classList.add("cursor-not-allowed");
+                submit.classList.add("hover:bg-gray-600");
+                submit.classList.add("border-gray-700");
+                submit.classList.add("bg-gray-500");
+            }
+        }
+
+        function validateEmail() {
+            let val = document.getElementById('email').value;
+            if (!val) return false;
+
+            let result = true;
+
+            if (!isValidEmail(val)) result = false;
+
+            const error_message = document.getElementById("error-email");
+            if (!result) {
+                error_message.classList.remove("hidden");
+            } else {
+                if (!error_message.classList.contains("hidden")) {
+                    error_message.classList.add("hidden");
+                }
+            }
+
+            const submit = document.getElementById("email-submit");
+
+            if (result) {
+                submit.classList.add("hover:bg-emerald-600");
+                submit.classList.add("border-emerald-700");
+                submit.classList.add("bg-emerald-500");
+                submit.classList.remove("cursor-not-allowed");
+                submit.classList.remove("hover:bg-gray-600");
+                submit.classList.remove("border-gray-700");
+                submit.classList.remove("bg-gray-500");
+            } else {
+                submit.classList.remove("hover:bg-emerald-600");
+                submit.classList.remove("border-emerald-700");
+                submit.classList.remove("bg-emerald-500");
+                submit.classList.add("cursor-not-allowed");
+                submit.classList.add("hover:bg-gray-600");
+                submit.classList.add("border-gray-700");
+                submit.classList.add("bg-gray-500");
+            }
+        }
+
+        function validatePassword() {
+            let val = document.getElementById('password').value;
+            if (!val) return false;
+
+            let result = true;
+
+            if (val.length < 6) result = false;
+
+            const error_message = document.getElementById("error-password");
+            if (!result) {
+                error_message.classList.remove("hidden");
+            } else {
+                if (!error_message.classList.contains("hidden")) {
+                    error_message.classList.add("hidden");
+                }
+            }
+
+            const submit = document.getElementById("password-submit");
+
+            if (result) {
+                submit.classList.add("hover:bg-emerald-600");
+                submit.classList.add("border-emerald-700");
+                submit.classList.add("bg-emerald-500");
+                submit.classList.remove("cursor-not-allowed");
+                submit.classList.remove("hover:bg-gray-600");
+                submit.classList.remove("border-gray-700");
+                submit.classList.remove("bg-gray-500");
+            } else {
+                submit.classList.remove("hover:bg-emerald-600");
+                submit.classList.remove("border-emerald-700");
+                submit.classList.remove("bg-emerald-500");
+                submit.classList.add("cursor-not-allowed");
+                submit.classList.add("hover:bg-gray-600");
+                submit.classList.add("border-gray-700");
+                submit.classList.add("bg-gray-500");
+            }
+        }
+
+        function containsSpecialCharacters(str) {
+            const regex = /[!@#$%^&*(),.?":{}|<> ]/;
+            return regex.test(str);
+        }
+
+        function isValidEmail(email) {
+            const regex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+            return regex.test(email);
+        }
+
+        const usernameForm = document.getElementById('username-form');
+
+        usernameForm.addEventListener('submit', async function(event) {
+            event.preventDefault();
+            
+            const formData = new FormData(usernameForm);
+            const data = new URLSearchParams(formData);
+
+            try {
+                const response = await fetch('/auth/update-username', {
+                    method: 'POST',
+                    body: data,
+                    headers: {
+                        'Accept': 'application/json',
+                    }
+                });
+
+                const responseData = await response.json();
+
+                if (response.ok) {
+                    window.location.href = '/home';
+                } else {
+                    const submit_error = document.getElementById("submit_error");
+                    const submit_error_msg = document.getElementById("submit_error_msg");
+
+                    submit_error.classList.remove("hidden");
+                    submit_error_msg.innerText = responseData.error;
+                }
+            } catch (error) {
+                console.error('Error during registration:', error);
+                alert('An unexpected error occurred. Please try again.');
+            }
+        });
+
+        const emailForm = document.getElementById('email-form');
+
+        emailForm.addEventListener('submit', async function(event) {
+            event.preventDefault();
+            
+            const formData = new FormData(emailForm);
+            const data = new URLSearchParams(formData);
+
+            try {
+                const response = await fetch('/auth/update-email', {
+                    method: 'POST',
+                    body: data,
+                    headers: {
+                        'Accept': 'application/json',
+                    }
+                });
+
+                const responseData = await response.json();
+
+                if (response.ok) {
+                    window.location.href = '/home';
+                } else {
+                    const submit_error = document.getElementById("submit_error");
+                    const submit_error_msg = document.getElementById("submit_error_msg");
+
+                    submit_error.classList.remove("hidden");
+                    submit_error_msg.innerText = responseData.error;
+                }
+            } catch (error) {
+                console.error('Error during registration:', error);
+                alert('An unexpected error occurred. Please try again.');
+            }
+        });
+
+        const passwordForm = document.getElementById('password-form');
+
+        passwordForm.addEventListener('submit', async function(event) {
+            event.preventDefault();
+            
+            const formData = new FormData(passwordForm);
+            const data = new URLSearchParams(formData);
+
+            try {
+                const response = await fetch('/auth/update-password', {
+                    method: 'POST',
+                    body: data,
+                    headers: {
+                        'Accept': 'application/json',
+                    }
+                });
+
+                const responseData = await response.json();
+
+                if (response.ok) {
+                    window.location.href = '/home';
+                } else {
+                    const submit_error = document.getElementById("submit_error");
+                    const submit_error_msg = document.getElementById("submit_error_msg");
+
+                    submit_error.classList.remove("hidden");
+                    submit_error_msg.innerText = responseData.error;
+                }
+            } catch (error) {
+                console.error('Error during registration:', error);
+                alert('An unexpected error occurred. Please try again.');
+            }
+        });
+
+
     </script>
 </body>
 </html>

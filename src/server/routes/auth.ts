@@ -54,10 +54,10 @@ router.post("/update-email", async (_req, res) => {
         // @ts-expect-error
         _req.session.user = updatedUser;
 
-        res.redirect("/home/user");
-    } catch (err) {
+        res.status(200).json({ message: 'Update successful' });
+    } catch (err: any) {
         console.error(err);
-        res.redirect("/home/user");
+        res.status(400).json({ error: err.message });
     }
 });
 
@@ -75,10 +75,10 @@ router.post("/update-username", async (_req, res) => {
         _req.session.user = updatedUser;
 
 
-        res.redirect("/home/user");
-    } catch (err) {
+        res.status(200).json({ message: 'Update successful' });
+    } catch (err: any) {
         console.error(err);
-        res.redirect("/home/user");
+        res.status(400).json({ error: err.message });
     }
 });
 
@@ -95,10 +95,10 @@ router.post("/update-password", async (_req, res) => {
         // @ts-expect-error
         _req.session.user = updatedUser;
 
-        res.redirect("/home/user");
-    } catch (err) {
+        res.status(200).json({ message: 'Update successful' });
+    } catch (err: any) {
         console.error(err);
-        res.redirect("/home/user");
+        res.status(400).json({ error: err.message });
     }
 });
 
