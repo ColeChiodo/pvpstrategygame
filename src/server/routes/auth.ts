@@ -27,10 +27,11 @@ router.post("/login", async (_req, res) => {
         // @ts-expect-error
         _req.session.user = user;
         _req.session.save();
-        res.redirect("/home");
-    } catch(err) {
+
+        res.status(200).json({ message: 'Registration successful' });
+    } catch(err: any) {
         console.error(err);
-        res.redirect("/login");
+        res.status(400).json({ error: err.message });
     }
 });
 

@@ -43,13 +43,13 @@ const login = async (credential: string, password: string) => {
 
     const user = await User.findOne({ $or: [{ email: credential }, { username: credential }] });
     if (!user) {
-        throw new Error("User not found");
+        throw new Error("User Does Not Exist.");
     }
 
     const valid = await bcrypt.compare(password, user.password);
 
     if (!valid) {
-        throw new Error("Invalid password");
+        throw new Error("Incorrect Password. Please Try Again.");
     }
 
     return user;

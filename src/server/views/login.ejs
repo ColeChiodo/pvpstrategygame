@@ -25,8 +25,13 @@
             <div id="contents" class="absolute inset-0 flex flex-col items-center justify-center text-center text-white z-10">
                 <div class="bg-secondary p-8 w-full max-w-md text-white rounded-xl border-b-4 border-r-4 border-primary">
                     <h1 class="text-3xl font-bold mb-6 text-center">Login</h1>
+
+                    <div id="login_error" class="hidden bg-amber-100 border border-amber-400 text-amber-700 px-4 py-3 rounded relative text-sm mb-6" role="alert">
+                        <strong class="font-bold">Error:</strong>
+                        <span id="login_error_msg" class="block sm:inline"></span>
+                    </div>
                     
-                    <form action="/auth/login" method="POST" class="space-y-4">
+                    <form id="login-form" class="space-y-4">
                         <div>
                             <input type="text" name="credential" id="credential" required placeholder="Username or Email"
                                    class="bg-white text-black block w-full px-4 py-2 border-r-4 border-b-4 border-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary">
@@ -59,5 +64,40 @@
         </div>
     </div>
     <script src="/js/imageparallax.js"></script>
+    <script>
+        const form = document.getElementById('login-form');
+
+        form.addEventListener('submit', async function(event) {
+            event.preventDefault();
+            
+            const formData = new FormData(form);
+            const data = new URLSearchParams(formData);
+
+            try {
+                const response = await fetch('/auth/login', {
+                    method: 'POST',
+                    body: data,
+                    headers: {
+                        'Accept': 'application/json',
+                    }
+                });
+
+                const responseData = await response.json();
+
+                if (response.ok) {
+                    window.location.href = '/home';
+                } else {
+                    const login_error = document.getElementById("login_error");
+                    const login_error_msg = document.getElementById("login_error_msg");
+
+                    login_error.classList.remove("hidden");
+                    login_error_msg.innerText = responseData.error;
+                }
+            } catch (error) {
+                console.error('Error during registration:', error);
+                alert('An unexpected error occurred. Please try again.');
+            }
+        });
+    </script>
 </body>
 </html>
