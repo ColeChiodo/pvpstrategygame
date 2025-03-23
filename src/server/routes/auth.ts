@@ -1,5 +1,13 @@
 import express from "express";
 import { Users } from "../database";
+const rateLimit = require('express-rate-limit');
+
+const loginLimiter = rateLimit({
+    windowMs: 5 * 60 * 1000,
+    max: 10,
+    message: { error: "Too many login attempts.\nYour IP has been blocked for 5 minutes.\nPlease try again later." },
+    headers: true
+});
 
 const router = express.Router();
 
@@ -19,7 +27,7 @@ router.post("/register", async (_req, res) => {
     }
 });
 
-router.post("/login", async (_req, res) => {
+router.post("/login", loginLimiter, async (_req, res) => {
     const { credential, password } = _req.body;
 
     try {

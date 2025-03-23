@@ -45,6 +45,7 @@
     "ejs": "^3.1.10",
     "express": "^5.0.1",
     "express-flash": "^0.0.2",
+    "express-rate-limit": "^7.5.0",
     "express-session": "^1.18.1",
     "http-errors": "^2.0.0",
     "leo-profanity": "^1.7.0",
