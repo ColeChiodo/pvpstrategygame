@@ -15,9 +15,47 @@
     <script src="/js/tailwind.js"></script>
 </head>
 <%- include('partials/header') %>
-<body class="bg-primary">
-    <div class="h-screen w-screen bg-primary">
-        Patch Notes
+<body class="bg-secondary flex flex-col items-center">
+    <div class="bg-primary w-screen flex justify-center">
+        <div class="bg-red flex flex-col items-center p-8 w-screen lg:w-1/2 text-white text-md">
+            <div class="">
+                <div class="py-4 shadow-lg">
+                    <div class="container mx-auto text-center">
+                        <h1 class="text-3xl font-bold">Patch Notes</h1>
+                        <h1 class="text-md text-gray-300">Current Build: v0.0.1</h1>
+                        <h1 class="text-md text-gray-300">Last Updated: 3/23/25</h1>
+                    </div>
+                </div>
+
+                <hr>
+            
+                <div class="container mx-auto px-4 py-10">
+                    <div class="flex flex-col justify-center items-center align-center bg-secondary bg-opacity-75 p-6 rounded-lg border-4 border-secondary">
+                        <div class="w-full">
+                            <h2 class="text-2xl font-bold">Welcome to Fortezza Tactics Online! 🥳</h2>
+                            <h2 class="text-xl text-gray-300">v0.0.1</h2>
+                        </div>
+                        <img class="w-full h-auto mb-4" src="/assets/patchnotes/001.png">
+                        <div class="w-full">
+                            <p class="mb-4">
+                                Welcome to the Public Release build of Fortezza Tactics Online! This post marks the release of version 0.0.1.
+                            </p>
+                            <p class="mb-4">
+                                This is the official patch notes page. Since this is our first public release, there aren't any past updates—yet! 
+                                But as the game evolves, this is where you'll find details about new features, balance changes, bug fixes, and more.
+                            </p>
+                            <p class="">
+                                Stay tuned for future updates, and enjoy playing the game!
+                            </p>
+
+                            <h2 class="text-md text-gray-500 mt-4">Thanks!</h2>
+                            <h2 class="text-md text-gray-500">Cole Chiodo</h2>
+                            <h2 class="text-md text-gray-500">March 23rd, 2025</h2>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </body>
 <%- include('partials/footer') %>
