@@ -1,13 +1,13 @@
-<div id="volumeControls" class="fixed bottom-4 left-4 flex items-center justify-center flex-col p-4">
+<div id="volumeControls" class="fixed bottom-12 sm:bottom-14 left-4 flex items-center justify-center flex-col">
     <div id="volumeControl" class="relative flex items-center group">
-        <img id="volumeIcon" 
-            src="/assets/global/audio.png" 
+        <img id="volumeIcon"
+            src="/assets/global/audio.png"
             alt="Volume Icon"
             class="w-10 h-10 cursor-pointer transition-all duration-300 group-hover:invert"
             onclick="toggleMute()">
 
         <input type="range" id="volumeSlider" 
-            min="0" max="1" step="0.01" value="0.5"
-            class="absolute left-12 w-32 opacity-0 scale-x-0 transition-all duration-300 group-hover:opacity-100 group-hover:scale-x-100 origin-left p-2 bg-gray-700 rounded-lg">
+            min="0" max="1" step="0.01" value="1"
+            class="absolute accent-cyan-500 left-12 w-32 opacity-0 scale-x-0 transition-all duration-300 group-hover:opacity-100 group-hover:scale-x-100 origin-left p-2 bg-gray-700 rounded-lg">
     </div>
 </div>

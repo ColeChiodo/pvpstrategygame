@@ -253,8 +253,8 @@ window.socket.on('nextRound', (player) => {
         nextTurnBG.classList.remove("border-cyan-500");
     } else {
         nextRoundMsg.innerHTML = "YOUR TURN";
-        nextTurnBG.classList.add("border-cyan-500");
         nextTurnBG.classList.remove("border-amber-500");
+        nextTurnBG.classList.add("border-cyan-500");
         if (document.hidden) {
             alert('It is now your turn.');
         }
@@ -337,7 +337,7 @@ window.socket.on('display-emote', (src: string, sid: string) => {
         if (!p2Emote) return;
         let emoteImg = loadImage(src+'2', src);
         p2Emote.appendChild(emoteImg);
-        emoteImg.classList.value = "w-24 h-24 transition-all duration-500 opacity-0";
+        emoteImg.classList.value = "w-16 h-16 sm:w-24 sm:h-24 transition-all duration-500 opacity-0";
         setTimeout(() => {
             emoteImg.classList.toggle('opacity-0');
             emoteImg.classList.toggle('opacity-95');
@@ -355,7 +355,7 @@ window.socket.on('display-emote', (src: string, sid: string) => {
         if (!p1Emote) return;
         let emoteImg = loadImage(src+'1', src);
         p1Emote.appendChild(emoteImg);
-        emoteImg.classList.value = "w-24 h-24 transition-all duration-500 opacity-0";
+        emoteImg.classList.value = "w-16 h-16 sm:w-24 sm:h-24 transition-all duration-500 opacity-0";
         setTimeout(() => {
             emoteImg.classList.toggle('opacity-0');
             emoteImg.classList.toggle('opacity-95');
