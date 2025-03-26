@@ -9,6 +9,16 @@ import * as configuration from './config';
 import * as middleware from "./middleware";
 import { createServer } from "http";
 import mongoose from "mongoose";
+import rateLimit from "express-rate-limit";
+
+const notFoundLimiter = rateLimit({
+    windowMs: 5 * 60 * 1000,
+    max: 10,
+    message: "Too many 404 requests from this IP, please try again later.",
+    standardHeaders: true,
+    legacyHeaders: false,
+    skipSuccessfulRequests: true,
+});
 
 dotenv.config();
 
@@ -39,9 +49,10 @@ mongoose.connect(process.env.DATABASE_URL!)
     app.use("/games", routes.games);
     app.use("/account", routes.account);
 
+    app.use(notFoundLimiter);
     app.use((_request, _response, next) => {
         next(httpErrors(404));
-        _response.render("404", { title: "404 - Page Not Found" });
+        _response.status(404).render("404", { title: "404 - Page Not Found" });
     });
 
     server.listen(PORT as number, '0.0.0.0' as string, () => {
