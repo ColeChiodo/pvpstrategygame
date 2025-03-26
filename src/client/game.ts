@@ -128,6 +128,7 @@ window.addEventListener('resize', resizeCanvas);
 window.addEventListener('orientationchange', resizeCanvas);
 
 async function animateMove(tempUnit: Unit, origin: { row: number, col: number }, target: { x: number, y: number, row: number, col: number }) {
+    console.log("animating move");
     isAnimating = true;
     const path = astarPath(origin.row, origin.col, target.row, target.col);
     const realUnit = units.find(unit => unit.row === tempUnit.row && unit.col === tempUnit.col);
@@ -136,8 +137,8 @@ async function animateMove(tempUnit: Unit, origin: { row: number, col: number },
     realUnit.sprite.currentFrame = 0;
     
     let lastTile: { x: number, y: number } = {x: origin.col, y: origin.row};
+    
     for (const tile of path) {
-        console.log(lastTile, tile)
         if (!isAnimating) break;
         animatingUnit = realUnit;
 
@@ -149,14 +150,12 @@ async function animateMove(tempUnit: Unit, origin: { row: number, col: number },
         realUnit.col = tile.x;
 
         if (realUnit.row == lastTile.y) {
-            
             if (realUnit.col > lastTile.x) {
                 realUnit.sprite.direction = 1; 
             } else if (realUnit.col < lastTile.x) {
                 realUnit.sprite.direction = -1; 
             }
         } else if (realUnit.col == lastTile.x) {
-            
             if (realUnit.row > lastTile.y) {
                 realUnit.sprite.direction = -1; 
             } else if (realUnit.row < lastTile.y) {
@@ -283,6 +282,7 @@ window.socket.on('player-unit-moving', (compressedData) => {
 
     isAction = true;
     animateMove(data.unit, data.origin, data.target);
+    console.log(`${data.unit.name} is moving [${data.origin.row}, ${data.origin.col}] => [${data.target.row}, ${data.target.col}]`);
     moveTile = data.target;
 });
 
@@ -449,10 +449,6 @@ function drawEntities(): void {
             const sx = frameX * frameSize;
             const sy = frameY * frameSize;
             const direction = unit.sprite.direction;
-
-            if (unit.name === "scout") {
-                console.log(direction)
-            }
 
             ctx.imageSmoothingEnabled = false;
 
@@ -1413,16 +1409,16 @@ function loadAudio(name: string, src: string): HTMLAudioElement {
 
 const audioContext = new AudioContext();
 const gainNode = audioContext.createGain();
-gainNode.gain.value = 0.5; // Default volume
+gainNode.gain.value = 0.5;
 gainNode.connect(audioContext.destination);
 
 function playSound(name: string, src: string) {
-    const audio = loadAudio(name, src);
+    const audio = new Audio(src);
     const track = audioContext.createMediaElementSource(audio);
     track.connect(gainNode);
     
     audio.currentTime = 0;
-    audio.play();
+    audio.play().catch(e => console.error("Audio play failed:", e));
 }
 
 window.gainNode = gainNode;
