@@ -12,8 +12,8 @@ import mongoose from "mongoose";
 import rateLimit from "express-rate-limit";
 
 const notFoundLimiter = rateLimit({
-    windowMs: 5 * 60 * 1000,
-    max: 10,
+    windowMs: 60 * 60 * 1000,
+    max: 5,
     message: "Too many 404 requests from this IP, please try again later.",
     standardHeaders: true,
     legacyHeaders: false,
