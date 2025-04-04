@@ -1123,7 +1123,49 @@ canvas.addEventListener('mousemove', function(event) {
 
 // -----------Touch Screen Logic---------------------------
 
+let touchStartX: number = 0;
+let touchStartY: number = 0;
+let isTouchDragging: boolean = false;
+let lastTouchDistance: number | null = null;
 
+canvas.addEventListener("touchstart", (e: TouchEvent) => {
+    if (e.touches.length === 1) {
+        isTouchDragging = true;
+        touchStartX = e.touches[0].clientX - cameraOffsetX;
+        touchStartY = e.touches[0].clientY - cameraOffsetY;
+    } else if (e.touches.length === 2) {
+        lastTouchDistance = getTouchDistance(e.touches);
+    }
+}, { passive: true });
+
+canvas.addEventListener("touchmove", (e: TouchEvent) => {
+    e.preventDefault();
+
+    if (e.touches.length === 1 && isTouchDragging) {
+        cameraOffsetX = e.touches[0].clientX - touchStartX;
+        cameraOffsetY = e.touches[0].clientY - touchStartY;
+    } else if (e.touches.length === 2) {
+        const newDistance = getTouchDistance(e.touches);
+        if (lastTouchDistance !== null) {
+            SCALE *= newDistance / lastTouchDistance;
+            SCALE = Math.max(MIN_SCALE - 0.5, Math.min(MAX_SCALE - 0.5, SCALE));
+        }
+        lastTouchDistance = newDistance;
+    }
+}, { passive: false });
+
+canvas.addEventListener("touchend", (e: TouchEvent) => {
+    if (e.touches.length === 0) {
+        isTouchDragging = false;
+        lastTouchDistance = null;
+    }
+}, { passive: true });
+
+function getTouchDistance(touches: TouchList): number {
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+}
 
 // ---------------GAMEPAD CONTROLS-------------------------------------------------
 
@@ -1399,26 +1441,33 @@ function loadImage(name: string, src: string): HTMLImageElement {
     return imageCache.get(name)!;
 }
 
-function loadAudio(name: string, src: string): HTMLAudioElement {
-    if (!audioCache.has(name)) {
-        const audio = new Audio(src);
-        audioCache.set(name, audio);
-    }
-    return audioCache.get(name)!;
-}
-
 const audioContext = new AudioContext();
 const gainNode = audioContext.createGain();
 gainNode.gain.value = 0.5;
 gainNode.connect(audioContext.destination);
 
 function playSound(name: string, src: string) {
-    const audio = new Audio(src);
-    const track = audioContext.createMediaElementSource(audio);
-    track.connect(gainNode);
+    const audio = audioCache.get(name) ?? loadAudio(name, src);
     
     audio.currentTime = 0;
+    
+    try {
+        // Connect only if not already connected
+        const track = audioContext.createMediaElementSource(audio);
+        track.connect(gainNode);
+    } catch (e) {
+        // MediaElementSource can only be used once per audio element — ignore this error if already connected
+    }
+
     audio.play().catch(e => console.error("Audio play failed:", e));
+}
+
+function loadAudio(name: string, src: string): HTMLAudioElement {
+    if (!audioCache.has(name)) {
+        const audio = new Audio(src);
+        audioCache.set(name, audio);
+    }
+    return audioCache.get(name)!;
 }
 
 window.gainNode = gainNode;
