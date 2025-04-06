@@ -1,0 +1,32 @@
+name: Deploy to DigitalOcean Droplet
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      # - name: Run Tests
+      #   run: |
+      #     npm install
+      #     npm test  # or your actual test command
+
+      - name: Deploy via SSH
+        if: success()
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.DO_HOST }}
+          username: ${{ secrets.DO_USER }}
+          key: ${{ secrets.DO_SSH_KEY }}
+          script: |
+            cd /var/www/pvpstrategygame
+            git pull origin main
+            npm install
+            pm2 restart pvpstrategygame
