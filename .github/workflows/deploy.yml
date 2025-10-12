@@ -29,4 +29,4 @@ jobs:
             cd /var/www/pvpstrategygame
             git pull origin main
             npm install
-            pm2 restart pvpstrategygame
+            pm2 restart fortezza
