@@ -1,4 +1,5 @@
-# PVP Strategy Game
+# Fortezza Tactics Online
+A Player vs Player Strategy Tactics Game made using Node, Express, Websockets.
 
 ## Build and Run Yourself
 
