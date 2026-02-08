@@ -1,0 +1,154 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id         String   @id @default(uuid())
+  provider   String // google, discord, steam
+  providerId String // external ID
+  username   String   @unique
+  displayName String
+  email      String   @unique
+  avatar     String   @default("/assets/avatars/free/default.png")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  isAdmin    Boolean  @default(false)
+  termsAcceptedAt DateTime?
+
+  level Int @default(1)
+  xp    Int @default(0)
+  currency Int @default(0)
+
+  cosmetics Cosmetic[]
+  purchasedItems PurchasedItem[]
+  loadout   Loadout?
+
+  matches         MatchHistory[] @relation("PlayerMatches") // Matches where user is the player
+  opponentMatches MatchHistory[] @relation("OpponentMatches") // Matches where user is the opponent
+
+  rank    Rank?
+  replays Replay[]
+
+  sessions UserSession[]
+
+  @@unique([provider, providerId])
+}
+
+model UserSession {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([token])
+}
+
+model MatchHistory {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation("PlayerMatches", fields: [userId], references: [id])
+  opponentId  String
+  opponent    User     @relation("OpponentMatches", fields: [opponentId], references: [id])
+  won         Boolean
+  unitsLost   Int
+  unitsKilled Int
+  turns       Int
+  duration    Int
+  rankChange  Int
+  replayId    String?
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model Rank {
+  userId    String   @id
+  user      User     @relation(fields: [userId], references: [id])
+  elo       Int      @default(1000)
+  tier      String   @default("BRONZE")
+  wins      Int      @default(0)
+  losses    Int      @default(0)
+  streak    Int      @default(0)
+  season    Int      @default(1)
+  updatedAt DateTime @updatedAt
+}
+
+model Cosmetic {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  type       String // "avatar", "badge", "reaction", etc.
+  key        String
+  unlockedAt DateTime @default(now())
+
+  @@unique([userId, type, key])
+}
+
+model PurchasedItem {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  type      String   // "avatar", "badge", "reaction", etc.
+  key       String
+  purchasedAt DateTime @default(now())
+
+  @@unique([userId, type, key])
+  @@index([userId])
+}
+
+model Loadout {
+  id        String  @id @default(uuid())
+  userId    String  @unique
+  user      User    @relation(fields: [userId], references: [id])
+  unitSkins Json
+  badge     String?
+  reaction  String  @default("default")
+}
+
+model Replay {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  matchData Json
+  winnerId  String
+  duration  Int
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model PatchNote {
+  id        String   @id @default(uuid())
+  version   String
+  title     String
+  content   String
+  imageUrl  String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+model GameSession {
+  id          String   @id @default(uuid())
+  player1Id   String
+  player2Id   String
+  serverUrl   String?
+  port        Int?
+  status      String   @default("waiting") // waiting, match_found, in_progress, completed
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([player1Id])
+  @@index([player2Id])
+  @@index([status])
+}
