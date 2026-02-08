@@ -1,13 +1,16 @@
-FROM node:20-alpine
+FROM node:20
 
 WORKDIR /app
 
 COPY package*.json ./
-COPY prisma ./prisma/
-ENV DATABASE_URL="postgresql://user:pass@localhost:5432/db?schema=public"
 RUN npm install
+
+COPY prisma ./prisma/
 RUN npx prisma generate
+
+COPY . .
 
 EXPOSE 3000
 
-CMD ["npm", "run", "dev"]
+# Use dotenv to load .env file
+CMD ["sh", "-c", "npx dotenv -e .env -- npm run dev"]
