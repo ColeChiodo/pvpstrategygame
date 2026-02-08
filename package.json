@@ -20,9 +20,10 @@
     "prisma:generate": "cd backend && npx prisma generate",
     "prisma:migrate": "cd backend && npx prisma migrate dev",
     "prisma:studio": "cd backend && npx prisma studio",
-    "docker:build": "docker-compose build",
-    "docker:up": "docker-compose up -d",
-    "docker:down": "docker-compose down",
+    "docker:build-all": "docker compose build --no-cache && docker compose up -d",
+    "docker:build": "docker compose up --build -d",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
     "k8s:apply": "kubectl apply -f k8s/",
     "k8s:delete": "kubectl delete -f k8s/"
   },

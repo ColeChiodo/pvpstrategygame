@@ -13,23 +13,26 @@ export default defineConfig(({ mode }) => {
         "@": fileURLToPath(new URL("./src", import.meta.url)),
       },
     },
-    css: {
-      postcss: "./postcss.config.js",
-    },
     server: {
-      host: "0.0.0.0",
+      host: "0.0.0.0",      // bind to all interfaces
       port: 5173,
+      allowedHosts: "all",
+      strictPort: false,
+      hmr: {
+        host: "fortezza.colechiodo.cc", // <-- fixes HMR via proxy
+        protocol: "wss",                 // if using HTTPS / WebSocket via Cloudflare
+      },
       proxy: {
         "/api": {
-          target: env.VITE_BACKEND_URL,
+          target: env.VITE_API_URL,
           changeOrigin: true,
         },
         "/auth": {
-          target: env.VITE_BACKEND_URL,
+          target: env.VITE_API_URL,
           changeOrigin: true,
         },
         "/socket.io": {
-          target: env.VITE_BACKEND_URL,
+          target: env.VITE_API_URL,
           ws: true,
         },
       },
