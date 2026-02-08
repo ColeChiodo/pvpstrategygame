@@ -2,17 +2,14 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Copy package files first to leverage cache
-COPY package.json package-lock.json* ./
-RUN npm install
+COPY package*.json ./
+RUN npm ci --production
 
-# Copy everything else
-COPY . .
+COPY dist ./dist
 
-# Fix permissions: all files readable by node user
-RUN chown -R node:node /app
-USER node
+ENV NODE_ENV=production
+ENV PORT=3000
 
 EXPOSE 3000
 
-CMD ["npm", "run", "dev"]
+CMD ["node", "dist/index.js"]

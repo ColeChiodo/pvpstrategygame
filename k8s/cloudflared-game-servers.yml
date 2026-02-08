@@ -1,0 +1,12 @@
+# Cloudflare Tunnel config for game servers
+# Point cloudflared to your K3s node IP on port 30080
+
+tunnel: YOUR-TUNNEL-ID
+credentials-file: ~/.cloudflared/credentials.json
+
+ingress:
+  - hostname: fortezza.colechiodo.cc
+    service: https://YOUR-K3S-HOST-IP:30080
+    originRequest:
+      noTLSVerify: true
+  - service: http_status:404

@@ -1,19 +1,20 @@
-FROM node:20-alpine
+# Build stage
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy package files first to leverage cache
-COPY package.json package-lock.json* ./
-RUN npm install
+COPY package*.json ./
+RUN npm ci
 
-# Copy everything else
 COPY . .
+RUN npm run build
 
-# Fix permissions: all files readable by node user
-RUN chown -R node:node /app
-USER node
+# Production stage
+FROM nginx:alpine
 
-EXPOSE 5173
+COPY --from=builder /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-CMD ["npm", "run", "dev"]
+EXPOSE 80
 
+CMD ["nginx", "-g", "daemon off;"]
