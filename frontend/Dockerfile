@@ -1,24 +1,18 @@
-# Build stage
-FROM node:20-alpine AS builder
-
-WORKDIR /app
-
-COPY package*.json ./
-RUN npm ci
-
-COPY . .
-RUN npm run build
-
-# Production stage
 FROM node:20-alpine
 
 WORKDIR /app
 
-COPY --from=builder /app/dist ./dist
-COPY package*.json ./
+# Copy package files first to leverage cache
+COPY package.json package-lock.json* ./
+RUN npm install
 
-RUN npm install -g serve
+# Copy everything else
+COPY . .
+
+# Fix permissions: all files readable by node user
+RUN chown -R node:node /app
+USER node
 
 EXPOSE 5173
 
-CMD ["serve", "-s", "dist", "-l", "5173"]
+CMD ["npm", "run", "dev"]
