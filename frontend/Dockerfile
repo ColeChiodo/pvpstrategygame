@@ -3,7 +3,7 @@ FROM node:20-alpine
 WORKDIR /app
 
 # Copy package files first to leverage cache
-COPY package.json package-lock.json* ./
+COPY package.json ../package-lock.json* ./
 RUN npm install
 
 # Copy everything else
