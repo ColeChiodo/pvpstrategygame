@@ -1,5 +1,4 @@
 # Kubernetes
-k8s/*.yaml
 k8s/secrets.yaml
 
 # Environment
