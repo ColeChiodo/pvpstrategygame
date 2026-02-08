@@ -4,7 +4,7 @@
   "description": "Frontend for Fortezza Tactics Online",
   "type": "module",
   "scripts": {
-    "dev": "vite --port $PORT --host $HOST",
+    "dev": "vite --port 5173 --host 0.0.0.0",
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix --ignore-path .gitignore",

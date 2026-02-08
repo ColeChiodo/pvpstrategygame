@@ -8,6 +8,8 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [vue()],
+    root: ".", // <-- ensure Vite root is the container working directory
+	base: "/",
     resolve: {
       alias: {
         "@": fileURLToPath(new URL("./src", import.meta.url)),
@@ -16,12 +18,11 @@ export default defineConfig(({ mode }) => {
     server: {
       host: "0.0.0.0",      // bind to all interfaces
       port: 5173,
-      allowedHosts: "all",
-      strictPort: false,
-      hmr: {
-        host: "fortezza.colechiodo.cc", // <-- fixes HMR via proxy
-        protocol: "wss",                 // if using HTTPS / WebSocket via Cloudflare
+      strictPort: true,     // fail if port is in use
+      fs: {
+        strict: false,      // <-- allow serving files outside root if needed
       },
+      allowedHosts: "all",
       proxy: {
         "/api": {
           target: env.VITE_API_URL,
@@ -36,6 +37,9 @@ export default defineConfig(({ mode }) => {
           ws: true,
         },
       },
+    },
+    build: {
+      sourcemap: true, // optional: helps debug Docker build issues
     },
   };
 });
