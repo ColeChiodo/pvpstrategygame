@@ -11,7 +11,7 @@ interface MatchmakingQueue {
 }
 
 const matchmakingQueue: MatchmakingQueue[] = [];
-const activeGames = new Map<string, { hostUserId: string; port: number; status: string }>();
+const activeGames = new Map<string, { hostUserId: string; status: string }>();
 
 router.post("/join", isAuthenticated, async (req, res) => {
   try {
@@ -32,7 +32,6 @@ router.post("/join", isAuthenticated, async (req, res) => {
       
       activeGames.set(gameId, {
         hostUserId: player1.userId,
-        port: 0,
         status: "starting",
       });
 
@@ -51,20 +50,16 @@ router.post("/join", isAuthenticated, async (req, res) => {
         return res.status(500).json({ error: "Failed to create game session" });
       }
 
-      let serverUrl = null;
-      let port = null;
+      let serverUrl: string | null = null;
       
       const localMode = process.env.LOCAL_GAME_SERVER === "true";
       
       try {
         if (localMode) {
-          const localPort = 3000 + Math.floor(Math.random() * 1000);
-          serverUrl = `http://localhost:${localPort}`;
-          port = localPort;
+          serverUrl = `http://localhost:3000`;
         } else {
           const server = await createGameServer(gameId);
           serverUrl = server?.url || null;
-          port = server?.port || null;
         }
       } catch (k8sError) {
         console.warn("K8s unavailable, running without game server");
@@ -76,7 +71,6 @@ router.post("/join", isAuthenticated, async (req, res) => {
         matched: true,
         opponent: player2.userId,
         serverUrl,
-        port,
       });
     }
 
@@ -128,7 +122,6 @@ router.get("/status", isAuthenticated, async (req, res) => {
           id: gameSession.id,
           status: gameSession.status,
           serverUrl: gameSession.serverUrl,
-          port: gameSession.port,
           isHost: gameSession.player1Id === userId,
           opponent: opponent || { displayName: "Unknown", avatar: null },
         },
@@ -179,7 +172,6 @@ router.get("/game/:gameId", isAuthenticated, async (req, res) => {
       gameId: game.id,
       status: game.status,
       serverUrl: game.serverUrl,
-      port: game.port,
       isHost: game.player1Id === userId,
       opponent: opponent || { displayName: "Unknown", avatar: null },
     });

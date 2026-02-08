@@ -8,14 +8,14 @@ const k8sApi = kc.makeApiClient(k8s.CoreV1Api);
 const k8sAppsApi = kc.makeApiClient(k8s.AppsV1Api);
 
 const GAME_SERVER_NAMESPACE = "game-servers";
-const GAME_SERVER_IMAGE = "localhost/fortezza-tactics-game-server:latest";
+const GAME_SERVER_IMAGE = "colechiodo/fortezza-game-server:latest";
 const GAME_SERVER_REPLICAS = 1;
 
 export async function createGameServer(gameId: string): Promise<{ url: string; port: number } | null> {
   try {
     const deploymentName = `game-server-${gameId}`;
     const serviceName = `game-server-${gameId}`;
-    const port = 3000 + Math.floor(Math.random() * 1000);
+    const containerPort = 3000;
 
     const deployment = {
       apiVersion: "apps/v1",
@@ -47,11 +47,12 @@ export async function createGameServer(gameId: string): Promise<{ url: string; p
               {
                 name: "game-server",
                 image: GAME_SERVER_IMAGE,
-                imagePullPolicy: "Never",
-                ports: [{ containerPort: port, name: "game" }],
+                imagePullPolicy: "Always",
+                ports: [{ containerPort, name: "game" }],
                 env: [
                   { name: "GAME_ID", value: gameId },
-                  { name: "PORT", value: port.toString() },
+                  { name: "PORT", value: containerPort.toString() },
+                  { name: "ALLOWED_ORIGINS", value: process.env.FRONTEND_URL || "" },
                 ],
                 resources: {
                   limits: {
@@ -63,10 +64,27 @@ export async function createGameServer(gameId: string): Promise<{ url: string; p
                     cpu: "100m",
                   },
                 },
+                livenessProbe: {
+                  httpGet: {
+                    path: "/health",
+                    port: containerPort,
+                  },
+                  initialDelaySeconds: 5,
+                  periodSeconds: 10,
+                },
+                readinessProbe: {
+                  httpGet: {
+                    path: "/health",
+                    port: containerPort,
+                  },
+                  initialDelaySeconds: 3,
+                  periodSeconds: 5,
+                },
               },
             ],
           },
         },
+        ttlSecondsAfterFinished: 3600,
       },
     };
 
@@ -79,52 +97,101 @@ export async function createGameServer(gameId: string): Promise<{ url: string; p
         labels: {
           app: deploymentName,
         },
+        annotations: {
+          "traefik.ingress.kubernetes.io/service.serversscheme": "ws",
+        },
       },
       spec: {
         selector: {
           app: deploymentName,
         },
         ports: [
-          { protocol: "TCP", port: port, targetPort: port, name: "game" },
+          { protocol: "TCP", port: containerPort, targetPort: containerPort, name: "game" },
         ],
         type: "ClusterIP",
       },
     };
 
-    await k8sAppsApi.createNamespacedDeployment({
-      namespace: GAME_SERVER_NAMESPACE,
-      body: deployment,
-    });
+    const GAME_SERVER_DOMAIN = process.env.GAME_SERVER_DOMAIN || "fortezza.colechiodo.cc";
+
+    const ingress = {
+      apiVersion: "networking.k8s.io/v1",
+      kind: "Ingress",
+      metadata: {
+        name: `game-server-${gameId}`,
+        namespace: GAME_SERVER_NAMESPACE,
+        annotations: {
+          "traefik.ingress.kubernetes.io/router.entrypoints": "websecure",
+          "traefik.ingress.kubernetes.io/router.tls": "true",
+        },
+      },
+      spec: {
+        ingressClassName: "traefik",
+        rules: [
+          {
+            host: GAME_SERVER_DOMAIN,
+            http: {
+              paths: [
+                {
+                  path: `/game-${gameId}`,
+                  pathType: "Prefix",
+                  backend: {
+                    service: {
+                      name: serviceName,
+                      port: { number: containerPort },
+                    },
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    };
 
     await k8sApi.createNamespacedService({
       namespace: GAME_SERVER_NAMESPACE,
       body: service,
     });
 
-    const serverUrl = `ws://${serviceName}.${GAME_SERVER_NAMESPACE}.svc.cluster.local:${port}`;
+    const k8sNetworkingApi = kc.makeApiClient(k8s.NetworkingV1Api);
+    await k8sNetworkingApi.createNamespacedIngress({
+      namespace: GAME_SERVER_NAMESPACE,
+      body: ingress,
+    });
+
+    const serverUrl = `wss://${GAME_SERVER_DOMAIN}/game-${gameId}`;
 
     await prisma.gameSession.update({
       where: { id: gameId },
       data: {
-        serverUrl: `ws://${serviceName}.${GAME_SERVER_NAMESPACE}.svc.cluster.local`,
-        port,
+        serverUrl,
         status: "in_progress",
       },
     });
 
-    console.log(`Game server created: ${deploymentName} on port ${port}`);
-    return { url: serverUrl, port };
+    console.log(`Game server created: ${deploymentName}`);
+    return { url: serverUrl, port: containerPort };
 
   } catch (error) {
     console.error("Failed to create game server:", error);
     return null;
   }
 }
+}
 
 export async function destroyGameServer(gameId: string): Promise<boolean> {
   try {
     const deploymentName = `game-server-${gameId}`;
     const serviceName = `game-server-${gameId}`;
+    const ingressName = `game-server-${gameId}`;
+
+    const k8sNetworkingApi = kc.makeApiClient(k8s.NetworkingV1Api);
+    
+    await k8sNetworkingApi.deleteNamespacedIngress({
+      name: ingressName,
+      namespace: GAME_SERVER_NAMESPACE,
+    });
 
     await k8sAppsApi.deleteNamespacedDeployment({
       name: deploymentName,
