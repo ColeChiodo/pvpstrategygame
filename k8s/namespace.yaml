@@ -3,7 +3,7 @@ kind: Namespace
 metadata:
   name: game-servers
   labels:
-    app: fortezza-game-server
+    app: fortezza
 ---
 apiVersion: v1
 kind: ServiceAccount

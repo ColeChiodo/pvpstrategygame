@@ -1,0 +1,26 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cleanup-stale-games
+  namespace: game-servers
+spec:
+  schedule: "*/5 * * * *"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: game-server-controller
+          containers:
+          - name: cleanup
+            image: colechiodo/fortezza-backend:latest
+            command: ["node", "dist/scripts/cleanup-stale-games.js"]
+            env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: fortezza-secrets
+                  key: DATABASE_URL
+            - name: KUBERNETES_NAMESPACE
+              value: "game-servers"
+            restartPolicy: OnFailure
