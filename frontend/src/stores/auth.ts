@@ -96,11 +96,11 @@ export const useAuthStore = defineStore("auth", () => {
   }
 
   async function loginWithGoogle() {
-    window.location.href = "api/auth/google";
+    window.location.href = "/api/auth/google";
   }
 
   async function loginWithDiscord() {
-    window.location.href = "api/auth/discord";
+    window.location.href = "/api/auth/discord";
   }
 
   async function logout() {
@@ -129,3 +129,4 @@ export const useAuthStore = defineStore("auth", () => {
     logout,
   };
 });
+

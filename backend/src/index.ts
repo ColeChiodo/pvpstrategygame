@@ -29,6 +29,9 @@ async function main() {
 
   const app = express();
 
+  // Trust Cloudflare proxy for proper HTTPS detection (secure cookies)
+  app.set("trust proxy", 1);
+
   // CORS
   app.use(
     cors({
@@ -45,6 +48,8 @@ async function main() {
   redisClient.on("error", (err) => console.error("Redis Client Error", err));
   await redisClient.connect();
 
+  const isProduction = process.env.NODE_ENV === "production";
+
   // Session middleware
   app.use(
     session({
@@ -53,9 +58,11 @@ async function main() {
       resave: false,
       saveUninitialized: false,
       cookie: {
-        secure: process.env.NODE_ENV === "production",
+        secure: isProduction,
         httpOnly: true,
-        maxAge: 1000 * 60 * 60 * 24 * 7, // 1 week
+        maxAge: 1000 * 60 * 60 * 24 * 7,
+        domain: isProduction ? ".colechiodo.cc" : undefined,
+        sameSite: isProduction ? "none" : "lax",
       },
     }),
   );
@@ -111,4 +118,5 @@ main().catch((err) => {
   console.error("Failed to start server", err);
   process.exit(1);
 });
+
 

@@ -16,13 +16,8 @@ export default defineConfig(({ mode }) => {
       },
     },
     server: {
-      host: "0.0.0.0",      // bind to all interfaces
       port: 5173,
-      strictPort: true,     // fail if port is in use
-      fs: {
-        strict: false,      // <-- allow serving files outside root if needed
-      },
-      allowedHosts: "all",
+      allowedHosts: true,
       proxy: {
         "/api": {
           target: env.VITE_API_URL,
