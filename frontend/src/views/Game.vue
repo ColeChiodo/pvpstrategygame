@@ -409,6 +409,7 @@ onUnmounted(() => {
   display: block;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
+  object-fit: contain;
 }
 
 .game-hud {

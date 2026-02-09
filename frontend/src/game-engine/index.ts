@@ -40,7 +40,7 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
 
     let cameraOffsetX = 0;
     let cameraOffsetY = 100;
-    let zoomScale = 2.5;
+    let zoomScale = 0.8;
     let isDragging = false;
     let startX = 0;
     let startY = 0;
@@ -215,14 +215,14 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     }
 
     function drawBackground() {
-        console.log('[DRAW] drawBackground() called');
         if (!ctx || !canvasRef.value) return;
+        ctx.imageSmoothingEnabled = false;
         ctx.fillStyle = '#0f0f2b';
         ctx.fillRect(0, 0, canvasRef.value.width, canvasRef.value.height);
     }
 
     function drawArena() {
-        console.log('[DRAW] drawArena() called, arenaImage:', !!arenaImage, 'arena:', !!arena);
+        console.log('[DRAW] drawArena() called, arenaImage:', !!arenaImage);
         if (!ctx || !arenaImage || !arena || !canvasRef.value) return;
         
         ctx.imageSmoothingEnabled = false;
@@ -625,17 +625,15 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
             console.log('[EVENT] handleClick ignored - not 2 players');
             return;
         }
+        console.log('[EVENT] Click proceeding...');
 
         const clickX = event.offsetX;
         const clickY = event.offsetY;
-        console.log('[EVENT] handleClick click position:', clickX, clickY);
         console.log('[EVENT] tiles array length:', tiles.length);
-        console.log('[EVENT] hoveredTile before:', hoveredTile.value);
 
         let found = false;
         for (const tile of tiles) {
             if (!hoveredTile.value) break;
-            console.log('[EVENT] Checking tile:', tile.row, tile.col);
             if (isPointInsideTile(clickX, clickY, tile)) {
                 console.log('[EVENT] Clicked inside tile:', tile.row, tile.col);
                 
@@ -791,10 +789,13 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
 
     function start() {
         console.log('[START] start() called');
+        console.log('[START] canvasRef.value:', !!canvasRef.value);
         if (!canvasRef.value) return;
+        
         canvasRef.value.width = window.innerWidth;
         canvasRef.value.height = window.innerHeight;
         ctx = canvasRef.value.getContext('2d');
+        console.log('[START] ctx:', !!ctx);
         if (ctx) {
             ctx.imageSmoothingEnabled = false;
             console.log('[START] Context created, imageSmoothingEnabled set to false');
@@ -803,14 +804,17 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
         console.log('[START] Adding event listeners');
         window.addEventListener('resize', handleResize);
         window.addEventListener('keydown', handleKeyDown);
+        console.log('[START] Window listeners added');
+        
         canvasRef.value.addEventListener('click', handleClick);
+        console.log('[START] Click listener added');
         canvasRef.value.addEventListener('mousedown', handleMouseDown);
         canvasRef.value.addEventListener('mouseup', handleMouseUp);
         canvasRef.value.addEventListener('mouseleave', handleMouseLeave);
         canvasRef.value.addEventListener('mousemove', handleMouseMove);
         canvasRef.value.addEventListener('wheel', handleWheel);
+        console.log('[START] Mouse listeners added');
         
-        console.log('[START] Adding gamepad listeners');
         window.addEventListener('gamepadconnected', (e: GamepadEvent) => {
             console.log('[GAMEPAD] Connected:', e.gamepad.id);
             gamepadIndex = e.gamepad.index;
@@ -830,7 +834,7 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
         if (!canvasRef.value || !ctx) return;
         canvasRef.value.width = window.innerWidth;
         canvasRef.value.height = window.innerHeight;
-        if (ctx) ctx.imageSmoothingEnabled = false;
+        ctx.imageSmoothingEnabled = false;
         console.log('[RESIZE] Canvas size set to:', canvasRef.value.width, 'x', canvasRef.value.height);
         draw();
     }
