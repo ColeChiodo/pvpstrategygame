@@ -25,6 +25,12 @@ const router = createRouter({
       component: () => import("../views/Play.vue"),
     },
     {
+      path: "/game/:gameId",
+      name: "game",
+      component: () => import("../views/Game.vue"),
+      props: true,
+    },
+    {
       path: "/patch-notes",
       name: "patch-notes",
       component: () => import("../views/PatchNotes.vue"),

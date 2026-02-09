@@ -205,66 +205,12 @@
       </div>
 
       <ConfirmModal
-        :is-open="showPurchaseConfirm"
+        v-if="pendingPurchaseAvatar"
         title="Purchase Avatar"
-        :message="`Are you sure you want to purchase this avatar for ${pendingPurchaseAvatar?.price ?? 0} Coins?`"
-        confirm-text="Purchase"
-        confirm-class="emerald"
-        :item-image="pendingPurchaseAvatar?.path"
-        :item-name="pendingPurchaseAvatar?.id?.split('/').pop() ?? ''"
-        :item-price="pendingPurchaseAvatar?.price"
+        :message="`Purchase ${pendingPurchaseAvatar.path} for ${pendingPurchaseAvatar.price} coins?`"
         @close="showPurchaseConfirm = false"
         @confirm="confirmPurchase"
       />
-
-      <div v-if="gameSession" class="modal-overlay" @click.self="handleGameLobbyClose">
-        <div class="game-lobby-modal">
-          <div class="game-lobby-header">
-            <h2 class="modal-title">Game Lobby</h2>
-            <button class="close-btn" @click="handleGameLobbyClose">X</button>
-          </div>
-
-          <div class="game-id-display">{{ gameSession.id }}</div>
-          <div class="game-status" :class="gameSession.status">{{ gameSession.status }}</div>
-
-          <div class="lobby-players">
-            <div class="lobby-player" :class="{ ready: true }">
-              <img :src="userAvatar" alt="Your Avatar" class="lobby-avatar" />
-              <div class="lobby-player-info">
-                <span class="lobby-player-name">{{ authStore.displayName }}</span>
-                <span class="lobby-player-label">You ({{ gameSession.isHost ? 'Host' : 'Player 1' }})</span>
-              </div>
-            </div>
-
-            <div class="lobby-vs">VS</div>
-
-            <div class="lobby-player" :class="{ ready: opponentConnected }">
-              <img :src="gameSession.opponent?.avatar || '/assets/avatars/free/default.png'" alt="Opponent Avatar" class="lobby-avatar" />
-              <div class="lobby-player-info">
-                <span class="lobby-player-name">{{ gameSession.opponent?.displayName || 'Waiting...' }}</span>
-                <span class="lobby-player-label">
-                  {{ gameSession.opponent?.displayName ? (opponentConnected ? 'Connected' : 'Waiting for you...') : 'Searching...' }}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div v-if="!gameSession.serverUrl" class="no-server-notice">
-            <p>Game server starting...</p>
-            <p class="server-status">{{ k8sAvailable ? 'Connecting to game server...' : 'Kubernetes not available (PoC mode)' }}</p>
-          </div>
-
-          <div class="lobby-actions">
-            <PlayButton
-              v-if="gameSession.isHost"
-              text="End Game"
-              color="rose"
-              :disabled="isEnding"
-              @click="endGame"
-            />
-          </div>
-        </div>
-      </div>
     </div>
   </div>
 </template>
@@ -296,11 +242,7 @@ const nameInputRef = ref<HTMLInputElement | null>(null);
 const isInQueue = ref(false);
 const queueTime = ref(0);
 const playersInQueue = ref(0);
-const gameSession = ref<any>(null);
-const opponentConnected = ref(false);
-const isEnding = ref(false);
 const k8sAvailable = ref(true);
-let socket: Socket | null = null;
 let matchmakingSocket: Socket | null = null;
 let queueTimer: any = null;
 let pollTimer: any = null;
@@ -614,107 +556,15 @@ const fetchGameDetails = async (gameId: string) => {
       credentials: "include",
     });
     const data = await response.json();
-    gameSession.value = data;
     k8sAvailable.value = !!data.serverUrl;
     isInQueue.value = false;
     stopQueueTimer();
-    if (data.serverUrl) {
-      connectToGameServer();
-    }
+    router.push(`/game/${gameId}`);
   } catch (err) {
     console.error("Failed to fetch game details:", err);
     alerts.error("Failed to load game");
   }
 };
-
-const connectToGameServer = () => {
-  if (!gameSession.value?.serverUrl) return;
-  
-  socket = io(gameSession.value.serverUrl, {
-    query: {
-      gameId: gameSession.value.id,
-      userId: authStore.user?.id,
-    },
-  });
-
-  socket.on("connect", () => {
-    console.log("Connected to game server");
-  });
-
-  socket.on("game:joined", (data: any) => {
-    console.log("Joined game:", data);
-    opponentConnected.value = data.players.length >= 2;
-  });
-
-  socket.on("player:joined", (data: any) => {
-    console.log("Player joined:", data);
-    if (data.players.length >= 2) {
-      opponentConnected.value = true;
-    }
-  });
-
-  socket.on("player:left", () => {
-    opponentConnected.value = false;
-  });
-
-  socket.on("game:started", () => {
-    alerts.success("Game started!");
-  });
-
-  socket.on("game:ended", () => {
-    alerts.info("Game ended");
-    closeGameLobby();
-  });
-
-  socket.on("game:destroyed", () => {
-    alerts.warn("Game server was destroyed");
-    closeGameLobby();
-  });
-
-  socket.on("disconnect", () => {
-    console.log("Disconnected from game server");
-  });
-};
-
-const closeGameLobby = () => {
-  socket?.disconnect();
-  socket = null;
-  gameSession.value = null;
-  opponentConnected.value = false;
-};
-
-const handleGameLobbyClose = () => {
-  closeGameLobby();
-};
-
-const endGame = async () => {
-  if (!gameSession.value?.id) return;
-  
-  isEnding.value = true;
-  
-  try {
-    const response = await fetch(`/api/matchmaking/game/${gameSession.value.id}/end`, {
-      method: "POST",
-      credentials: "include",
-    });
-    
-    if (response.ok) {
-      closeGameLobby();
-      alerts.success("Game ended");
-    } else {
-      alerts.error("Failed to end game");
-    }
-  } catch (err) {
-    console.error("Failed to end game:", err);
-    alerts.error("Failed to end game");
-  } finally {
-    isEnding.value = false;
-  }
-};
-
-const opponentAvatar = computed(() => {
-  return gameSession.value?.opponent?.avatar || null;
-});
 </script>
 
 <style scoped>
