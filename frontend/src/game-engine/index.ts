@@ -60,13 +60,8 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     function loadArenaImage(newArena: Arena) {
         arena = newArena;
         arenaImage = new Image();
-        arenaImage.onload = () => {
-            console.log('[DRAW] Arena image loaded:', newArena.name);
-            draw();
-        };
-        arenaImage.onerror = () => {
-            console.error('[DRAW] Failed to load arena image:', `/assets/maps/${newArena.name}.png`);
-        };
+        arenaImage.onload = () => draw();
+        arenaImage.onerror = () => console.error('[DRAW] Failed to load arena image:', `/assets/maps/${newArena.name}.png`);
         arenaImage.src = `/assets/maps/${newArena.name}.png`;
     }
 
@@ -78,33 +73,33 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     }
 
     function loadUnits(newPlayers: Player[]) {
-        console.log('[LOAD] loadUnits called with', newPlayers.length, 'players');
+        const existingUnitIds = new Set(units.value.map(u => String(u.id)));
         
-        const updatedOrAddedIds = new Set<string | number>();
-
         for (const player of newPlayers) {
-            console.log('[LOAD] Player:', player.name, 'has', player.units.length, 'units');
             for (const unit of player.units) {
-                console.log('[LOAD] Unit:', unit.name, 'at', unit.row, unit.col, 'id:', unit.id);
+                const unitId = String(unit.id);
                 
-                unit.owner = player;
-                const newSprite = sprites.find(s => s.name === unit.name);
-                console.log('[LOAD] Sprite found:', !!newSprite, 'name:', newSprite?.name);
-                if (newSprite) {
-                    unit.sprite = { ...newSprite, currentFrame: 0, direction: 1 };
-                    console.log('[LOAD] Unit sprite assigned:', unit.sprite?.name);
+                if (existingUnitIds.has(unitId)) {
+                    const existingUnit = units.value.find(u => String(u.id) === unitId);
+                    if (existingUnit) {
+                        existingUnit.row = unit.row;
+                        existingUnit.col = unit.col;
+                        existingUnit.health = unit.health;
+                        existingUnit.canMove = unit.canMove;
+                        existingUnit.canAct = unit.canAct;
+                        existingUnit.currentStatus = !unit.canMove && !unit.canAct ? 1 : 0;
+                    }
                 } else {
-                    console.log('[LOAD] No sprite found for unit:', unit.name);
+                    unit.owner = player;
+                    const newSprite = sprites.find(s => s.name === unit.name);
+                    if (newSprite) {
+                        unit.sprite = { ...newSprite, currentFrame: 0, direction: 1 };
+                    }
+                    unit.currentStatus = unit.canMove || unit.canAct ? 0 : 1;
+                    units.value.push(unit);
+                    existingUnitIds.add(unitId);
                 }
-                unit.currentStatus = unit.canMove || unit.canAct ? 0 : 1;
-                units.value.push(unit);
-                updatedOrAddedIds.add(String(unit.id));
             }
-        }
-        
-        console.log('[LOAD] Total units after load:', units.value.length);
-        for (const u of units.value) {
-            console.log('[LOAD] Unit in list:', u.name, 'sprite:', u.sprite?.name);
         }
     }
 
@@ -174,17 +169,7 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     }
 
     function draw() {
-        console.log('[DRAW] draw() called, ctx:', !!ctx, 'canvasRef.value:', !!canvasRef.value);
-        
-        if (!ctx && canvasRef.value) {
-            console.log('[DRAW] Initializing ctx from draw()');
-            ctx = canvasRef.value.getContext('2d');
-        }
-        
-        if (!ctx || !canvasRef.value) {
-            console.log('[DRAW] draw() returning early - still no ctx');
-            return;
-        }
+        if (!ctx || !canvasRef.value) return;
         
         ctx.clearRect(0, 0, canvasRef.value.width, canvasRef.value.height);
         drawBackground();
@@ -192,8 +177,7 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
         drawFogOfWarTiles();
         drawEntities();
         drawUI();
-        const tilesCount = drawInteractionSquares();
-        console.log('[DRAW] tiles populated:', tilesCount);
+        drawInteractionSquares();
     }
 
     function drawInteractionSquares(): number {
@@ -248,16 +232,8 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     }
 
     function drawEntities() {
-        if (!ctx || !arena) {
-            console.log('[DRAW] drawEntities missing ctx or arena');
-            return;
-        }
-        console.log('[DRAW] Drawing', units.value.length, 'units');
-        
-        if (units.value.length === 0) {
-            console.log('[DRAW] No units to draw');
-            return;
-        }
+        if (!ctx || !arena) return;
+        if (units.value.length === 0) return;
 
         const entities = [
             ...arena.obstacles.map(o => ({ type: 'obstacle' as const, entity: o })),
@@ -512,7 +488,7 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     }
 
     function drawInteractionSquares() {
-        if (!arenaImage || !arena || !canvasRef.value || !ctx) return;
+        if (!arenaImage || !arena || !canvasRef.value || !ctx) return 0;
         const tileWidth = 32 * SCALE;
         const tileHeight = 16 * SCALE;
         const rows = arena.tiles.length;
@@ -533,6 +509,7 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
                 tiles.push(drawIsometricTile(isoX, isoY, row, col));
             }
         }
+        return tiles.length;
     }
 
     function drawIsometricTile(x: number, y: number, row: number, col: number): Tile {
@@ -736,9 +713,7 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     }
 
     function updateState(state: GameState) {
-        console.log('[UPDATE] updateState called');
         if (!ctx && canvasRef.value) {
-            console.log('[UPDATE] Initializing ctx');
             ctx = canvasRef.value.getContext('2d');
         }
         if (state.arena) {
