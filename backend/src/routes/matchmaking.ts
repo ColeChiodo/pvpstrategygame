@@ -2,12 +2,19 @@ import express from "express";
 import { isAuthenticated } from "../middleware/auth";
 import prisma from "../config/database";
 import { createGameServer, destroyGameServer } from "../services/k8s";
+import { Server as SocketIOServer } from "socket.io";
 
 const router = express.Router();
 
 interface MatchmakingQueue {
   userId: string;
   joinedAt: Date;
+}
+
+let io: SocketIOServer | null = null;
+
+export function setMatchmakingIO(socketIO: SocketIOServer) {
+  io = socketIO;
 }
 
 const matchmakingQueue: MatchmakingQueue[] = [];
@@ -22,11 +29,14 @@ router.post("/join", isAuthenticated, async (req, res) => {
       return res.status(400).json({ error: "Already in queue" });
     }
 
+    console.log(`[MATCHMAKING] User ${userId} joined queue. Queue size: ${matchmakingQueue.length + 1}`);
     matchmakingQueue.push({ userId, joinedAt: new Date() });
 
     if (matchmakingQueue.length >= 2) {
       const player1 = matchmakingQueue.shift()!;
       const player2 = matchmakingQueue.shift()!;
+
+      console.log(`[MATCHMAKING] Match found! Player1: ${player1.userId}, Player2: ${player2.userId}`);
 
       const gameId = `game-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       
@@ -44,8 +54,9 @@ router.post("/join", isAuthenticated, async (req, res) => {
             status: "match_found",
           },
         });
+        console.log(`[MATCHMAKING] Game session created: ${gameId}`);
       } catch (dbError) {
-        console.error("Game session creation failed:", dbError);
+        console.error("[MATCHMAKING] Game session creation failed:", dbError);
         activeGames.delete(gameId);
         return res.status(500).json({ error: "Failed to create game session" });
       }
@@ -60,12 +71,18 @@ router.post("/join", isAuthenticated, async (req, res) => {
         } else {
           const server = await createGameServer(gameId);
           serverUrl = server?.url || null;
+          console.log(`[MATCHMAKING] Game server created: ${serverUrl}`);
         }
       } catch (k8sError) {
-        console.warn("K8s unavailable, running without game server");
+        console.log("[MATCHMAKING] K8s unavailable, running without game server");
       }
 
       if (player2.userId === userId) {
+        console.log(`[MATCHMAKING] Sending match response to player2: ${userId}`);
+        if (io) {
+          io.to(player1.userId).emit("match:found", { gameId, opponent: player2.userId, serverUrl });
+          console.log(`[MATCHMAKING] Socket notification sent to player1: ${player1.userId}`);
+        }
         return res.json({
           success: true,
           gameId,
@@ -75,6 +92,11 @@ router.post("/join", isAuthenticated, async (req, res) => {
         });
       }
 
+      console.log(`[MATCHMAKING] Sending match response to player1: ${userId}`);
+      if (io) {
+        io.to(player2.userId).emit("match:found", { gameId, opponent: player1.userId, serverUrl });
+        console.log(`[MATCHMAKING] Socket notification sent to player2: ${player2.userId}`);
+      }
       return res.json({
         success: true,
         gameId,
@@ -84,9 +106,10 @@ router.post("/join", isAuthenticated, async (req, res) => {
       });
     }
 
+    console.log(`[MATCHMAKING] User ${userId} waiting in queue. Position: ${matchmakingQueue.length}`);
     res.json({ success: true, matched: false, position: matchmakingQueue.length });
   } catch (error) {
-    console.error("Matchmaking error:", error);
+    console.error("[MATCHMAKING] Matchmaking error:", error);
     res.status(500).json({ error: "Matchmaking failed" });
   }
 });

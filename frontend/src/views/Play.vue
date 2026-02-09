@@ -301,6 +301,7 @@ const opponentConnected = ref(false);
 const isEnding = ref(false);
 const k8sAvailable = ref(true);
 let socket: Socket | null = null;
+let matchmakingSocket: Socket | null = null;
 let queueTimer: any = null;
 let pollTimer: any = null;
 
@@ -315,13 +316,23 @@ const handleMouseMove = (e: MouseEvent) => {
 onMounted(async () => {
   window.addEventListener("mousemove", handleMouseMove);
   await fetchLatestVersion();
-});
 
-onUnmounted(() => {
-  window.removeEventListener("mousemove", handleMouseMove);
-  socket?.disconnect();
-  if (queueTimer) clearInterval(queueTimer);
-  if (pollTimer) clearTimeout(pollTimer);
+  matchmakingSocket = io("/", {
+    path: "/socket.io",
+    query: {},
+  });
+
+  matchmakingSocket.on("connect", () => {
+    console.log("[MATCHMAKING] Socket connected");
+    if (authStore.user?.id) {
+      matchmakingSocket?.emit("authenticate", authStore.user.id);
+    }
+  });
+
+  matchmakingSocket.on("match:found", async (data: { gameId: string; opponent: string; serverUrl: string | null }) => {
+    console.log("[MATCHMAKING] Match found via socket:", data);
+    await fetchGameDetails(data.gameId);
+  });
 });
 
 watch(showUserModal, (val) => {
@@ -330,6 +341,12 @@ watch(showUserModal, (val) => {
     newDisplayName.value = "";
   } else {
     newDisplayName.value = authStore.displayName;
+  }
+});
+
+watch(() => authStore.user?.id, (userId) => {
+  if (userId && matchmakingSocket?.connected) {
+    matchmakingSocket.emit("authenticate", userId);
   }
 });
 
