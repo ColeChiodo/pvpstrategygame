@@ -9,7 +9,7 @@
 
       <div v-else-if="gameSession" class="game-container">
         <div class="game-info">
-          <h2 class="game-id">{{ gameSession.id }}</h2>
+          <h2 class="game-id">{{ gameSession.gameId }}</h2>
           <span class="game-status" :class="gameSession.status">{{ gameSession.status }}</span>
         </div>
 
@@ -89,14 +89,17 @@ const isEnding = ref(false);
 const loading = ref(true);
 let socket: Socket | null = null;
 
-const fetchGameDetails = async () => {
+  const fetchGameDetails = async () => {
   try {
     const response = await fetch(`/api/matchmaking/game/${props.gameId}`, {
       credentials: "include",
     });
     const data = await response.json();
+    console.log("[GAME] API response:", data);
     gameSession.value = data;
     loading.value = false;
+
+    console.log("[GAME] gameSession after set:", gameSession.value);
 
     if (data.serverUrl) {
       connectToGameServer();
@@ -115,7 +118,7 @@ const connectToGameServer = () => {
   }
 
   const serverUrl = gameSession.value.serverUrl;
-  const gameId = gameSession.value.id;
+  const gameId = gameSession.value.gameId;
   const userId = authStore.user?.id;
 
   console.log("[GAME] Connecting to game server URL:", serverUrl);
@@ -124,6 +127,7 @@ const connectToGameServer = () => {
 
   if (!gameId || !userId) {
     console.error("[GAME] ERROR: gameId or userId is undefined!");
+    console.error("[GAME] gameId value:", gameId);
     return;
   }
 
