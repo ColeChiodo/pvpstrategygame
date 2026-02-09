@@ -115,7 +115,7 @@ async function main() {
   // Socket.IO setup
   const io = new SocketIOServer(server, {
     cors: {
-      origin: process.env.FRONTEND_URL || "http://localhost:5173",
+      origin: [process.env.FRONTEND_URL || "http://localhost:5173", process.env.GAME_URL || "http://localhost:4000"],
       credentials: true,
     },
   });
