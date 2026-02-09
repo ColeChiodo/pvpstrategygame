@@ -7,6 +7,11 @@
 
       <div v-if="loading" class="loading-state">Loading game...</div>
 
+      <div v-else-if="gameSession && !connectedToGameServer" class="connecting-state">
+        <div class="connecting-spinner"></div>
+        <p>Connecting to game server...</p>
+      </div>
+
       <div v-else-if="gameSession" class="game-container">
         <div class="game-info">
           <h2 class="game-id">{{ gameSession.gameId }}</h2>
@@ -15,7 +20,7 @@
 
         <div class="players-container">
           <div class="player-card host">
-            <div class="player-avatar-placeholder"></div>
+            <img :src="authStore.user?.avatar || '/default-avatar.png'" class="player-avatar" />
             <div class="player-info">
               <span class="player-name">{{ authStore.displayName }}</span>
               <span class="player-label">You ({{ gameSession.isHost ? 'Host' : 'Player 1' }})</span>
@@ -26,7 +31,7 @@
           <div class="vs-badge">VS</div>
 
           <div class="player-card opponent">
-            <div class="player-avatar-placeholder"></div>
+            <img :src="gameSession.opponent?.avatar || '/default-avatar.png'" class="player-avatar" />
             <div class="player-info">
               <span class="player-name">{{ gameSession.opponent?.displayName || 'Connecting...' }}</span>
               <span class="player-label">{{ opponentConnected ? 'Connected' : 'Waiting...' }}</span>
@@ -87,10 +92,13 @@ const gameSession = ref<any>(null);
 const opponentConnected = ref(false);
 const isEnding = ref(false);
 const loading = ref(true);
+const connectedToGameServer = ref(false);
 let socket: Socket | null = null;
 
   const fetchGameDetails = async () => {
   console.log("[GAME] fetchGameDetails called for gameId:", props.gameId);
+  connectedToGameServer.value = false;
+  opponentConnected.value = false;
   try {
     const url = `${import.meta.env.VITE_API_URL}/api/matchmaking/game/${props.gameId}`;
     console.log("[GAME] Fetching from:", url);
@@ -148,6 +156,7 @@ const connectToGameServer = () => {
 
   socket.on("connect", () => {
     console.log("Connected to game server");
+    connectedToGameServer.value = true;
   });
 
   socket.on("game:joined", (data: any) => {
@@ -172,7 +181,16 @@ const connectToGameServer = () => {
 
   socket.on("game:ended", () => {
     alerts.info("Game ended");
+    socket?.disconnect();
     router.push("/play");
+  });
+
+  socket.on("disconnect", (reason) => {
+    console.log("[GAME] Disconnected from game server:", reason);
+    if (gameSession.value && !isEnding.value) {
+      alerts.info("Game ended");
+      router.push("/play");
+    }
   });
 };
 
@@ -262,8 +280,26 @@ onUnmounted(() => {
 }
 
 .loading-state,
-.error-state {
+.error-state,
+.connecting-state {
   color: white;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.connecting-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  border-top-color: #22d3ee;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 .game-info {
@@ -311,10 +347,11 @@ onUnmounted(() => {
   width: 180px;
 }
 
-.player-avatar-placeholder {
+.player-avatar {
   width: 80px;
   height: 80px;
   border-radius: 50%;
+  object-fit: cover;
   background-color: #333;
 }
 
