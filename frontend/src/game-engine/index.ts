@@ -55,48 +55,6 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
 
         uiImage = new Image();
         uiImage.src = '/assets/spritesheets/UI.png';
-
-        socket.on('gameState', (gameState: GameState) => {
-            console.log('[GAME] Received gameState');
-            loadArenaImage(gameState.arena);
-            loadPlayers(gameState.players);
-            loadUnits(gameState.players);
-            visibleTiles.value = gameState.visibleTiles;
-            currentRound = gameState.round;
-            player1Time = gameState.player1Time;
-            player2Time = gameState.player2Time;
-        });
-
-        socket.on('nextRound', (data: { socket: string }) => {
-            const myTurn = data.socket === socket?.id;
-            isMyTurn.value = myTurn;
-            isAction = false;
-            moveTile.value = null;
-            selectedTile.value = null;
-        });
-
-        socket.on('gameOver', (data: { socket: string }) => {
-            gameOver = true;
-        });
-
-        socket.on('player-unit-moving', (data: { unit: Unit; origin: { row: number; col: number }; target: { row: number; col: number } }) => {
-            const realUnit = units.value.find(u => u.row === data.unit.row && u.col === data.unit.col);
-            if (!realUnit) return;
-            isAction = true;
-            animateMove(data.unit, data.origin, data.target);
-        });
-
-        socket.on('player-unit-acting', (data: { unit: Unit }) => {
-            const realUnit = units.value.find(u => u.row === data.unit.row && u.col === data.unit.col);
-            if (!realUnit) return;
-            isAction = false;
-            animateAction(data.unit);
-        });
-
-        socket.on('force-unit-end-turn', () => {
-            isAction = false;
-            moveTile.value = null;
-        });
     }
 
     function loadArenaImage(newArena: Arena) {
@@ -733,8 +691,6 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
             visibleTiles.value = state.visibleTiles;
         }
         currentRound = state.round || 0;
-        player1Time.value = state.player1Time || 0;
-        player2Time.value = state.player2Time || 0;
         draw();
     }
 
