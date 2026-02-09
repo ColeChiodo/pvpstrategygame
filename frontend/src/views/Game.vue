@@ -1,121 +1,122 @@
 <template>
   <div class="game-page">
-    <div class="game-content">
-      <div class="game-header">
-        <RouterLink to="/play" class="back-link">← Back to Play</RouterLink>
-      </div>
+    <div v-if="loading" class="loading-state">
+      <div class="loading-spinner"></div>
+      <p>Loading game...</p>
+    </div>
 
-      <div v-if="loading" class="loading-state">Loading game...</div>
+    <div v-else-if="gameSession && !connectedToGameServer" class="connecting-state">
+      <div class="connecting-spinner"></div>
+      <p>Connecting to game server...</p>
+    </div>
 
-      <div v-else-if="gameSession && !connectedToGameServer" class="connecting-state">
-        <div class="connecting-spinner"></div>
-        <p>Connecting to game server...</p>
-      </div>
-
-      <div v-else-if="gameSession" class="game-container">
-        <div class="game-info">
-          <h2 class="game-id">{{ gameSession.gameId }}</h2>
-          <span class="game-status" :class="gameSession.status">{{ gameSession.status }}</span>
-        </div>
-
-        <div class="players-container">
-          <div class="player-card host">
-            <img :src="authStore.user?.avatar || '/default-avatar.png'" class="player-avatar" />
-            <div class="player-info">
-              <span class="player-name">{{ authStore.displayName }}</span>
-              <span class="player-label">You ({{ gameSession.isHost ? 'Host' : 'Player 1' }})</span>
-            </div>
-            <div class="player-status ready">Ready</div>
+    <div v-else-if="gameSession && showLobby" class="lobby-overlay" :class="{ 'lobby-exit': lobbyExiting }">
+      <div class="lobby-content">
+        <div class="lobby-players">
+          <div class="lobby-player">
+            <img :src="authStore.user?.avatar || '/default-avatar.png'" class="lobby-avatar" />
+            <span class="lobby-name">{{ authStore.displayName }}</span>
+            <span class="lobby-label">YOU</span>
           </div>
-
-          <div class="vs-badge">VS</div>
-
-          <div class="player-card opponent">
-            <img :src="gameSession.opponent?.avatar || '/default-avatar.png'" class="player-avatar" />
-            <div class="player-info">
-              <span class="player-name">{{ gameSession.opponent?.displayName || 'Connecting...' }}</span>
-              <span class="player-label">{{ opponentConnected ? 'Connected' : 'Waiting...' }}</span>
-            </div>
-            <div class="player-status" :class="{ ready: opponentConnected }">
-              {{ opponentConnected ? 'Ready' : 'Connecting...' }}
-            </div>
+          <div class="vs-badge-large">VS</div>
+          <div class="lobby-player">
+            <img :src="gameSession.opponent?.avatar || '/default-avatar.png'" class="lobby-avatar" />
+            <span class="lobby-name">{{ gameSession.opponent?.displayName || 'Opponent' }}</span>
+            <span class="lobby-label">OPPONENT</span>
           </div>
         </div>
+        <p class="lobby-subtitle">Game starting soon...</p>
+      </div>
+    </div>
 
-        <div v-if="!gameSession.serverUrl" class="server-notice">
-          Game server is starting up...
+    <div v-else-if="gameSession" class="game-layout">
+      <canvas ref="gameCanvas" class="game-canvas"></canvas>
+
+      <div class="game-hud">
+        <div class="back-link-container">
+          <RouterLink to="/play" class="back-link">← Back to Play</RouterLink>
         </div>
 
-        <div class="game-actions">
-          <PlayButton
-            v-if="gameSession.isHost"
-            text="End Game"
-            color="rose"
-            :disabled="isEnding"
-            @click="endGame"
-          />
-          <PlayButton
-            v-else
-            text="Waiting for host..."
-            color="gray"
-            disabled
-          />
+        <div class="game-info-bar">
+          <div class="player-timer" :class="{ 'active-turn': isMyTurn }">
+            <img :src="authStore.user?.avatar || '/default-avatar.png'" class="timer-avatar" />
+            <span class="timer-name">{{ authStore.displayName }}</span>
+            <span class="timer-value">{{ formatTime(player1Time) }}</span>
+          </div>
+
+          <div class="turn-indicator" :class="{ 'my-turn': isMyTurn }">
+            {{ isMyTurn ? 'YOUR TURN' : 'ENEMY TURN' }}
+          </div>
+
+          <div class="player-timer opponent" :class="{ 'active-turn': !isMyTurn }">
+            <img :src="gameSession.opponent?.avatar || '/default-avatar.png'" class="timer-avatar" />
+            <span class="timer-name">{{ gameSession.opponent?.displayName || 'Opponent' }}</span>
+            <span class="timer-value">{{ formatTime(player2Time) }}</span>
+          </div>
         </div>
       </div>
+    </div>
 
-      <div v-else class="error-state">
-        <p>Game not found</p>
-        <RouterLink to="/play">Return to Play</RouterLink>
-      </div>
+    <div v-else class="error-state">
+      <p>Game not found</p>
+      <RouterLink to="/play">Return to Play</RouterLink>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from "vue";
+import { ref, onMounted, onUnmounted, watch } from "vue";
 import { useRouter } from "vue-router";
-import { useRoute, RouterLink } from "vue-router";
+import { RouterLink } from "vue-router";
 import { useAuthStore } from "../stores/auth";
 import { alerts } from "../composables/useAlerts";
 import { io, Socket } from "socket.io-client";
-import PlayButton from "../components/PlayButton.vue";
+import { useGameEngine } from "../game-engine";
 
 const props = defineProps<{
   gameId: string;
 }>();
 
 const router = useRouter();
-const route = useRoute();
 const authStore = useAuthStore();
+const gameCanvas = ref<HTMLCanvasElement | null>(null);
 
 const gameSession = ref<any>(null);
-const opponentConnected = ref(false);
 const isEnding = ref(false);
 const loading = ref(true);
 const connectedToGameServer = ref(false);
+const showLobby = ref(true);
+const lobbyExiting = ref(false);
+const isMyTurn = ref(false);
+const player1Time = ref(0);
+const player2Time = ref(0);
+
 let socket: Socket | null = null;
 
-  const fetchGameDetails = async () => {
+const { initSocket, start, stop } = useGameEngine(gameCanvas);
+
+const formatTime = (seconds: number): string => {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+};
+
+const fetchGameDetails = async () => {
   console.log("[GAME] fetchGameDetails called for gameId:", props.gameId);
   connectedToGameServer.value = false;
-  opponentConnected.value = false;
+  showLobby.value = true;
+  lobbyExiting.value = false;
   try {
     const url = `${import.meta.env.VITE_API_URL}/api/matchmaking/game/${props.gameId}`;
     console.log("[GAME] Fetching from:", url);
-    
-    const response = await fetch(url, {
-      credentials: "include",
-    });
-    
+
+    const response = await fetch(url, { credentials: "include" });
     console.log("[GAME] Response status:", response.status);
     const data = await response.json();
     console.log("[GAME] API response:", JSON.stringify(data, null, 2));
-    
+
     gameSession.value = data;
     loading.value = false;
-
-    console.log("[GAME] gameSession.value after set:", gameSession.value);
-    console.log("[GAME] opponent displayName:", gameSession.value?.opponent?.displayName);
 
     if (data.serverUrl) {
       connectToGameServer();
@@ -143,40 +144,43 @@ const connectToGameServer = () => {
 
   if (!gameId || !userId) {
     console.error("[GAME] ERROR: gameId or userId is undefined!");
-    console.error("[GAME] gameId value:", gameId);
     return;
   }
 
   socket = io(import.meta.env.VITE_GAME_URL, {
     path: `/game/${gameId}/socket.io`,
-    query: {
-      userId,
-    },
+    query: { userId },
   });
 
   socket.on("connect", () => {
     console.log("Connected to game server");
     connectedToGameServer.value = true;
+
+    setTimeout(() => {
+      lobbyExiting.value = true;
+      setTimeout(() => {
+        showLobby.value = false;
+        if (gameCanvas.value) {
+          start();
+        }
+      }, 1500);
+    }, 3000);
   });
 
   socket.on("game:joined", (data: any) => {
     console.log("Joined game:", data);
-    opponentConnected.value = data.players.length >= 2;
   });
 
   socket.on("player:joined", (data: any) => {
     console.log("Player joined:", data);
-    if (data.players.length >= 2) {
-      opponentConnected.value = true;
-    }
-  });
-
-  socket.on("player:left", () => {
-    opponentConnected.value = false;
   });
 
   socket.on("game:started", () => {
     alerts.success("Game started!");
+  });
+
+  socket.on("nextRound", (data: { socket: string }) => {
+    isMyTurn.value = data.socket === socket?.id;
   });
 
   socket.on("game:ended", () => {
@@ -188,10 +192,13 @@ const connectToGameServer = () => {
   socket.on("disconnect", (reason) => {
     console.log("[GAME] Disconnected from game server:", reason);
     if (gameSession.value && !isEnding.value) {
+      stop();
       alerts.info("Game ended");
       router.push("/play");
     }
   });
+
+  initSocket(socket, gameSession.value);
 };
 
 const endGame = async () => {
@@ -201,9 +208,6 @@ const endGame = async () => {
   }
 
   console.log("[END-GAME] Starting end game for:", gameSession.value.gameId);
-  console.log("[END-GAME] isHost:", gameSession.value.isHost);
-  console.log("[END-GAME] API URL:", `${import.meta.env.VITE_API_URL}/api/matchmaking/game/${gameSession.value.gameId}/end`);
-
   isEnding.value = true;
 
   try {
@@ -217,6 +221,7 @@ const endGame = async () => {
     console.log("[END-GAME] Response:", result);
 
     if (response.ok) {
+      stop();
       socket?.disconnect();
       router.push("/play");
       alerts.success("Game ended");
@@ -231,12 +236,21 @@ const endGame = async () => {
   }
 };
 
+watch(isMyTurn, (val) => {
+  console.log("[GAME] isMyTurn changed:", val);
+});
+
+watch([() => player1Time.value, () => player2Time.value], () => {
+  console.log("[GAME] Timer update:", player1Time.value, player2Time.value);
+});
+
 onMounted(() => {
   fetchGameDetails();
 });
 
 onUnmounted(() => {
   socket?.disconnect();
+  stop();
 });
 </script>
 
@@ -244,51 +258,22 @@ onUnmounted(() => {
 .game-page {
   min-height: 100vh;
   background-color: #0f0f2b;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.game-content {
-  text-align: center;
-  padding: 2rem;
-}
-
-.game-header {
-  position: absolute;
-  top: 2rem;
-  left: 2rem;
-}
-
-.back-link {
-  color: white;
-  text-decoration: none;
-  font-size: 1rem;
-  opacity: 0.8;
-}
-
-.back-link:hover {
-  opacity: 1;
-}
-
-.game-container {
-  background-color: #1a1a3e;
-  padding: 2rem;
-  border-radius: 1rem;
-  max-width: 600px;
-  width: 100%;
+  position: relative;
+  overflow: hidden;
 }
 
 .loading-state,
-.error-state,
-.connecting-state {
+.error-state {
   color: white;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 1rem;
+  min-height: 100vh;
 }
 
+.loading-spinner,
 .connecting-spinner {
   width: 40px;
   height: 40px;
@@ -302,101 +287,206 @@ onUnmounted(() => {
   to { transform: rotate(360deg); }
 }
 
-.game-info {
-  margin-bottom: 2rem;
-}
-
-.game-id {
-  font-size: 1rem;
-  color: #888;
-  margin-bottom: 0.5rem;
-}
-
-.game-status {
-  padding: 0.25rem 1rem;
-  border-radius: 1rem;
-  font-size: 0.875rem;
-  font-weight: bold;
-  text-transform: uppercase;
-}
-
-.game-status.match_found {
-  color: #4ade80;
-}
-
-.game-status.in_progress {
-  color: #facc15;
-}
-
-.players-container {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 2rem;
-  margin-bottom: 2rem;
-}
-
-.player-card {
+.connecting-state {
+  color: white;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.75rem;
-  padding: 1rem;
-  background-color: #0f0f2b;
-  border-radius: 0.5rem;
-  width: 180px;
+  justify-content: center;
+  gap: 1rem;
+  min-height: 100vh;
 }
 
-.player-avatar {
-  width: 80px;
-  height: 80px;
+.lobby-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: #0f0f2b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  transition: opacity 1.5s ease, transform 1.5s ease;
+}
+
+.lobby-overlay.lobby-exit {
+  opacity: 0;
+  transform: scale(1.1);
+}
+
+.lobby-content {
+  text-align: center;
+  animation: fadeIn 0.5s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.lobby-players {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4rem;
+  margin-bottom: 2rem;
+}
+
+.lobby-player {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.lobby-avatar {
+  width: 120px;
+  height: 120px;
   border-radius: 50%;
   object-fit: cover;
-  background-color: #333;
+  border: 4px solid #22d3ee;
+  box-shadow: 0 0 30px rgba(34, 211, 238, 0.3);
 }
 
-.player-info {
-  display: flex;
-  flex-direction: column;
-}
-
-.player-name {
+.lobby-name {
   color: white;
-  font-weight: bold;
-}
-
-.player-label {
-  color: #888;
-  font-size: 0.75rem;
-}
-
-.player-status {
-  font-size: 0.875rem;
-  color: #facc15;
-}
-
-.player-status.ready {
-  color: #4ade80;
-}
-
-.vs-badge {
   font-size: 1.5rem;
   font-weight: bold;
-  color: #0f0f2b;
-  background-color: white;
-  padding: 0.5rem 1rem;
-  border-radius: 0.5rem;
 }
 
-.server-notice {
+.lobby-label {
+  color: #22d3ee;
+  font-size: 0.875rem;
+  letter-spacing: 0.2em;
+}
+
+.vs-badge-large {
+  font-size: 3rem;
+  font-weight: bold;
   color: #facc15;
-  margin-bottom: 1.5rem;
+  text-shadow: 0 0 20px rgba(250, 204, 21, 0.5);
+}
+
+.lobby-subtitle {
+  color: #888;
+  font-size: 1rem;
+}
+
+.game-layout {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+}
+
+.game-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.game-hud {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+}
+
+.back-link-container {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  z-index: 10;
+}
+
+.back-link {
+  color: white;
+  text-decoration: none;
+  font-size: 1rem;
+  opacity: 0.8;
+  padding: 0.5rem 1rem;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 0.5rem;
+  transition: opacity 0.2s;
+}
+
+.back-link:hover {
+  opacity: 1;
+}
+
+.game-info-bar {
+  position: absolute;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  padding: 0.75rem 1.5rem;
+  background: rgba(26, 26, 62, 0.9);
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.player-timer {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  transition: all 0.3s;
+}
+
+.player-timer.active-turn {
+  background: rgba(34, 211, 238, 0.2);
+  border: 1px solid #22d3ee;
+}
+
+.timer-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.timer-name {
+  color: white;
+  font-weight: bold;
   font-size: 0.875rem;
 }
 
-.game-actions {
-  display: flex;
-  justify-content: center;
+.timer-value {
+  font-family: monospace;
+  font-size: 1.25rem;
+  color: #facc15;
+}
+
+.player-timer.opponent .timer-name,
+.player-timer.opponent .timer-value {
+  color: #f97316;
+}
+
+.player-timer.opponent.active-turn {
+  background: rgba(249, 115, 22, 0.2);
+  border-color: #f97316;
+}
+
+.player-timer.opponent.active-turn .timer-value {
+  color: #f97316;
+}
+
+.turn-indicator {
+  padding: 0.5rem 1.5rem;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 0.5rem;
+  color: #888;
+  font-weight: bold;
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+}
+
+.turn-indicator.my-turn {
+  background: rgba(34, 211, 238, 0.3);
+  color: #22d3ee;
 }
 
 .error-state a {

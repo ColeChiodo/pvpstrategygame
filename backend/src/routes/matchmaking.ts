@@ -181,7 +181,8 @@ router.get("/status", isAuthenticated, async (req, res) => {
 });
 
 router.get("/game/:gameId", isAuthenticated, async (req, res) => {
-  console.log(`[GAME-DETAILS] Fetching game ${req.params.gameId} for user ${req.user?.id}`);
+  const userId = (req.user as any).id;
+  console.log(`[GAME-DETAILS] Fetching game ${req.params.gameId} for user ${userId}`);
   try {
     const { gameId } = req.params;
     const userId = (req.user as any).id;
@@ -226,7 +227,8 @@ router.get("/game/:gameId", isAuthenticated, async (req, res) => {
 });
 
 router.post("/game/:gameId/end", isAuthenticated, async (req, res) => {
-  console.log(`[END-GAME] Request received from user ${req.user?.id} for game ${req.params.gameId}`);
+  const userId = (req.user as any).id;
+  console.log(`[END-GAME] Request received from user ${userId} for game ${req.params.gameId}`);
   try {
     const { gameId } = req.params;
     const userId = (req.user as any).id;
