@@ -265,10 +265,19 @@ onMounted(async () => {
   });
 
   matchmakingSocket.on("connect", () => {
-    console.log("[MATCHMAKING] Socket connected");
+    console.log("[MATCHMAKING] Socket connected:", matchmakingSocket?.id);
     if (authStore.user?.id) {
+      console.log("[MATCHMAKING] Authenticating as user:", authStore.user.id);
       matchmakingSocket?.emit("authenticate", authStore.user.id);
     }
+  });
+
+  matchmakingSocket.on("disconnect", () => {
+    console.log("[MATCHMAKING] Socket disconnected");
+  });
+
+  matchmakingSocket.on("connect_error", (err: Error) => {
+    console.log("[MATCHMAKING] Socket connection error:", err.message);
   });
 
   matchmakingSocket.on("match:found", async (data: { gameId: string; opponent: string; serverUrl: string | null }) => {

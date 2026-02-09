@@ -79,9 +79,12 @@ router.post("/join", isAuthenticated, async (req, res) => {
 
       if (player2.userId === userId) {
         console.log(`[MATCHMAKING] Sending match response to player2: ${userId}`);
+        console.log(`[MATCHMAKING] Player1 room exists: ${io?.nsps["/"]?.adapter?.rooms?.get(player1.userId)}`);
         if (io) {
           io.to(player1.userId).emit("match:found", { gameId, opponent: player2.userId, serverUrl });
           console.log(`[MATCHMAKING] Socket notification sent to player1: ${player1.userId}`);
+        } else {
+          console.log(`[MATCHMAKING] ERROR: io is null!`);
         }
         return res.json({
           success: true,
@@ -93,9 +96,12 @@ router.post("/join", isAuthenticated, async (req, res) => {
       }
 
       console.log(`[MATCHMAKING] Sending match response to player1: ${userId}`);
+      console.log(`[MATCHMAKING] Player2 room exists: ${io?.nsps["/"]?.adapter?.rooms?.get(player2.userId)}`);
       if (io) {
         io.to(player2.userId).emit("match:found", { gameId, opponent: player1.userId, serverUrl });
         console.log(`[MATCHMAKING] Socket notification sent to player2: ${player2.userId}`);
+      } else {
+        console.log(`[MATCHMAKING] ERROR: io is null!`);
       }
       return res.json({
         success: true,
