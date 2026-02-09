@@ -255,14 +255,13 @@
           </div>
 
           <div class="lobby-actions">
-            <button 
-              v-if="gameSession.isHost" 
-              class="end-game-btn" 
-              @click="endGame"
+            <PlayButton
+              v-if="gameSession.isHost"
+              text="End Game"
+              color="rose"
               :disabled="isEnding"
-            >
-              {{ isEnding ? 'Ending...' : 'End Game' }}
-            </button>
+              @click="endGame"
+            />
           </div>
         </div>
       </div>
@@ -1507,28 +1506,5 @@ const opponentAvatar = computed(() => {
 .lobby-actions {
   display: flex;
   gap: 1rem;
-}
-
-.end-game-btn {
-  flex: 1;
-  padding: 0.75rem;
-  background-color: var(--color-rose-600);
-  color: white;
-  border: none;
-  border-bottom: 4px solid var(--color-rose-800);
-  border-right: 4px solid var(--color-rose-800);
-  border-radius: 0.5rem;
-  cursor: pointer;
-  font-weight: bold;
-  transition: all 0.2s;
-}
-
-.end-game-btn:hover:not(:disabled) {
-  filter: brightness(1.1);
-}
-
-.end-game-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 </style>

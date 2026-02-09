@@ -125,6 +125,7 @@ export async function createGameServer(gameId: string): Promise<{ url: string; p
       namespace: GAME_SERVER_NAMESPACE,
       body: deployment,
     });
+    console.log(`Kubernetes pod created: ${deploymentName}`);
 
     await k8sApi.createNamespacedService({
       namespace: GAME_SERVER_NAMESPACE,
