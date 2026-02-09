@@ -38,7 +38,7 @@ const GAME_SERVER_NAMESPACE = "game-servers";
 const GAME_SERVER_IMAGE = "colechiodo/fortezza-game-server:latest";
 const GAME_SERVER_REPLICAS = 1;
 const GAME_SERVER_PORT = 3000;
-const GAME_SERVER_HOSTNAME = process.env.GAME_SERVER_HOSTNAME || "fortezza.colechiodo.cc";
+const GAME_SERVER_HOSTNAME = process.env.GAME_SERVER_HOSTNAME || "gamefortezza.colechiodo.cc";
 
 async function createStripPrefixMiddleware(gameId: string): Promise<boolean> {
   const middlewareName = `strip-game-prefix-${gameId}`;
