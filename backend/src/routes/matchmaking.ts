@@ -65,6 +65,16 @@ router.post("/join", isAuthenticated, async (req, res) => {
         console.warn("K8s unavailable, running without game server");
       }
 
+      if (player2.userId === userId) {
+        return res.json({
+          success: true,
+          gameId,
+          matched: true,
+          opponent: player1.userId,
+          serverUrl,
+        });
+      }
+
       return res.json({
         success: true,
         gameId,

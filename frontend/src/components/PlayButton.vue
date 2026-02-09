@@ -7,7 +7,7 @@
     <img v-if="icon" :src="icon" alt="" class="button-icon" />
     {{ text }}
   </RouterLink>
-  <button v-else :class="colorClass" class="play-button">
+  <button v-else type="button" :class="colorClass" class="play-button" @click="$emit('click')">
     <img v-if="icon" :src="icon" alt="" class="button-icon" />
     {{ text }}
   </button>
@@ -23,6 +23,10 @@ const props = defineProps<{
   to?: string;
   icon?: string;
   color?: "emerald" | "cyan" | "amber" | "rose" | "gray" | "google" | "discord";
+}>();
+
+defineEmits<{
+  click: [];
 }>();
 
 const colorClass = computed(() => `play-button-${props.color || "emerald"}`);
