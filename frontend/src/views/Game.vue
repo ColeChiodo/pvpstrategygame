@@ -177,19 +177,19 @@ const connectToGameServer = () => {
 };
 
 const endGame = async () => {
-  if (!gameSession.value?.id) {
-    console.log("[END-GAME] No gameSession.id, aborting");
+  if (!gameSession.value?.gameId) {
+    console.log("[END-GAME] No gameSession.gameId, aborting");
     return;
   }
 
-  console.log("[END-GAME] Starting end game for:", gameSession.value.id);
+  console.log("[END-GAME] Starting end game for:", gameSession.value.gameId);
   console.log("[END-GAME] isHost:", gameSession.value.isHost);
-  console.log("[END-GAME] API URL:", `${import.meta.env.VITE_API_URL}/api/matchmaking/game/${gameSession.value.id}/end`);
+  console.log("[END-GAME] API URL:", `${import.meta.env.VITE_API_URL}/api/matchmaking/game/${gameSession.value.gameId}/end`);
 
   isEnding.value = true;
 
   try {
-    const response = await fetch(`${import.meta.env.VITE_API_URL}/api/matchmaking/game/${gameSession.value.id}/end`, {
+    const response = await fetch(`${import.meta.env.VITE_API_URL}/api/matchmaking/game/${gameSession.value.gameId}/end`, {
       method: "POST",
       credentials: "include",
     });
