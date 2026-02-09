@@ -144,8 +144,38 @@ function handleJoin(socket: Socket, sessionId: string, userId: string, name: str
     const existingPlayer = gameState.players.find(p => p.id === userId);
     if (existingPlayer) {
         existingPlayer.socketId = socket.id;
-        socket.emit("joined", { playerIndex: gameState.players.indexOf(existingPlayer) });
-        console.log(`[${gameId}] Re-joined existing player`);
+        const playerIndex = gameState.players.indexOf(existingPlayer);
+        
+        // Re-assign units if missing (for reconnects)
+        if (existingPlayer.units.length === 0) {
+            console.log(`[${gameId}] Re-assigning units to rejoined player ${name}`);
+            const isPlayer1 = playerIndex === 0;
+            const startRow = isPlayer1 ? gameState.arena.p1Start.row : gameState.arena.p2Start.row;
+            const startCol = isPlayer1 ? gameState.arena.p2Start.col : gameState.arena.p2Start.col;
+            
+            existingPlayer.units.push(
+                { id: Date.now() + 1, row: startRow, col: startCol, name: "king", action: "attack", canMove: true, canAct: true, health: 40, maxHealth: 40, attack: 30, defense: 10, range: 2, mobility: 3 },
+                { id: Date.now() + 2, row: startRow + 2, col: startCol, name: "melee", action: "attack", canMove: true, canAct: true, health: 30, maxHealth: 30, attack: 30, defense: 10, range: 1, mobility: 2 },
+                { id: Date.now() + 3, row: startRow, col: startCol + 2, name: "ranged", action: "attack", canMove: true, canAct: true, health: 20, maxHealth: 20, attack: 20, defense: 0, range: 3, mobility: 3 },
+                { id: Date.now() + 4, row: startRow + 1, col: startCol, name: "mage", action: "attack", canMove: true, canAct: true, health: 20, maxHealth: 20, attack: 40, defense: 0, range: 2, mobility: 2 },
+                { id: Date.now() + 5, row: startRow, col: startCol + 1, name: "healer", action: "heal", canMove: true, canAct: true, health: 10, maxHealth: 10, attack: 30, defense: 0, range: 2, mobility: 4 },
+                { id: Date.now() + 6, row: startRow + 2, col: startCol + 1, name: "cavalry", action: "attack", canMove: true, canAct: true, health: 20, maxHealth: 20, attack: 20, defense: 10, range: 1, mobility: 4 },
+                { id: Date.now() + 7, row: startRow + 2, col: startCol + 2, name: "scout", action: "attack", canMove: true, canAct: true, health: 20, maxHealth: 20, attack: 10, defense: 10, range: 1, mobility: 5 },
+                { id: Date.now() + 8, row: startRow + 1, col: startCol + 2, name: "tank", action: "attack", canMove: true, canAct: true, health: 40, maxHealth: 40, attack: 10, defense: 20, range: 1, mobility: 2 }
+            );
+        }
+        
+        socket.emit("joined", { playerIndex });
+        console.log(`[${gameId}] Re-joined existing player ${name} as player ${playerIndex + 1} with ${existingPlayer.units.length} units`);
+        
+        // If game already started (has 2 players), send start event
+        if (gameState.players.length === 2) {
+            console.log(`[${gameId}] Sending start event to rejoined player`);
+            socket.emit("start", { round: gameState.round });
+        }
+        
+        // Send current state immediately
+        broadcastState();
         return;
     }
 
@@ -397,7 +427,28 @@ function initializeGame(id: string): GameState {
                 [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
                 [1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1]
             ],
-            heightMap: [],
+            heightMap: [
+                [1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1],
+                [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+                [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2,1,1],
+                [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+                [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+                [0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0],
+                [0,1,1,1,1,1,1,1,0,0,0,0,1,1,1,1,1,1,1,0],
+                [0,1,1,1,1,1,1,0,0,0,0,0,0,1,1,1,1,1,1,0],
+                [0,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0],
+                [0,0,0,1,1,1,0,0,0,0,0,0,0,0,1,1,1,0,0,0],
+                [0,0,0,1,1,1,0,0,0,0,0,0,0,0,1,1,1,0,0,0],
+                [0,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0],
+                [0,1,1,1,1,1,1,0,0,0,0,0,0,1,1,1,1,1,1,0],
+                [0,1,1,1,1,1,1,1,0,0,0,0,1,1,1,1,1,1,1,0],
+                [0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0],
+                [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+                [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+                [1,1,2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+                [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+                [1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1]
+            ],
             obstacles: [],
             p1Start: { row: 0, col: 0 },
             p2Start: { row: 19, col: 19 },
