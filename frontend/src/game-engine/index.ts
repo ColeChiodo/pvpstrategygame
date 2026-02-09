@@ -62,7 +62,7 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
 
     function loadArenaImage(newArena: Arena) {
         // Only load if arena changed
-        if (arena?.name === newArena.name) {
+        if (arena?.name === newArena.name && arenaImage?.complete) {
             return;
         }
         console.log('[LOAD] loadArenaImage called for:', newArena.name);
@@ -189,8 +189,18 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
         realUnit.sprite.currentFrame = 0;
     }
 
+    let frameCount = 0;
+    
     function draw() {
-        if (!ctx || !canvasRef.value) return;
+        frameCount++;
+        if (frameCount % 60 === 0) {
+            console.log('[DRAW] frame', frameCount, 'ctx:', !!ctx, 'canvas:', !!canvasRef.value, 'arenaImage:', !!arenaImage, 'units:', units.value.length);
+        }
+        
+        if (!ctx || !canvasRef.value) {
+            console.log('[DRAW] Missing ctx or canvas');
+            return;
+        }
         
         ctx.imageSmoothingEnabled = false;
         ctx.clearRect(0, 0, canvasRef.value.width, canvasRef.value.height);
@@ -207,12 +217,21 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     }
 
     function drawArena() {
-        if (!ctx || !arenaImage || !arena || !canvasRef.value) return;
+        if (!ctx || !arenaImage || !arena || !canvasRef.value) {
+            console.log('[DRAW] drawArena early return - ctx:', !!ctx, 'arenaImage:', !!arenaImage, 'arena:', !!arena, 'canvas:', !!canvasRef.value);
+            return;
+        }
+        
+        if (!arenaImage.complete) {
+            console.log('[DRAW] Arena image not loaded yet');
+            return;
+        }
         
         ctx.imageSmoothingEnabled = false;
         const drawX = (canvasRef.value.width - arena.width * SCALE) / 2 + cameraOffsetX;
         const drawY = (canvasRef.value.height - arena.height * SCALE - 16 * SCALE) / 2 + cameraOffsetY;
         
+        console.log('[DRAW] Drawing arena at:', drawX, drawY, 'size:', arena.width * SCALE, 'x', arena.height * SCALE);
         ctx.drawImage(arenaImage, drawX, drawY, arena.width * SCALE, arena.height * SCALE);
     }
 
@@ -541,7 +560,12 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     }
 
     function endTurn() {
-        if (!socket) return;
+        console.log('[TURN] endTurn() called, socket:', !!socket);
+        if (!socket) {
+            console.log('[TURN] No socket, cannot end turn');
+            return;
+        }
+        console.log('[TURN] Emitting endTurn event');
         socket.emit('endTurn');
         selectedTile.value = null;
         isAction = false;
@@ -549,15 +573,26 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     }
 
     function handleClick(event: MouseEvent) {
-        if (event.button !== 0) return;
-        if (!isMyTurn.value) return;
-        if (players.value.length !== 2) return;
+        console.log('[EVENT] Click at:', event.offsetX, event.offsetY, 'button:', event.button, 'isMyTurn:', isMyTurn.value);
+        if (event.button !== 0) {
+            console.log('[EVENT] Ignoring non-left click');
+            return;
+        }
+        if (!isMyTurn.value) {
+            console.log('[EVENT] Not my turn, ignoring click');
+            return;
+        }
+        if (players.value.length !== 2) {
+            console.log('[EVENT] Not 2 players, ignoring click');
+            return;
+        }
         
         // Focus canvas for keyboard events
         canvasRef.value?.focus();
 
         const clickX = event.offsetX;
         const clickY = event.offsetY;
+        console.log('[EVENT] Processing click, tiles count:', tiles.length);
 
         let found = false;
         for (const tile of tiles) {
@@ -628,32 +663,40 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     }
 
     function handleKeyDown(e: KeyboardEvent) {
+        console.log('[EVENT] Key pressed:', e.key, 'SCALE:', SCALE, 'camera:', cameraOffsetX, cameraOffsetY);
         switch (e.key) {
             case 'z':
                 if (SCALE > MIN_SCALE) SCALE -= 0.125;
                 if (SCALE < MIN_SCALE) SCALE = MIN_SCALE;
+                console.log('[EVENT] Zoom out, SCALE:', SCALE);
                 break;
             case 'x':
                 if (SCALE < MAX_SCALE) SCALE += 0.125;
                 if (SCALE > MAX_SCALE) SCALE = MAX_SCALE;
+                console.log('[EVENT] Zoom in, SCALE:', SCALE);
                 break;
             case 'ArrowUp':
             case 'w':
                 cameraOffsetY += 8 * SCALE;
+                console.log('[EVENT] Move up, cameraY:', cameraOffsetY);
                 break;
             case 'ArrowDown':
             case 's':
                 cameraOffsetY -= 8 * SCALE;
+                console.log('[EVENT] Move down, cameraY:', cameraOffsetY);
                 break;
             case 'ArrowLeft':
             case 'a':
                 cameraOffsetX += 8 * SCALE;
+                console.log('[EVENT] Move left, cameraX:', cameraOffsetX);
                 break;
             case 'ArrowRight':
             case 'd':
                 cameraOffsetX -= 8 * SCALE;
+                console.log('[EVENT] Move right, cameraX:', cameraOffsetX);
                 break;
             case 'Enter':
+                console.log('[EVENT] Enter pressed, ending turn');
                 endTurn();
                 break;
         }
@@ -669,17 +712,26 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
         }
     }
 
+    let isStarted = false;
+
     function start() {
-        console.log('[START] start() called');
+        console.log('[START] start() called, isStarted:', isStarted);
+        if (isStarted) {
+            console.log('[START] Already started, skipping');
+            return;
+        }
         if (!canvasRef.value) {
             console.log('[START] ERROR: canvasRef.value is null');
             return;
         }
         
+        isStarted = true;
+        
         // Get context and set up canvas like old game
         ctx = canvasRef.value.getContext('2d');
         if (!ctx) {
             console.log('[START] ERROR: Could not get context');
+            isStarted = false;
             return;
         }
         
@@ -724,13 +776,25 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     }
 
     function updateState(state: GameState) {
-        if (state.arena) loadArenaImage(state.arena);
+        console.log('[UPDATE] updateState called');
+        if (state.arena) {
+            console.log('[UPDATE] Loading arena:', state.arena.name);
+            loadArenaImage(state.arena);
+        }
         if (state.players) {
+            console.log('[UPDATE] Loading players and units');
             loadPlayers(state.players as any);
             loadUnits(state.players as any);
         }
-        if (state.visibleTiles) visibleTiles.value = state.visibleTiles;
-        if (state.round !== undefined) currentRound = state.round;
+        if (state.visibleTiles) {
+            console.log('[UPDATE] Setting visible tiles:', state.visibleTiles.length);
+            visibleTiles.value = state.visibleTiles;
+        }
+        if (state.round !== undefined) {
+            console.log('[UPDATE] Setting round:', state.round);
+            currentRound = state.round;
+        }
+        console.log('[UPDATE] State update complete');
     }
 
     return {

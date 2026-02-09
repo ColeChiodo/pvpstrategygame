@@ -103,6 +103,7 @@ const playerIndex = ref<number>(-1);
 const player1Time = ref(600);
 const player2Time = ref(600);
 const currentRound = ref(0);
+const pendingState = ref<GameState | null>(null);
 
 let socket: Socket | null = null;
 
@@ -203,23 +204,32 @@ const connectToGameServer = () => {
     try {
       const decompressed = inflate(compressedData, { to: 'string' });
       const state = JSON.parse(decompressed);
-      console.log("[GAME] Parsed state:", JSON.stringify(state, null, 2));
       console.log("[GAME] Players in state:", state.players?.length);
       console.log("[GAME] Round in state:", state.round);
-       
+      
+      // Always update timers and round
       if (state.player1Time !== undefined) player1Time.value = state.player1Time;
       if (state.player2Time !== undefined) player2Time.value = state.player2Time;
       if (state.round !== undefined) currentRound.value = state.round;
       
-      console.log("[GAME] Timer update:", player1Time.value, player2Time.value);
-      console.log("[GAME] isPlayer1Turn:", isPlayer1Turn.value, "isHost:", gameSession.value?.isHost);
-      console.log("[GAME] showLobby.value:", showLobby.value);
+      // Check if game has already started (has units)
+      const hasUnits = state.players?.some((p: any) => p.units?.length > 0);
+      console.log("[GAME] Has units:", hasUnits, "showLobby:", showLobby.value);
       
+      // If game has started and we're still in lobby, skip lobby
+      if (hasUnits && showLobby.value) {
+        console.log("[GAME] Game already started, skipping lobby");
+        showLobby.value = false;
+      }
+      
+      // Update game state if canvas is ready
       if (gameCanvas.value && !showLobby.value) {
         console.log("[GAME] Calling updateGameState");
         updateGameState(state);
-      } else {
-        console.log("[GAME] Skipping updateGameState (lobby still showing or no canvas)");
+      } else if (hasUnits) {
+        // Game started but canvas not ready yet, wait and try again
+        console.log("[GAME] Canvas not ready, queuing state update");
+        pendingState.value = state;
       }
     } catch (err) {
       console.error("[GAME] Error parsing state:", err);
@@ -227,21 +237,23 @@ const connectToGameServer = () => {
   });
 
   socket.on("start", (data: { round: number }) => {
-    console.log("[GAME] Game started! Round:", data.round, "playerIndex:", playerIndex.value);
-    console.log("[GAME] Game session value:", !!gameSession.value);
-    console.log("[GAME] isHost:", gameSession.value?.isHost);
-    console.log("[GAME] gameCanvas.value:", !!gameCanvas.value);
-    console.log("[GAME] gameCanvas.value dimensions:", gameCanvas.value?.width, 'x', gameCanvas.value?.height);
+    console.log("[GAME] Game started! Round:", data.round);
     currentRound.value = data.round;
     showLobby.value = false;
     
-    console.log("[GAME] About to call start() on game engine");
+    console.log("[GAME] About to call start()");
     if (gameCanvas.value) {
       console.log("[GAME] Canvas exists, calling start()");
-      setTimeout(() => {
-        console.log("[GAME] Inside setTimeout, calling start()");
-        start();
-      }, 100);
+      start();
+      
+      // Apply pending state if exists
+      if (pendingState.value) {
+        console.log("[GAME] Applying pending state");
+        setTimeout(() => {
+          updateGameState(pendingState.value!);
+          pendingState.value = null;
+        }, 50);
+      }
     } else {
       console.log("[GAME] ERROR: Canvas does not exist!");
     }
@@ -276,6 +288,17 @@ const endTurn = () => {
 
 watch([() => player1Time.value, () => player2Time.value], () => {
   console.log("[GAME] Timer update:", player1Time.value, player2Time.value);
+});
+
+// Watch for lobby closing and focus canvas
+watch(() => showLobby.value, (newVal) => {
+  if (!newVal) {
+    console.log("[GAME] Lobby closed, focusing canvas");
+    setTimeout(() => {
+      gameCanvas.value?.focus();
+      console.log("[GAME] Canvas focused:", document.activeElement === gameCanvas.value);
+    }, 100);
+  }
 });
 
 onMounted(() => {
@@ -412,14 +435,20 @@ onUnmounted(() => {
   position: relative;
   width: 100vw;
   height: 100vh;
+  background-color: #0f0f2b;
 }
 
 .game-canvas {
-  width: 100vw;
-  height: 100vh;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
   display: block;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
+  outline: none;
+  border: 2px solid red; /* DEBUG: remove later */
 }
 
 .game-hud {
