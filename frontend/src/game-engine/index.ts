@@ -58,12 +58,16 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     }
 
     function loadArenaImage(newArena: Arena) {
-        if (!arenaImage) {
-            arenaImage = new Image();
-            arenaImage.src = `/assets/maps/${newArena.name}.png`;
-            arena = newArena;
-            arenaImage.onload = () => draw();
-        }
+        arena = newArena;
+        arenaImage = new Image();
+        arenaImage.onload = () => {
+            console.log('[DRAW] Arena image loaded:', newArena.name);
+            draw();
+        };
+        arenaImage.onerror = () => {
+            console.error('[DRAW] Failed to load arena image:', `/assets/maps/${newArena.name}.png`);
+        };
+        arenaImage.src = `/assets/maps/${newArena.name}.png`;
     }
 
     function loadPlayers(newPlayers: Player[]) {
@@ -74,10 +78,15 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     }
 
     function loadUnits(newPlayers: Player[]) {
+        console.log('[LOAD] loadUnits called with', newPlayers.length, 'players');
+        
         const updatedOrAddedIds = new Set<string | number>();
 
         for (const player of newPlayers) {
+            console.log('[LOAD] Player:', player.name, 'has', player.units.length, 'units');
             for (const unit of player.units) {
+                console.log('[LOAD] Unit:', unit.name, 'at', unit.row, unit.col, 'has sprite:', !!unit.sprite);
+                
                 const existingUnit = units.value.find(u => u.id === unit.id);
 
                 if (existingUnit) {
@@ -93,7 +102,10 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
                 } else {
                     unit.owner = player;
                     const newSprite = sprites.find(s => s.name === unit.name) || sprites[0];
-                    if (newSprite) unit.sprite = newSprite.copy();
+                    if (newSprite) {
+                        unit.sprite = { ...newSprite, currentFrame: 0, direction: 1 };
+                        console.log('[LOAD] Assigned sprite to unit:', unit.name, 'sprite:', unit.sprite.name);
+                    }
                     unit.currentStatus = unit.canMove || unit.canAct ? 0 : 1;
                     units.value.push(unit);
                     updatedOrAddedIds.add(unit.id);
@@ -104,6 +116,8 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
         if (!animatingUnit) {
             units.value = units.value.filter(u => updatedOrAddedIds.has(u.id));
         }
+        
+        console.log('[LOAD] Total units after load:', units.value.length);
     }
 
     function resizeCanvas() {
@@ -189,7 +203,10 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     }
 
     function drawArena() {
-        if (!ctx || !arenaImage || !arena || !canvasRef.value) return;
+        if (!ctx || !arenaImage || !arena || !canvasRef.value) {
+            console.log('[DRAW] drawArena missing requirements, arenaImage:', !!arenaImage, 'arena:', !!arena);
+            return;
+        }
         ctx.imageSmoothingEnabled = false;
         ctx.drawImage(
             arenaImage,
@@ -201,7 +218,16 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     }
 
     function drawEntities() {
-        if (!arena || !ctx) return;
+        if (!ctx || !arena) {
+            console.log('[DRAW] drawEntities missing ctx or arena');
+            return;
+        }
+        console.log('[DRAW] Drawing', units.value.length, 'units');
+        
+        if (units.value.length === 0) {
+            console.log('[DRAW] No units to draw');
+            return;
+        }
 
         const entities = [
             ...arena.obstacles.map(o => ({ type: 'obstacle' as const, entity: o })),
@@ -232,10 +258,10 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
             } else {
                 const unit = entity as Unit;
                 const frameSize = 32;
-                const frameX = unit.sprite.currentFrame;
+                const frameX = unit.sprite?.currentFrame || 0;
                 const frameY = unit.currentStatus;
-                const direction = unit.sprite.direction;
-                const unitImg = loadImage(unit.sprite.name, `/assets/spritesheets/units/${unit.sprite.name}.png`);
+                const direction = unit.sprite?.direction || 1;
+                const unitImg = loadImage(unit.sprite?.name || 'test', `/assets/spritesheets/units/${unit.sprite?.name || 'test'}.png`);
 
                 ctx.imageSmoothingEnabled = false;
                 ctx.save();

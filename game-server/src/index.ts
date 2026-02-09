@@ -79,6 +79,7 @@ interface Tile {
 }
 
 let gameState: GameState | null = null;
+let gameInterval: NodeJS.Timeout | null = null;
 let gameId = process.env.GAME_ID || "unknown";
 const port = parseInt(process.env.PORT || "3000");
 
@@ -198,6 +199,38 @@ function startGame() {
     gameState.player2Time = 600;
     console.log(`[${gameId}] Game started! Round 0, Player 1's turn`);
     io?.emit("start", { round: 0 });
+
+    if (gameInterval) clearInterval(gameInterval);
+    gameInterval = setInterval(() => {
+        if (!gameState || gameState.players.length !== 2) return;
+
+        if (gameState.round % 2 === 0) {
+            gameState.player1Time--;
+            if (gameState.player1Time <= 0) {
+                console.log(`[${gameId}] Player 1 ran out of time`);
+                endGame(1);
+            }
+        } else {
+            gameState.player2Time--;
+            if (gameState.player2Time <= 0) {
+                console.log(`[${gameId}] Player 2 ran out of time`);
+                endGame(0);
+            }
+        }
+        broadcastState();
+    }, 1000);
+}
+
+function endGame(winnerIndex: number) {
+    if (gameInterval) {
+        clearInterval(gameInterval);
+        gameInterval = null;
+    }
+    if (gameState) {
+        io?.emit("gameOver", { winner: gameState.players[winnerIndex]?.name });
+    }
+    console.log(`[${gameId}] Game ended, winner: ${winnerIndex}`);
+    gameState = null;
 }
 
 function handleMove(socket: Socket, userId: string, unitId: number, row: number, col: number) {
