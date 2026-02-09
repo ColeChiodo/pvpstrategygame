@@ -2,7 +2,18 @@ import * as k8s from "@kubernetes/client-node";
 import prisma from "../config/database";
 
 const kc = new k8s.KubeConfig();
-kc.loadFromDefault();
+
+if (process.env.KUBECONFIG) {
+  kc.loadFromFile(process.env.KUBECONFIG);
+} else {
+  kc.loadFromDefault();
+}
+
+kc.clusters.forEach(cluster => {
+  if (cluster.server.startsWith("http://")) {
+    cluster.insecureSkipTLSVerify = true;
+  }
+});
 
 const k8sApi = kc.makeApiClient(k8s.CoreV1Api);
 const k8sAppsApi = kc.makeApiClient(k8s.AppsV1Api);
