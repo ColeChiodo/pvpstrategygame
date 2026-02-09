@@ -109,12 +109,29 @@ const fetchGameDetails = async () => {
 };
 
 const connectToGameServer = () => {
-  if (!gameSession.value?.serverUrl) return;
+  if (!gameSession.value?.serverUrl) {
+    console.log("[GAME] No serverUrl, skipping game server connection");
+    return;
+  }
 
-  socket = io(gameSession.value.serverUrl, {
+  const serverUrl = gameSession.value.serverUrl;
+  const gameId = gameSession.value.id;
+  const userId = authStore.user?.id;
+
+  console.log("[GAME] Connecting to game server URL:", serverUrl);
+  console.log("[GAME] Game ID:", gameId);
+  console.log("[GAME] User ID:", userId);
+
+  if (!gameId || !userId) {
+    console.error("[GAME] ERROR: gameId or userId is undefined!");
+    return;
+  }
+
+  socket = io(serverUrl, {
+    path: "/socket.io",
     query: {
-      gameId: gameSession.value.id,
-      userId: authStore.user?.id,
+      gameId,
+      userId,
     },
   });
 

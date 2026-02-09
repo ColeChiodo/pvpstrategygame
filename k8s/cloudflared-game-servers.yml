@@ -1,4 +1,4 @@
-# Cloudflare Tunnel config for game servers
+# Cloudflare Tunnel config for game servers and backend
 # Point cloudflared to your K3s node IP on port 30080
 
 tunnel: YOUR-TUNNEL-ID

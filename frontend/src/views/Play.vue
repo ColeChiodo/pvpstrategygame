@@ -282,8 +282,15 @@ onMounted(async () => {
 
   matchmakingSocket.on("match:found", async (data: { gameId: string; opponent: string; serverUrl: string | null }) => {
     console.log("[MATCHMAKING] Match found via socket:", data);
+    matchmakingSocket?.disconnect();
     await fetchGameDetails(data.gameId);
   });
+});
+
+onUnmounted(() => {
+  matchmakingSocket?.disconnect();
+  stopQueueTimer();
+  window.removeEventListener("mousemove", handleMouseMove);
 });
 
 watch(showUserModal, (val) => {
