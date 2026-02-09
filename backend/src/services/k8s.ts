@@ -32,11 +32,77 @@ kc.clusters.forEach(cluster => {
 
 const k8sApi = kc.makeApiClient(k8s.CoreV1Api);
 const k8sAppsApi = kc.makeApiClient(k8s.AppsV1Api);
+const k8sCustomApi = kc.makeApiClient(k8s.CustomObjectsApi);
 
 const GAME_SERVER_NAMESPACE = "game-servers";
 const GAME_SERVER_IMAGE = "colechiodo/fortezza-game-server:latest";
 const GAME_SERVER_REPLICAS = 1;
 const GAME_SERVER_PORT = 3000;
+const GAME_SERVER_HOSTNAME = process.env.GAME_SERVER_HOSTNAME || "fortezza.colechiodo.cc";
+
+async function createIngressRoute(gameId: string, serviceName: string): Promise<boolean> {
+  const ingressRouteName = `game-server-${gameId}`;
+  
+  const ingressRoute = {
+    apiVersion: "traefik.io/v1alpha1",
+    kind: "IngressRoute",
+    metadata: {
+      name: ingressRouteName,
+      namespace: GAME_SERVER_NAMESPACE,
+    },
+    spec: {
+      entryPoints: ["web", "websecure"],
+      routes: [
+        {
+          match: `Host(\`${GAME_SERVER_HOSTNAME}\`) && PathPrefix(\`/game/${gameId}\`)`,
+          kind: "Rule",
+          services: [
+            {
+              name: serviceName,
+              port: GAME_SERVER_PORT,
+            },
+          ],
+        },
+      ],
+    },
+  };
+
+  try {
+    await k8sCustomApi.createNamespacedCustomObject(
+      "traefik.io",
+      "v1alpha1",
+      GAME_SERVER_NAMESPACE,
+      "ingressroutes",
+      ingressRoute
+    );
+    console.log(`[K8S] IngressRoute created: ${ingressRouteName}`);
+    return true;
+  } catch (error: any) {
+    console.error(`[K8S] Failed to create IngressRoute:`, error.message);
+    return false;
+  }
+}
+
+async function deleteIngressRoute(gameId: string): Promise<boolean> {
+  const ingressRouteName = `game-server-${gameId}`;
+  
+  try {
+    await k8sCustomApi.deleteNamespacedCustomObject(
+      "traefik.io",
+      "v1alpha1",
+      GAME_SERVER_NAMESPACE,
+      "ingressroutes",
+      ingressRouteName
+    );
+    console.log(`[K8S] IngressRoute deleted: ${ingressRouteName}`);
+    return true;
+  } catch (error: any) {
+    if (error.statusCode !== 404) {
+      console.error(`[K8S] Failed to delete IngressRoute:`, error.message);
+    }
+    return false;
+  }
+}
 
 export async function createGameServer(gameId: string): Promise<{ url: string; port: number } | null> {
   console.log(`[K8S] createGameServer called for ${gameId}`);
@@ -162,9 +228,14 @@ export async function createGameServer(gameId: string): Promise<{ url: string; p
       namespace: GAME_SERVER_NAMESPACE,
       body: service,
     });
+    console.log(`[K8S] Kubernetes service created: ${serviceName}`);
 
-    const hostname = process.env.GAME_SERVER_HOSTNAME || "fortezza.colechiodo.cc";
-    const serverUrl = `ws://${hostname}/game/${gameId}`;
+    const ingressRouteCreated = await createIngressRoute(gameId, serviceName);
+    if (!ingressRouteCreated) {
+      console.warn(`[K8S] Failed to create IngressRoute for ${gameId}, continuing anyway`);
+    }
+
+    const serverUrl = `wss://${GAME_SERVER_HOSTNAME}/game/${gameId}`;
     console.log(`[K8S] Game server URL: ${serverUrl}`);
 
     await prisma.gameSession.update({
@@ -198,6 +269,8 @@ export async function destroyGameServer(gameId: string): Promise<boolean> {
       name: serviceName,
       namespace: GAME_SERVER_NAMESPACE,
     });
+
+    await deleteIngressRoute(gameId);
 
     await prisma.gameSession.update({
       where: { id: gameId },
