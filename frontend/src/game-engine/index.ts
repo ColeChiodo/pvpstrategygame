@@ -236,6 +236,15 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
             arena.height * scale
         );
     }
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(
+            arenaImage,
+            (canvasRef.value.width - arena.width * SCALE) / 2 + cameraOffsetX,
+            (canvasRef.value.height - arena.height * SCALE - 16 * SCALE) / 2 + cameraOffsetY,
+            arena.width * SCALE,
+            arena.height * SCALE
+        );
+    }
 
     function drawEntities() {
         if (!ctx || !arena) return;
@@ -806,7 +815,7 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
 
     function stop() {
         if (animationFrameId) cancelAnimationFrame(animationFrameId);
-        window.removeEventListener('resize', handleResize);
+        window.removeEventListener('resize', resizeCanvas);
         window.removeEventListener('keydown', handleKeyDown);
         if (canvasRef.value) {
             canvasRef.value.removeEventListener('click', handleClick);
