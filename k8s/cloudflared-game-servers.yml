@@ -5,8 +5,32 @@ tunnel: YOUR-TUNNEL-ID
 credentials-file: ~/.cloudflared/credentials.json
 
 ingress:
+  # API routes - backend docker-compose
   - hostname: fortezza.colechiodo.cc
-    service: https://YOUR-K3S-HOST-IP:30080
+    path: /api/*
+    service: http://localhost:3000
     originRequest:
       noTLSVerify: true
+
+  # Socket.IO - backend docker-compose
+  - hostname: fortezza.colechiodo.cc
+    path: /socket.io
+    service: http://localhost:3000
+    originRequest:
+      noTLSVerify: true
+
+  # Game servers - K8s (matches /game/game-xxx)
+  - hostname: fortezza.colechiodo.cc
+    path: /game/*
+    service: https://172.19.0.2:30080
+    originRequest:
+      noTLSVerify: true
+
+  # Frontend fallback
+  - hostname: fortezza.colechiodo.cc
+    service: http://localhost:5173
+    originRequest:
+      noTLSVerify: true
+
+  # Catch-all
   - service: http_status:404
