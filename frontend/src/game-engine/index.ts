@@ -190,14 +190,49 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     }
 
     function draw() {
-        if (!ctx || !canvasRef.value) return;
+        console.log('[DRAW] draw() called, ctx:', !!ctx, 'canvasRef.value:', !!canvasRef.value);
+        if (!ctx || !canvasRef.value) {
+            console.log('[DRAW] draw() returning early - missing ctx or canvasRef');
+            return;
+        }
         ctx.clearRect(0, 0, canvasRef.value.width, canvasRef.value.height);
         drawBackground();
         drawArena();
         drawFogOfWarTiles();
         drawEntities();
         drawUI();
-        drawInteractionSquares();
+        const tilesCount = drawInteractionSquares();
+        console.log('[DRAW] tiles populated:', tilesCount);
+    }
+
+    function drawInteractionSquares(): number {
+        console.log('[DRAW] drawInteractionSquares() called, arenaImage:', !!arenaImage, 'arena:', !!arena, 'ctx:', !!ctx);
+        if (!arenaImage || !arena || !canvasRef.value || !ctx) {
+            console.log('[DRAW] drawInteractionSquares() returning early');
+            return 0;
+        }
+        const tileWidth = 32 * SCALE;
+        const tileHeight = 16 * SCALE;
+        const rows = arena.tiles.length;
+        const cols = arena.tiles[0].length;
+        const imgCenterX = canvasRef.value.width / 2;
+        const imgCenterY = canvasRef.value.height / 2;
+        const gridWidth = (cols - 1) * tileWidth / 2;
+        const gridHeight = (rows - 1) * tileHeight / 2;
+        const offsetX = imgCenterX - tileWidth / 2 + cameraOffsetX;
+        const offsetY = imgCenterY - gridHeight - tileHeight - 8 * SCALE + cameraOffsetY;
+
+        tiles = [];
+        for (let row = 0; row < rows; row++) {
+            for (let col = 0; col < cols; col++) {
+                if (arena.tiles[row][col] === 0) continue;
+                const isoX = (col - row) * tileWidth / 2 + offsetX;
+                const isoY = (col + row) * tileHeight / 2 + offsetY - ((getTileHeight(row, col) * 16) * SCALE);
+                tiles.push(drawIsometricTile(isoX, isoY, row, col));
+            }
+        }
+        console.log('[DRAW] tiles created:', tiles.length);
+        return tiles.length;
     }
 
     function drawBackground() {
@@ -586,7 +621,7 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
 
     function endTurn() {
         if (!socket) return;
-        socket.emit('force-end-turn');
+        socket.emit('endTurn');
         selectedTile.value = null;
         isAction = false;
         moveTile.value = null;
