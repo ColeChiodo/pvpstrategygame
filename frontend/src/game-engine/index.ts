@@ -39,7 +39,11 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     let healthBarCurrent = 0;
 
     let cameraOffsetX = 0;
-    let cameraOffsetY = 100;
+    let cameraOffsetY = 150;
+    let zoomScale = 1.0;
+    let isDragging = false;
+    let lastMouseX = 0;
+    let lastMouseY = 0;
 
     let tiles: Tile[] = [];
     let isAction = false;
@@ -217,23 +221,27 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     }
 
     function drawArena() {
-        if (!ctx || !arenaImage || !arena || !canvasRef.value) {
-            console.log('[DRAW] drawArena missing requirements, arenaImage:', !!arenaImage, 'arena:', !!arena);
-            return;
-        }
+        if (!ctx || !arenaImage || !arena || !canvasRef.value) return;
         ctx.imageSmoothingEnabled = false;
+        
+        const scale = SCALE * zoomScale;
+        const centerX = canvasRef.value.width / 2 + cameraOffsetX;
+        const centerY = canvasRef.value.height / 2 + cameraOffsetY;
+        
         ctx.drawImage(
             arenaImage,
-            (canvasRef.value.width - arena.width * SCALE) / 2 + cameraOffsetX,
-            (canvasRef.value.height - arena.height * SCALE - 16 * SCALE) / 2 + cameraOffsetY,
-            arena.width * SCALE,
-            arena.height * SCALE
+            centerX - (arena.width * scale) / 2,
+            centerY - (arena.height * scale) / 2,
+            arena.width * scale,
+            arena.height * scale
         );
     }
 
     function drawEntities() {
         if (!ctx || !arena) return;
         if (units.value.length === 0) return;
+
+        const scale = SCALE * zoomScale;
 
         const entities = [
             ...arena.obstacles.map(o => ({ type: 'obstacle' as const, entity: o })),
@@ -257,8 +265,8 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
                 const obstacleImg = loadImage(obstacle.sprite.name, `/assets/maps/${obstacle.sprite.name}.png`);
                 ctx.drawImage(
                     obstacleImg, 0, 0, frameSize, frameSize,
-                    pos.x - 32 * SCALE, pos.y - frameSize * SCALE + 8 * SCALE,
-                    frameSize * SCALE, frameSize * SCALE
+                    pos.x - frameSize * scale, pos.y - frameSize * scale,
+                    frameSize * scale, frameSize * scale
                 );
                 ctx.globalAlpha = 1.0;
             } else {
@@ -275,14 +283,14 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
                     ctx.scale(-1, 1);
                     ctx.drawImage(
                         unitImg, frameX * frameSize, frameY * frameSize, frameSize, frameSize,
-                        -(pos.x + frameSize * SCALE), pos.y - frameSize * SCALE + 2 * SCALE,
-                        frameSize * SCALE, frameSize * SCALE
+                        -(pos.x + frameSize * scale), pos.y - frameSize * scale,
+                        frameSize * scale, frameSize * scale
                     );
                 } else {
                     ctx.drawImage(
                         unitImg, frameX * frameSize, frameY * frameSize, frameSize, frameSize,
-                        pos.x, pos.y - frameSize * SCALE + 2 * SCALE,
-                        frameSize * SCALE, frameSize * SCALE
+                        pos.x, pos.y - frameSize * scale,
+                        frameSize * scale, frameSize * scale
                     );
                 }
                 ctx.restore();
@@ -303,25 +311,79 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     function drawHoveredTile() {
         if (!hoveredTile.value || !uiImage || !ctx) return;
         const frameSize = 32;
+        const scale = SCALE * zoomScale;
         const highlightFrameX = hasUnit(hoveredTile.value.row, hoveredTile.value.col)
             ? (unitIsTeam(hoveredTile.value.row, hoveredTile.value.col) ? 1 : 2)
             : 0;
         ctx.imageSmoothingEnabled = false;
         ctx.drawImage(
             uiImage, highlightFrameX * frameSize, 0, frameSize, frameSize,
-            hoveredTile.value.x, hoveredTile.value.y - 8 * SCALE,
-            frameSize * SCALE, frameSize * SCALE
+            hoveredTile.value.x, hoveredTile.value.y - 8 * scale,
+            frameSize * scale, frameSize * scale
         );
     }
 
     function drawSelectedTile() {
         if (!selectedTile.value || !uiImage || !ctx) return;
         const frameSize = 32;
+        const scale = SCALE * zoomScale;
         ctx.imageSmoothingEnabled = false;
         ctx.drawImage(
             uiImage, 3 * frameSize, 0, frameSize, frameSize,
-            selectedTile.value.x, selectedTile.value.y - 8 * SCALE,
-            frameSize * SCALE, frameSize * SCALE
+            selectedTile.value.x, selectedTile.value.y - 8 * scale,
+            frameSize * scale, frameSize * scale
+        );
+    }
+
+    function drawMoveTile(tile: Tile) {
+        if (!uiImage || !ctx) return;
+        const frameSize = 32;
+        const scale = SCALE * zoomScale;
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(
+            uiImage, 3 * frameSize, frameSize, frameSize, frameSize,
+            tile.x, tile.y - 8 * scale,
+            frameSize * scale, frameSize * scale
+        );
+    }
+
+    function drawActionTile(tile: Tile, action: string) {
+        if (!uiImage || !ctx) return;
+        validActionTiles.value.push(tile);
+        const frameSize = 32;
+        const scale = SCALE * zoomScale;
+        const frameX = action === 'attack' ? 2 : 1;
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(
+            uiImage, frameX * frameSize, frameSize, frameSize, frameSize,
+            tile.x, tile.y - 8 * scale,
+            frameSize * scale, frameSize * scale
+        );
+    }
+
+    function drawPathTile(tile: Tile) {
+        if (!uiImage || !ctx) return;
+        const frameSize = 32;
+        const scale = SCALE * zoomScale;
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(
+            uiImage, 0, 4 * frameSize, frameSize, frameSize,
+            tile.x, tile.y - 8 * scale,
+            frameSize * scale, frameSize * scale
+        );
+    }
+
+    function drawFogTile(row: number, col: number) {
+        if (!uiImage || !ctx) return;
+        const pos = coordToPosition(row, col);
+        if (pos.x === -9999) return;
+        const frameSize = 32;
+        const scale = SCALE * zoomScale;
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(
+            uiImage, 4 * frameSize, frameSize, frameSize, frameSize,
+            pos.x, pos.y - 8 * scale,
+            frameSize * scale, frameSize * scale
         );
     }
 
@@ -369,11 +431,12 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     function drawMoveTile(tile: Tile) {
         if (!uiImage || !ctx) return;
         const frameSize = 32;
+        const scale = SCALE * zoomScale;
         ctx.imageSmoothingEnabled = false;
         ctx.drawImage(
             uiImage, 3 * frameSize, frameSize, frameSize, frameSize,
-            tile.x, tile.y - 8 * SCALE,
-            frameSize * SCALE, frameSize * SCALE
+            tile.x, tile.y - 8 * scale,
+            frameSize * scale, frameSize * scale
         );
     }
 
@@ -406,12 +469,13 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
         if (!uiImage || !ctx) return;
         validActionTiles.value.push(tile);
         const frameSize = 32;
+        const scale = SCALE * zoomScale;
         const frameX = action === 'attack' ? 2 : 1;
         ctx.imageSmoothingEnabled = false;
         ctx.drawImage(
             uiImage, frameX * frameSize, frameSize, frameSize, frameSize,
-            tile.x, tile.y - 8 * SCALE,
-            frameSize * SCALE, frameSize * SCALE
+            tile.x, tile.y - 8 * scale,
+            frameSize * scale, frameSize * scale
         );
     }
 
@@ -428,25 +492,27 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     function drawPathTile(tile: Tile) {
         if (!uiImage || !ctx) return;
         const frameSize = 32;
+        const scale = SCALE * zoomScale;
         ctx.imageSmoothingEnabled = false;
         ctx.drawImage(
             uiImage, 0, 4 * frameSize, frameSize, frameSize,
-            tile.x, tile.y - 8 * SCALE,
-            frameSize * SCALE, frameSize * SCALE
+            tile.x, tile.y - 8 * scale,
+            frameSize * scale, frameSize * scale
         );
     }
 
     function drawHealthBars() {
         if ((!isAction && !selectedTile.value) || animatingUnit) return;
+        const scale = SCALE * zoomScale;
         for (const unit of units.value) {
             const pos = coordToPosition(unit.row, unit.col);
             if (pos.x === -9999) continue;
-            const barHeight = 2 * SCALE;
-            const barWidth = 12 * SCALE;
+            const barHeight = 2 * scale;
+            const barWidth = 12 * scale;
             ctx!.fillStyle = '#555';
-            ctx!.fillRect(pos.x + barWidth - 2 * SCALE, pos.y - 16 * SCALE, barWidth, barHeight);
+            ctx!.fillRect(pos.x + barWidth - 2 * scale, pos.y - 16 * scale, barWidth, barHeight);
             ctx!.fillStyle = '#0f0';
-            ctx!.fillRect(pos.x + barWidth - 2 * SCALE, pos.y - 16 * SCALE, barWidth * (unit.health / unit.maxHealth), barHeight);
+            ctx!.fillRect(pos.x + barWidth - 2 * scale, pos.y - 16 * scale, barWidth * (unit.health / unit.maxHealth), barHeight);
         }
     }
 
@@ -455,12 +521,13 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
         const unit = animatingHealthBarUnit;
         const pos = coordToPosition(unit.row, unit.col);
         if (pos.x === -9999) return;
-        const barHeight = 2 * SCALE;
-        const barWidth = 12 * SCALE;
+        const scale = SCALE * zoomScale;
+        const barHeight = 2 * scale;
+        const barWidth = 12 * scale;
         ctx.fillStyle = '#555';
-        ctx.fillRect(pos.x + barWidth - 2 * SCALE, pos.y - 16 * SCALE, barWidth, barHeight);
+        ctx.fillRect(pos.x + barWidth - 2 * scale, pos.y - 16 * scale, barWidth, barHeight);
         ctx.fillStyle = '#0f0';
-        ctx.fillRect(pos.x + barWidth - 2 * SCALE, pos.y - 16 * SCALE, barWidth * (healthBarCurrent / unit.maxHealth), barHeight);
+        ctx.fillRect(pos.x + barWidth - 2 * scale, pos.y - 16 * scale, barWidth * (healthBarCurrent / unit.maxHealth), barHeight);
     }
 
     function drawFogOfWarTiles() {
@@ -479,33 +546,32 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
         const pos = coordToPosition(row, col);
         if (pos.x === -9999) return;
         const frameSize = 32;
+        const scale = SCALE * zoomScale;
         ctx.imageSmoothingEnabled = false;
         ctx.drawImage(
             uiImage, 4 * frameSize, frameSize, frameSize, frameSize,
-            pos.x, pos.y - 8 * SCALE,
-            frameSize * SCALE, frameSize * SCALE
+            pos.x, pos.y - 8 * scale,
+            frameSize * scale, frameSize * scale
         );
     }
 
     function drawInteractionSquares() {
-        if (!arenaImage || !arena || !canvasRef.value || !ctx) return 0;
-        const tileWidth = 32 * SCALE;
-        const tileHeight = 16 * SCALE;
+        if (!arena || !canvasRef.value || !ctx) return 0;
+        
+        const scale = SCALE * zoomScale;
+        const tileWidth = 32 * scale;
+        const tileHeight = 16 * scale;
         const rows = arena.tiles.length;
         const cols = arena.tiles[0].length;
-        const imgCenterX = canvasRef.value.width / 2;
-        const imgCenterY = canvasRef.value.height / 2;
-        const gridWidth = (cols - 1) * tileWidth / 2;
-        const gridHeight = (rows - 1) * tileHeight / 2;
-        const offsetX = imgCenterX - tileWidth / 2 + cameraOffsetX;
-        const offsetY = imgCenterY - gridHeight - tileHeight - 8 * SCALE + cameraOffsetY;
+        const centerX = canvasRef.value.width / 2 + cameraOffsetX;
+        const centerY = canvasRef.value.height / 2 + cameraOffsetY;
 
         tiles = [];
         for (let row = 0; row < rows; row++) {
             for (let col = 0; col < cols; col++) {
                 if (arena.tiles[row][col] === 0) continue;
-                const isoX = (col - row) * tileWidth / 2 + offsetX;
-                const isoY = (col + row) * tileHeight / 2 + offsetY - ((getTileHeight(row, col) * 16) * SCALE);
+                const isoX = centerX + (col - row) * tileWidth / 2;
+                const isoY = centerY + (col + row) * tileHeight / 2;
                 tiles.push(drawIsometricTile(isoX, isoY, row, col));
             }
         }
@@ -596,6 +662,7 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     }
 
     function handleClick(event: MouseEvent) {
+        if (event.button !== 0) return;
         if (!isMyTurn.value) return;
         if (players.value.length !== 2) return;
 
@@ -634,9 +701,15 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
         }
     }
 
-    function handleMouseMove(event: MouseEvent) {
-        const clickX = event.offsetX;
-        const clickY = event.offsetY;
+    function handleMouseMove(e: MouseEvent) {
+        const clickX = e.offsetX;
+        const clickY = e.offsetY;
+
+        if (isDragging && e.buttons === 2) {
+            cameraOffsetX += e.movementX;
+            cameraOffsetY += e.movementY;
+            return;
+        }
 
         for (const tile of tiles) {
             if (isPointInsideTile(clickX, clickY, tile)) {
@@ -677,33 +750,63 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     }
 
     function handleWheel(e: WheelEvent) {
-        if (e.deltaY < 0) {
-        } else {
+        e.preventDefault();
+        const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+        const newZoom = Math.max(MIN_SCALE, Math.min(MAX_SCALE, zoomScale * zoomFactor));
+        
+        if (newZoom !== zoomScale) {
+            const rect = canvasRef.value?.getBoundingClientRect();
+            if (rect) {
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+                
+                const worldX = (mouseX - rect.width / 2 - cameraOffsetX) / zoomScale;
+                const worldY = (mouseY - rect.height / 2 - cameraOffsetY) / zoomScale;
+                
+                zoomScale = newZoom;
+                
+                cameraOffsetX = mouseX - rect.width / 2 - worldX * zoomScale;
+                cameraOffsetY = mouseY - rect.height / 2 - worldY * zoomScale;
+            }
         }
     }
 
     function start() {
         if (!canvasRef.value) return;
+        canvasRef.value.width = window.innerWidth;
+        canvasRef.value.height = window.innerHeight;
         ctx = canvasRef.value.getContext('2d');
-        window.addEventListener('resize', resizeCanvas);
+        if (ctx) ctx.imageSmoothingEnabled = false;
+        
+        window.addEventListener('resize', handleResize);
         window.addEventListener('keydown', handleKeyDown);
         canvasRef.value.addEventListener('click', handleClick);
         canvasRef.value.addEventListener('mousemove', handleMouseMove);
-        canvasRef.value.addEventListener('wheel', handleWheel);
+        canvasRef.value.addEventListener('wheel', handleWheel, { passive: false });
+        canvasRef.value.addEventListener('contextmenu', (e) => e.preventDefault());
+        
         window.addEventListener('gamepadconnected', (e: GamepadEvent) => {
-            console.log('Gamepad connected:', e.gamepad.id);
             gamepadIndex = e.gamepad.index;
         });
         window.addEventListener('gamepaddisconnected', (e: GamepadEvent) => {
             if (gamepadIndex === e.gamepad.index) gamepadIndex = null;
         });
-        resizeCanvas();
+        
+        handleResize();
         gameLoop();
+    }
+
+    function handleResize() {
+        if (!canvasRef.value || !ctx) return;
+        canvasRef.value.width = window.innerWidth;
+        canvasRef.value.height = window.innerHeight;
+        if (ctx) ctx.imageSmoothingEnabled = false;
+        draw();
     }
 
     function stop() {
         if (animationFrameId) cancelAnimationFrame(animationFrameId);
-        window.removeEventListener('resize', resizeCanvas);
+        window.removeEventListener('resize', handleResize);
         window.removeEventListener('keydown', handleKeyDown);
         if (canvasRef.value) {
             canvasRef.value.removeEventListener('click', handleClick);
