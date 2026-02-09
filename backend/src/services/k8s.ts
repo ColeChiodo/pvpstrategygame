@@ -68,13 +68,13 @@ async function createIngressRoute(gameId: string, serviceName: string): Promise<
   };
 
   try {
-    await k8sCustomApi.createNamespacedCustomObject(
-      "traefik.io",
-      "v1alpha1",
-      GAME_SERVER_NAMESPACE,
-      "ingressroutes",
-      ingressRoute
-    );
+    await k8sCustomApi.createNamespacedCustomObject({
+      group: "traefik.io",
+      version: "v1alpha1",
+      namespace: GAME_SERVER_NAMESPACE,
+      plural: "ingressroutes",
+      body: ingressRoute,
+    });
     console.log(`[K8S] IngressRoute created: ${ingressRouteName}`);
     return true;
   } catch (error: any) {
@@ -87,13 +87,13 @@ async function deleteIngressRoute(gameId: string): Promise<boolean> {
   const ingressRouteName = `game-server-${gameId}`;
   
   try {
-    await k8sCustomApi.deleteNamespacedCustomObject(
-      "traefik.io",
-      "v1alpha1",
-      GAME_SERVER_NAMESPACE,
-      "ingressroutes",
-      ingressRouteName
-    );
+    await k8sCustomApi.deleteNamespacedCustomObject({
+      group: "traefik.io",
+      version: "v1alpha1",
+      namespace: GAME_SERVER_NAMESPACE,
+      plural: "ingressroutes",
+      name: ingressRouteName,
+    });
     console.log(`[K8S] IngressRoute deleted: ${ingressRouteName}`);
     return true;
   } catch (error: any) {
