@@ -73,30 +73,6 @@ async function main() {
   app.use(passport.initialize());
   app.use(passport.session());
 
-  // Socket.IO setup (MUST be before routes that use it)
-  const io = new SocketIOServer(server, {
-    cors: {
-      origin: process.env.FRONTEND_URL || "http://localhost:5173",
-      credentials: true,
-    },
-  });
-
-  io.on("connection", (socket) => {
-    console.log(`[SOCKET] Client connected: ${socket.id}`);
-    
-    socket.on("authenticate", (userId: string) => {
-      socket.join(userId);
-      console.log(`[SOCKET] User ${userId} joined room ${userId}`);
-    });
-
-    socket.on("disconnect", () => {
-      console.log(`[SOCKET] Client disconnected: ${socket.id}`);
-    });
-  });
-
-  // Pass socket.io instance to matchmaking routes
-  setMatchmakingIO(io);
-
   // Routes
   app.use("/api/auth", authRoutes);
   app.use("/api/patch-notes", patchNotesRoutes);
@@ -121,7 +97,12 @@ async function main() {
     res.status(404).json({ error: "Not found" });
   });
 
-  // Socket.IO setup (must be before server.listen)
+  // Start server
+  const server = app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+
+  // Socket.IO setup
   const io = new SocketIOServer(server, {
     cors: {
       origin: process.env.FRONTEND_URL || "http://localhost:5173",
@@ -145,11 +126,6 @@ async function main() {
   // Pass socket.io instance to matchmaking routes
   setMatchmakingIO(io);
 
-  // Start server
-  const server = app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-  });
-
   // Graceful shutdown
   const gracefulShutdown = async () => {
     console.log("Shutting down gracefully...");
@@ -168,5 +144,3 @@ main().catch((err) => {
   console.error("Failed to start server", err);
   process.exit(1);
 });
-
-
