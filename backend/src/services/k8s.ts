@@ -3,16 +3,31 @@ import prisma from "../config/database";
 
 const kc = new k8s.KubeConfig();
 
+console.log("[K8S] KUBECONFIG env:", process.env.KUBECONFIG);
+
 if (process.env.KUBECONFIG) {
-  kc.loadFromFile(process.env.KUBECONFIG);
+  console.log("[K8S] Loading kubeconfig from:", process.env.KUBECONFIG);
+  try {
+    kc.loadFromFile(process.env.KUBECONFIG);
+    console.log("[K8S] Kubeconfig loaded successfully");
+  } catch (e) {
+    console.error("[K8S] Failed to load kubeconfig:", e);
+  }
 } else {
-  kc.loadFromDefault();
+  console.log("[K8S] No KUBECONFIG env, trying loadFromDefault");
+  try {
+    kc.loadFromDefault();
+  } catch (e) {
+    console.error("[K8S] Failed to loadFromDefault:", e);
+  }
 }
 
+console.log("[K8S] Clusters:", kc.clusters.map(c => c.name));
+console.log("[K8S] Current cluster:", kc.getCurrentCluster()?.name);
+console.log("[K8S] Cluster server:", kc.getCurrentCluster()?.server);
+
 kc.clusters.forEach(cluster => {
-  if (cluster.server.startsWith("http://")) {
-    cluster.insecureSkipTLSVerify = true;
-  }
+  console.log(`[K8S] Cluster ${cluster.name}: ${cluster.server}, skipTLSVerify: ${cluster.insecureSkipTLSVerify}`);
 });
 
 const k8sApi = kc.makeApiClient(k8s.CoreV1Api);
@@ -24,6 +39,23 @@ const GAME_SERVER_REPLICAS = 1;
 const GAME_SERVER_NODE_PORT = 30080;
 
 export async function createGameServer(gameId: string): Promise<{ url: string; port: number } | null> {
+  console.log(`[K8S] createGameServer called for ${gameId}`);
+  console.log(`[K8S] K8sApi ready:`, !!k8sAppsApi);
+  
+  try {
+    // Test K8s API connectivity
+    const cluster = kc.getCurrentCluster();
+    console.log(`[K8S] Attempting to reach ${cluster?.server}`);
+    
+    // Try to list deployments to verify connectivity
+    await k8sAppsApi.listNamespacedDeployment({ namespace: GAME_SERVER_NAMESPACE });
+    console.log(`[K8S] K8s API is reachable`);
+  } catch (apiError: any) {
+    console.error(`[K8S] K8s API unreachable:`, apiError.message);
+    console.log(`[K8S] Returning null - game server will not be created`);
+    return null;
+  }
+
   try {
     const deploymentName = `game-server-${gameId}`;
     const serviceName = `game-server-${gameId}`;
