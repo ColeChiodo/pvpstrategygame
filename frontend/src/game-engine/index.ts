@@ -61,12 +61,28 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     }
 
     function loadArenaImage(newArena: Arena) {
-        console.log('[LOAD] loadArenaImage called');
+        // Only load if arena changed
+        if (arena?.name === newArena.name) {
+            return;
+        }
+        console.log('[LOAD] loadArenaImage called for:', newArena.name);
         arena = newArena;
+        
+        // Check if image already cached
+        const cacheKey = `arena_${newArena.name}`;
+        if (imageCache.has(cacheKey)) {
+            console.log('[LOAD] Using cached arena image');
+            arenaImage = imageCache.get(cacheKey)!;
+            return;
+        }
+        
         arenaImage = new Image();
         arenaImage.onload = () => {
-            console.log('[LOAD] Arena image loaded');
-            draw();
+            console.log('[LOAD] Arena image loaded and cached');
+            imageCache.set(cacheKey, arenaImage!);
+        };
+        arenaImage.onerror = () => {
+            console.error('[LOAD] Failed to load arena image:', `/assets/maps/${newArena.name}.png`);
         };
         arenaImage.src = `/assets/maps/${newArena.name}.png`;
     }
@@ -638,10 +654,7 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
                 cameraOffsetX -= 8 * SCALE;
                 break;
             case 'Enter':
-                socket?.emit('force-end-turn');
-                selectedTile.value = null;
-                isAction = false;
-                moveTile.value = null;
+                endTurn();
                 break;
         }
     }
