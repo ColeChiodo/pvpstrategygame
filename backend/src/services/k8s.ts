@@ -69,7 +69,7 @@ async function createIngressRoute(gameId: string, serviceName: string): Promise<
 
   try {
     await k8sCustomApi.createNamespacedCustomObject(
-      "traefik.io",
+      "traefik.containo.us",
       "v1alpha1",
       GAME_SERVER_NAMESPACE,
       "ingressroutes",
@@ -88,7 +88,7 @@ async function deleteIngressRoute(gameId: string): Promise<boolean> {
   
   try {
     await k8sCustomApi.deleteNamespacedCustomObject(
-      "traefik.io",
+      "traefik.containo.us",
       "v1alpha1",
       GAME_SERVER_NAMESPACE,
       "ingressroutes",
