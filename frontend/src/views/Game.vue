@@ -90,12 +90,13 @@ const connectedToGameServer = ref(false);
 const showLobby = ref(true);
 const lobbyExiting = ref(false);
 const isMyTurn = ref(false);
-const player1Time = ref(0);
-const player2Time = ref(0);
+const playerIndex = ref<number>(-1);
+const player1Time = ref(600);
+const player2Time = ref(600);
 
 let socket: Socket | null = null;
 
-const { initSocket, start, stop } = useGameEngine(gameCanvas);
+const { initSocket, start, stop, updateState } = useGameEngine(gameCanvas);
 
 const formatTime = (seconds: number): string => {
   const mins = Math.floor(seconds / 60);
@@ -171,16 +172,8 @@ const connectToGameServer = () => {
   socket.on("joined", (data: any) => {
     console.log("[GAME] Joined game:", data);
     connectedToGameServer.value = true;
-
-    setTimeout(() => {
-      lobbyExiting.value = true;
-      setTimeout(() => {
-        showLobby.value = false;
-        if (gameCanvas.value) {
-          start();
-        }
-      }, 1500);
-    }, 3000);
+    playerIndex.value = data.playerIndex;
+    // Wait for "start" event to show game
   });
 
   socket.on("error", (err: any) => {
@@ -191,8 +184,15 @@ const connectToGameServer = () => {
     try {
       const decompressed = inflate(compressedData, { to: 'string' });
       const state = JSON.parse(decompressed);
-      console.log("[GAME] Received state, players:", state.players?.length);
-      if (gameCanvas.value && ctx) {
+      console.log("[GAME] Received state, players:", state.players?.length, "round:", state.round);
+      
+      // Update timers
+      if (state.player1Time !== undefined) player1Time.value = state.player1Time;
+      if (state.player2Time !== undefined) player2Time.value = state.player2Time;
+      
+      // Show game canvas when we start receiving state
+      if (gameCanvas.value) {
+        showLobby.value = false;
         updateGameState(state);
       }
     } catch (err) {
@@ -201,13 +201,19 @@ const connectToGameServer = () => {
   });
 
   socket.on("start", (data: { round: number }) => {
-    console.log("[GAME] Game started! Round:", data.round);
-    isMyTurn.value = true;
+    console.log("[GAME] Game started! Round:", data.round, "playerIndex:", playerIndex.value);
+    isMyTurn.value = playerIndex.value === 0;
+    showLobby.value = false;
+    
+    // Start the game canvas
+    if (gameCanvas.value) {
+      start();
+    }
   });
 
   socket.on("turn", (data: { round: number }) => {
-    console.log("[GAME] Turn changed, round:", data.round);
-    isMyTurn.value = data.round % 2 === 0;
+    console.log("[GAME] Turn changed, round:", data.round, "playerIndex:", playerIndex.value);
+    isMyTurn.value = (data.round % 2) === playerIndex.value;
   });
 
   socket.on("gameOver", (data: { socket: string }) => {
@@ -224,20 +230,19 @@ const connectToGameServer = () => {
   });
 };
 
-function updateGameState(gameState: GameState) {
+function updateGameState(state: GameState) {
   console.log("[GAME] Updating game state:", {
-    players: gameState.players.length,
-    arena: gameState.arena.name,
-    round: gameState.round,
-    p1Time: gameState.player1Time,
-    p2Time: gameState.player2Time,
+    players: state.players?.length,
+    arena: state.arena?.name,
+    round: state.round,
+    p1Time: state.player1Time,
+    p2Time: state.player2Time,
   });
 
-  player1Time.value = gameState.player1Time;
-  player2Time.value = gameState.player2Time;
+  player1Time.value = state.player1Time || 600;
+  player2Time.value = state.player2Time || 600;
 
-  const { updateState } = useGameEngine(gameCanvas);
-  updateState(gameState);
+  updateState(state);
 }
 
 const endGame = async () => {
