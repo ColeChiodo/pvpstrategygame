@@ -35,6 +35,7 @@ const io = new Server(httpServer, {
     methods: ["GET", "POST"],
     credentials: true,
   },
+  path: `/game/${gameId}/socket.io`,
 });
 
 io.on("connection", (socket) => {

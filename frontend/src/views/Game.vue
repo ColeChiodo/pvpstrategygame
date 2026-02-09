@@ -132,9 +132,8 @@ const connectToGameServer = () => {
   }
 
   socket = io(serverUrl, {
-    path: "/socket.io",
+    path: `/game/${gameId}/socket.io`,
     query: {
-      gameId,
       userId,
     },
   });

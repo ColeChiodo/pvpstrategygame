@@ -19,12 +19,14 @@ ingress:
     originRequest:
       noTLSVerify: true
 
-  # Game servers - K8s (matches /game/game-xxx)
+  # Game servers - K8s (matches /game/game-xxx and /game/game-xxx/socket.io)
+  # Points to Traefik HTTPS endpoint for WebSocket support
   - hostname: fortezza.colechiodo.cc
     path: /game/*
-    service: https://172.19.0.2:30080
+    service: https://172.19.0.2:30082
     originRequest:
       noTLSVerify: true
+      http2Origin: false
 
   # Frontend fallback
   - hostname: fortezza.colechiodo.cc
