@@ -156,12 +156,19 @@ const connectToGameServer = () => {
     query: { userId },
   });
 
+  console.log("[GAME] Socket connecting to:", `${import.meta.env.VITE_GAME_URL}/game/${gameSessionId}/socket.io`);
+
   socket.on("connect", () => {
-    console.log("[GAME] Socket connected, joining game...");
-    socket?.emit('join-game', gameSessionId, userName, userAvatar);
+    console.log("[GAME] Socket connected! ID:", socket?.id);
+    console.log("[GAME] Emitting join...");
+    socket?.emit('join', { gameId: gameSessionId, name: userName, avatar: userAvatar });
   });
 
-  socket.on("game-joined", (data: any) => {
+  socket.on("connect_error", (err: Error) => {
+    console.error("[GAME] Connect error:", err.message);
+  });
+
+  socket.on("joined", (data: any) => {
     console.log("[GAME] Joined game:", data);
     connectedToGameServer.value = true;
 
@@ -176,22 +183,31 @@ const connectToGameServer = () => {
     }, 3000);
   });
 
-  socket.on("gameState", (compressedData: any) => {
+  socket.on("error", (err: any) => {
+    console.error("[GAME] Server error:", err);
+  });
+
+  socket.on("state", (compressedData: any) => {
     try {
       const decompressed = inflate(compressedData, { to: 'string' });
-      const gameState = JSON.parse(decompressed);
-      console.log("[GAME] Received gameState");
+      const state = JSON.parse(decompressed);
+      console.log("[GAME] Received state, players:", state.players?.length);
       if (gameCanvas.value && ctx) {
-        updateGameState(gameState);
+        updateGameState(state);
       }
     } catch (err) {
-      console.error("[GAME] Error parsing gameState:", err);
+      console.error("[GAME] Error parsing state:", err);
     }
   });
 
-  socket.on("nextRound", (data: { socket: string }) => {
-    console.log("[GAME] Next round, current socket:", socket?.id, "turn socket:", data.socket);
-    isMyTurn.value = data.socket === socket?.id;
+  socket.on("start", (data: { round: number }) => {
+    console.log("[GAME] Game started! Round:", data.round);
+    isMyTurn.value = true;
+  });
+
+  socket.on("turn", (data: { round: number }) => {
+    console.log("[GAME] Turn changed, round:", data.round);
+    isMyTurn.value = data.round % 2 === 0;
   });
 
   socket.on("gameOver", (data: { socket: string }) => {
