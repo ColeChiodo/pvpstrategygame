@@ -14,15 +14,15 @@
       <div class="lobby-content">
         <div class="lobby-players">
           <div class="lobby-player">
-            <img :src="authStore.user?.avatar || '/default-avatar.png'" class="lobby-avatar" />
-            <span class="lobby-name">{{ authStore.displayName }}</span>
-            <span class="lobby-label">YOU</span>
+            <img :src="gameSession.isHost ? authStore.user?.avatar : gameSession.opponent?.avatar" class="lobby-avatar" />
+            <span class="lobby-name">{{ gameSession.isHost ? authStore.displayName : gameSession.opponent?.displayName }}</span>
+            <span class="lobby-label">HOST</span>
           </div>
           <div class="vs-badge-large">VS</div>
           <div class="lobby-player">
-            <img :src="gameSession.opponent?.avatar || '/default-avatar.png'" class="lobby-avatar" />
-            <span class="lobby-name">{{ gameSession.opponent?.displayName || 'Opponent' }}</span>
-            <span class="lobby-label">OPPONENT</span>
+            <img :src="gameSession.isHost ? gameSession.opponent?.avatar : authStore.user?.avatar" class="lobby-avatar" />
+            <span class="lobby-name">{{ gameSession.isHost ? gameSession.opponent?.displayName : authStore.displayName }}</span>
+            <span class="lobby-label">CHALLENGER</span>
           </div>
         </div>
         <p class="lobby-subtitle">Game starting soon...</p>
@@ -33,47 +33,57 @@
       <canvas ref="gameCanvas" class="game-canvas"></canvas>
 
       <div class="game-hud">
-        <div class="back-link-container">
-          <RouterLink to="/play" class="back-link">← Back to Play</RouterLink>
-        </div>
-
         <div class="game-info-bar">
-          <div class="player-timer" :class="{ 'active-turn': isMyTurn }">
-            <img :src="authStore.user?.avatar || '/default-avatar.png'" class="timer-avatar" />
-            <span class="timer-name">{{ authStore.displayName }}</span>
+          <div class="player-timer" :class="{ 'active-turn': isPlayer1Turn }">
+            <img :src="gameSession.isHost ? authStore.user?.avatar : gameSession.opponent?.avatar" class="timer-avatar" />
+            <span class="timer-name">{{ gameSession.isHost ? authStore.displayName : gameSession.opponent?.displayName }}</span>
             <span class="timer-value">{{ formatTime(player1Time) }}</span>
           </div>
 
-          <div class="turn-indicator" :class="{ 'my-turn': isMyTurn }">
-            {{ isMyTurn ? 'YOUR TURN' : 'ENEMY TURN' }}
+          <div class="turn-indicator" :class="{ 'my-turn': isPlayer1Turn }">
+            {{ isPlayer1Turn ? 'HOST TURN' : 'CHALLENGER TURN' }}
           </div>
 
-          <div class="player-timer opponent" :class="{ 'active-turn': !isMyTurn }">
-            <img :src="gameSession.opponent?.avatar || '/default-avatar.png'" class="timer-avatar" />
-            <span class="timer-name">{{ gameSession.opponent?.displayName || 'Opponent' }}</span>
+          <div class="player-timer opponent" :class="{ 'active-turn': !isPlayer1Turn }">
+            <img :src="gameSession.isHost ? gameSession.opponent?.avatar : authStore.user?.avatar" class="timer-avatar" />
+            <span class="timer-name">{{ gameSession.isHost ? gameSession.opponent?.displayName : authStore.displayName }}</span>
             <span class="timer-value">{{ formatTime(player2Time) }}</span>
           </div>
+        </div>
+
+        <div class="game-controls">
+          <PlayButton
+            v-if="isPlayer1Turn && gameSession.isHost"
+            text="END TURN"
+            color="cyan"
+            @click="endTurn"
+          />
+          <PlayButton
+            v-else-if="!isPlayer1Turn && !gameSession.isHost"
+            text="END TURN"
+            color="cyan"
+            @click="endTurn"
+          />
         </div>
       </div>
     </div>
 
     <div v-else class="error-state">
       <p>Game not found</p>
-      <RouterLink to="/play">Return to Play</RouterLink>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch } from "vue";
+import { ref, onMounted, onUnmounted, computed } from "vue";
 import { useRouter } from "vue-router";
-import { RouterLink } from "vue-router";
 import { useAuthStore } from "../stores/auth";
 import { alerts } from "../composables/useAlerts";
 import { io, Socket } from "socket.io-client";
 import { inflate } from 'pako';
 import { useGameEngine } from "../game-engine";
 import { GameState } from "../game-engine/types";
+import PlayButton from "../components/PlayButton.vue";
 
 const props = defineProps<{
   gameId: string;
@@ -89,14 +99,18 @@ const loading = ref(true);
 const connectedToGameServer = ref(false);
 const showLobby = ref(true);
 const lobbyExiting = ref(false);
-const isMyTurn = ref(false);
 const playerIndex = ref<number>(-1);
 const player1Time = ref(600);
 const player2Time = ref(600);
+const currentRound = ref(0);
 
 let socket: Socket | null = null;
 
 const { initSocket, start, stop, updateState } = useGameEngine(gameCanvas);
+
+const isPlayer1Turn = computed(() => {
+  return currentRound.value % 2 === 0;
+});
 
 const formatTime = (seconds: number): string => {
   const mins = Math.floor(seconds / 60);
@@ -111,16 +125,11 @@ const fetchGameDetails = async () => {
   lobbyExiting.value = false;
   try {
     const url = `${import.meta.env.VITE_API_URL}/api/matchmaking/game/${props.gameId}`;
-    console.log("[GAME] Fetching from:", url);
-
     const response = await fetch(url, { credentials: "include" });
-    console.log("[GAME] Response status:", response.status);
     const data = await response.json();
     console.log("[GAME] API response:", JSON.stringify(data, null, 2));
-
     gameSession.value = data;
     loading.value = false;
-
     if (data.serverUrl) {
       connectToGameServer();
     }
@@ -146,6 +155,7 @@ const connectToGameServer = () => {
   console.log("[GAME] Connecting to game server URL:", serverUrl);
   console.log("[GAME] Game Session ID:", gameSessionId);
   console.log("[GAME] User:", userId, userName);
+  console.log("[GAME] isHost:", gameSession.value.isHost);
 
   if (!gameSessionId || !userId) {
     console.error("[GAME] ERROR: gameSessionId or userId is undefined!");
@@ -173,7 +183,6 @@ const connectToGameServer = () => {
     console.log("[GAME] Joined game:", data);
     connectedToGameServer.value = true;
     playerIndex.value = data.playerIndex;
-    // Wait for "start" event to show game
   });
 
   socket.on("error", (err: any) => {
@@ -186,13 +195,14 @@ const connectToGameServer = () => {
       const state = JSON.parse(decompressed);
       console.log("[GAME] Received state, players:", state.players?.length, "round:", state.round);
       
-      // Update timers
       if (state.player1Time !== undefined) player1Time.value = state.player1Time;
       if (state.player2Time !== undefined) player2Time.value = state.player2Time;
+      if (state.round !== undefined) currentRound.value = state.round;
       
-      // Show game canvas when we start receiving state
-      if (gameCanvas.value) {
-        showLobby.value = false;
+      console.log("[GAME] Timer update:", player1Time.value, player2Time.value);
+      console.log("[GAME] isPlayer1Turn:", isPlayer1Turn.value, "isHost:", gameSession.value?.isHost);
+      
+      if (gameCanvas.value && !showLobby.value) {
         updateGameState(state);
       }
     } catch (err) {
@@ -202,10 +212,9 @@ const connectToGameServer = () => {
 
   socket.on("start", (data: { round: number }) => {
     console.log("[GAME] Game started! Round:", data.round, "playerIndex:", playerIndex.value);
-    isMyTurn.value = playerIndex.value === 0;
+    currentRound.value = data.round;
     showLobby.value = false;
     
-    // Start the game canvas
     if (gameCanvas.value) {
       start();
     }
@@ -213,11 +222,7 @@ const connectToGameServer = () => {
 
   socket.on("turn", (data: { round: number }) => {
     console.log("[GAME] Turn changed, round:", data.round, "playerIndex:", playerIndex.value);
-    isMyTurn.value = (data.round % 2) === playerIndex.value;
-  });
-
-  socket.on("gameOver", (data: { socket: string }) => {
-    console.log("[GAME] Game over, winner socket:", data.socket);
+    currentRound.value = data.round;
   });
 
   socket.on("disconnect", (reason) => {
@@ -231,58 +236,13 @@ const connectToGameServer = () => {
 };
 
 function updateGameState(state: GameState) {
-  console.log("[GAME] Updating game state:", {
-    players: state.players?.length,
-    arena: state.arena?.name,
-    round: state.round,
-    p1Time: state.player1Time,
-    p2Time: state.player2Time,
-  });
-
-  player1Time.value = state.player1Time || 600;
-  player2Time.value = state.player2Time || 600;
-
   updateState(state);
 }
 
-const endGame = async () => {
-  if (!gameSession.value?.gameId) {
-    console.log("[END-GAME] No gameSession.gameId, aborting");
-    return;
-  }
-
-  console.log("[END-GAME] Starting end game for:", gameSession.value.gameId);
-  isEnding.value = true;
-
-  try {
-    const response = await fetch(`${import.meta.env.VITE_API_URL}/api/matchmaking/game/${gameSession.value.gameId}/end`, {
-      method: "POST",
-      credentials: "include",
-    });
-
-    console.log("[END-GAME] Response status:", response.status);
-    const result = await response.json();
-    console.log("[END-GAME] Response:", result);
-
-    if (response.ok) {
-      stop();
-      socket?.disconnect();
-      router.push("/play");
-      alerts.success("Game ended");
-    } else {
-      alerts.error("Failed to end game: " + (result.error || "Unknown error"));
-    }
-  } catch (err) {
-    console.error("[END-GAME] Error:", err);
-    alerts.error("Failed to end game");
-  } finally {
-    isEnding.value = false;
-  }
+const endTurn = () => {
+  console.log("[GAME] End turn clicked");
+  socket?.emit('endTurn');
 };
-
-watch(isMyTurn, (val) => {
-  console.log("[GAME] isMyTurn changed:", val);
-});
 
 watch([() => player1Time.value, () => player2Time.value], () => {
   console.log("[GAME] Timer update:", player1Time.value, player2Time.value);
@@ -432,36 +392,15 @@ onUnmounted(() => {
   top: 0;
   left: 0;
   right: 0;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
   pointer-events: none;
 }
 
-.back-link-container {
-  position: absolute;
-  top: 1rem;
-  left: 1rem;
-  z-index: 10;
-}
-
-.back-link {
-  color: white;
-  text-decoration: none;
-  font-size: 1rem;
-  opacity: 0.8;
-  padding: 0.5rem 1rem;
-  background: rgba(0, 0, 0, 0.5);
-  border-radius: 0.5rem;
-  transition: opacity 0.2s;
-}
-
-.back-link:hover {
-  opacity: 1;
-}
-
 .game-info-bar {
-  position: absolute;
-  top: 1rem;
-  left: 50%;
-  transform: translateX(-50%);
   display: flex;
   align-items: center;
   gap: 2rem;
@@ -469,6 +408,7 @@ onUnmounted(() => {
   background: rgba(26, 26, 62, 0.9);
   border-radius: 1rem;
   border: 1px solid rgba(255, 255, 255, 0.1);
+  pointer-events: auto;
 }
 
 .player-timer {
@@ -533,7 +473,7 @@ onUnmounted(() => {
   color: #22d3ee;
 }
 
-.error-state a {
-  color: #22d3ee;
+.game-controls {
+  pointer-events: auto;
 }
 </style>
