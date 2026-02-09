@@ -175,10 +175,17 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
 
     function draw() {
         console.log('[DRAW] draw() called, ctx:', !!ctx, 'canvasRef.value:', !!canvasRef.value);
+        
+        if (!ctx && canvasRef.value) {
+            console.log('[DRAW] Initializing ctx from draw()');
+            ctx = canvasRef.value.getContext('2d');
+        }
+        
         if (!ctx || !canvasRef.value) {
-            console.log('[DRAW] draw() returning early - missing ctx or canvasRef');
+            console.log('[DRAW] draw() returning early - still no ctx');
             return;
         }
+        
         ctx.clearRect(0, 0, canvasRef.value.width, canvasRef.value.height);
         drawBackground();
         drawArena();
@@ -729,6 +736,11 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     }
 
     function updateState(state: GameState) {
+        console.log('[UPDATE] updateState called');
+        if (!ctx && canvasRef.value) {
+            console.log('[UPDATE] Initializing ctx');
+            ctx = canvasRef.value.getContext('2d');
+        }
         if (state.arena) {
             loadArenaImage(state.arena);
         }
@@ -739,7 +751,9 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
         if (state.visibleTiles) {
             visibleTiles.value = state.visibleTiles;
         }
-        currentRound = state.round || 0;
+        if (state.round !== undefined) {
+            currentRound = state.round;
+        }
         draw();
     }
 
