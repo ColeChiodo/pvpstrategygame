@@ -85,43 +85,27 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
         for (const player of newPlayers) {
             console.log('[LOAD] Player:', player.name, 'has', player.units.length, 'units');
             for (const unit of player.units) {
-                console.log('[LOAD] Unit:', unit.name, 'at', unit.row, unit.col, 'id:', unit.id, 'type:', typeof unit.id);
+                console.log('[LOAD] Unit:', unit.name, 'at', unit.row, unit.col, 'id:', unit.id);
                 
-                const existingUnit = units.value.find(u => String(u.id) === String(unit.id));
-                console.log('[LOAD] Existing unit found:', !!existingUnit, 'existing sprite:', existingUnit?.sprite?.name);
-
-                if (existingUnit) {
-                    console.log('[LOAD] Updating existing unit');
-                    if (animatingUnit && animatingUnit.id === unit.id && animatingUnit.owner === player) {
-                        existingUnit.row = unit.row;
-                        existingUnit.col = unit.col;
-                    }
-                    existingUnit.health = unit.health;
-                    existingUnit.canMove = unit.canMove;
-                    existingUnit.canAct = unit.canAct;
-                    existingUnit.currentStatus = !unit.canMove && !unit.canAct ? 1 : 0;
-                    updatedOrAddedIds.add(String(existingUnit.id));
+                unit.owner = player;
+                const newSprite = sprites.find(s => s.name === unit.name);
+                console.log('[LOAD] Sprite found:', !!newSprite, 'name:', newSprite?.name);
+                if (newSprite) {
+                    unit.sprite = { ...newSprite, currentFrame: 0, direction: 1 };
+                    console.log('[LOAD] Unit sprite assigned:', unit.sprite?.name);
                 } else {
-                    console.log('[LOAD] Creating new unit, looking for sprite:', unit.name);
-                    unit.owner = player;
-                    const newSprite = sprites.find(s => s.name === unit.name);
-                    console.log('[LOAD] Sprite found:', !!newSprite, 'name:', newSprite?.name);
-                    if (newSprite) {
-                        unit.sprite = { ...newSprite, currentFrame: 0, direction: 1 };
-                    }
-                    console.log('[LOAD] Unit sprite after assign:', unit.sprite?.name);
-                    unit.currentStatus = unit.canMove || unit.canAct ? 0 : 1;
-                    units.value.push(unit);
-                    updatedOrAddedIds.add(String(unit.id));
+                    console.log('[LOAD] No sprite found for unit:', unit.name);
                 }
+                unit.currentStatus = unit.canMove || unit.canAct ? 0 : 1;
+                units.value.push(unit);
+                updatedOrAddedIds.add(String(unit.id));
             }
-        }
-
-        if (!animatingUnit) {
-            units.value = units.value.filter(u => updatedOrAddedIds.has(String(u.id)));
         }
         
         console.log('[LOAD] Total units after load:', units.value.length);
+        for (const u of units.value) {
+            console.log('[LOAD] Unit in list:', u.name, 'sprite:', u.sprite?.name);
+        }
     }
 
     function resizeCanvas() {
