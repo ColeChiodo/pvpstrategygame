@@ -173,6 +173,7 @@ const connectToGameServer = () => {
     console.log("[GAME] Socket connected! ID:", socket?.id);
     console.log("[GAME] Emitting join...");
     console.log("[GAME] About to call initSocket");
+    loading.value = false;
     initSocket(socket, {
       gameId: gameSessionId,
       isHost: gameSession.value.isHost,
@@ -227,15 +228,20 @@ const connectToGameServer = () => {
 
   socket.on("start", (data: { round: number }) => {
     console.log("[GAME] Game started! Round:", data.round, "playerIndex:", playerIndex.value);
-    console.log("[GAME] Game session value:", gameSession.value);
+    console.log("[GAME] Game session value:", !!gameSession.value);
     console.log("[GAME] isHost:", gameSession.value?.isHost);
+    console.log("[GAME] gameCanvas.value:", !!gameCanvas.value);
+    console.log("[GAME] gameCanvas.value dimensions:", gameCanvas.value?.width, 'x', gameCanvas.value?.height);
     currentRound.value = data.round;
     showLobby.value = false;
     
     console.log("[GAME] About to call start() on game engine");
     if (gameCanvas.value) {
       console.log("[GAME] Canvas exists, calling start()");
-      start();
+      setTimeout(() => {
+        console.log("[GAME] Inside setTimeout, calling start()");
+        start();
+      }, 100);
     } else {
       console.log("[GAME] ERROR: Canvas does not exist!");
     }
@@ -249,8 +255,10 @@ const connectToGameServer = () => {
   socket.on("disconnect", (reason) => {
     console.log("[GAME] Disconnected from game server:", reason);
     if (gameSession.value && !isEnding.value) {
+      console.log("[GAME] Calling stop()");
       stop();
-      alerts.info("Game ended");
+      console.log("[GAME] Navigating to /play");
+      alerts.info("Game ended - disconnected");
       router.push("/play");
     }
   });
@@ -271,6 +279,14 @@ watch([() => player1Time.value, () => player2Time.value], () => {
 });
 
 onMounted(() => {
+  console.log("[GAME] onMounted called");
+  console.log("[GAME] gameCanvas.value:", !!gameCanvas.value);
+  
+  // Debug keyboard events at window level
+  window.addEventListener('keydown', (e) => {
+    console.log("[DEBUG] Window keydown:", e.key);
+  });
+  
   fetchGameDetails();
 });
 
@@ -282,7 +298,8 @@ onUnmounted(() => {
 
 <style scoped>
 .game-page {
-  min-height: 100vh;
+  width: 100vw;
+  height: 100vh;
   background-color: #0f0f2b;
   position: relative;
   overflow: hidden;
@@ -404,8 +421,8 @@ onUnmounted(() => {
 }
 
 .game-canvas {
-  width: 100%;
-  height: 100%;
+  width: 100vw;
+  height: 100vh;
   display: block;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
@@ -423,6 +440,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 1rem;
   pointer-events: none;
+  z-index: 10;
 }
 
 .game-info-bar {
