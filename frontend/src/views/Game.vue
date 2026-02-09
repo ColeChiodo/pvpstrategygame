@@ -30,7 +30,7 @@
     </div>
 
     <div v-else-if="gameSession" class="game-layout">
-      <canvas ref="gameCanvas" class="game-canvas"></canvas>
+      <canvas ref="gameCanvas" class="game-canvas" tabindex="0"></canvas>
 
       <div class="game-hud">
         <div class="game-info-bar">
@@ -281,12 +281,6 @@ watch([() => player1Time.value, () => player2Time.value], () => {
 onMounted(() => {
   console.log("[GAME] onMounted called");
   console.log("[GAME] gameCanvas.value:", !!gameCanvas.value);
-  
-  // Debug keyboard events at window level
-  window.addEventListener('keydown', (e) => {
-    console.log("[DEBUG] Window keydown:", e.key);
-  });
-  
   fetchGameDetails();
 });
 
@@ -426,7 +420,6 @@ onUnmounted(() => {
   display: block;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
-  object-fit: contain;
 }
 
 .game-hud {
@@ -434,11 +427,12 @@ onUnmounted(() => {
   top: 0;
   left: 0;
   right: 0;
-  padding: 1rem;
+  bottom: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1rem;
+  justify-content: space-between;
+  padding: 1rem;
   pointer-events: none;
   z-index: 10;
 }
