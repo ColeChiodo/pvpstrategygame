@@ -10,27 +10,29 @@
       <p>Connecting to game server...</p>
     </div>
 
-    <div v-else-if="gameSession && showLobby" class="lobby-overlay" :class="{ 'lobby-exit': lobbyExiting }">
-      <div class="lobby-content">
-        <div class="lobby-players">
-          <div class="lobby-player">
-            <img :src="gameSession.isHost ? authStore.user?.avatar : gameSession.opponent?.avatar" class="lobby-avatar" />
-            <span class="lobby-name">{{ gameSession.isHost ? authStore.displayName : gameSession.opponent?.displayName }}</span>
-            <span class="lobby-label">HOST</span>
-          </div>
-          <div class="vs-badge-large">VS</div>
-          <div class="lobby-player">
-            <img :src="gameSession.isHost ? gameSession.opponent?.avatar : authStore.user?.avatar" class="lobby-avatar" />
-            <span class="lobby-name">{{ gameSession.isHost ? gameSession.opponent?.displayName : authStore.displayName }}</span>
-            <span class="lobby-label">CHALLENGER</span>
-          </div>
-        </div>
-        <p class="lobby-subtitle">Game starting soon...</p>
-      </div>
-    </div>
-
     <div v-else-if="gameSession" class="game-layout">
-      <canvas ref="gameCanvas" class="game-canvas" tabindex="0"></canvas>
+      <!-- Lobby Overlay -->
+      <div v-if="showLobby" class="lobby-overlay" :class="{ 'lobby-exit': lobbyExiting }">
+        <div class="lobby-content">
+          <div class="lobby-players">
+            <div class="lobby-player">
+              <img :src="gameSession.isHost ? authStore.user?.avatar : gameSession.opponent?.avatar" class="lobby-avatar" />
+              <span class="lobby-name">{{ gameSession.isHost ? authStore.displayName : gameSession.opponent?.displayName }}</span>
+              <span class="lobby-label">HOST</span>
+            </div>
+            <div class="vs-badge-large">VS</div>
+            <div class="lobby-player">
+              <img :src="gameSession.isHost ? gameSession.opponent?.avatar : authStore.user?.avatar" class="lobby-avatar" />
+              <span class="lobby-name">{{ gameSession.isHost ? gameSession.opponent?.displayName : authStore.displayName }}</span>
+              <span class="lobby-label">CHALLENGER</span>
+            </div>
+          </div>
+          <p class="lobby-subtitle">Game starting soon...</p>
+        </div>
+      </div>
+
+      <!-- Game Canvas -->
+      <canvas ref="gameCanvas" class="game-canvas" tabindex="0" :class="{ 'hidden': showLobby }"></canvas>
 
       <div class="game-hud">
         <div class="game-info-bar">
@@ -214,11 +216,20 @@ const connectToGameServer = () => {
       
       // Check if game has already started (has units)
       const hasUnits = state.players?.some((p: any) => p.units?.length > 0);
-      console.log("[GAME] Has units:", hasUnits, "showLobby:", showLobby.value);
+      console.log("[GAME] Has units:", hasUnits, "showLobby:", showLobby.value, "connected:", connectedToGameServer.value);
       
-      // If game has started and we're still in lobby, skip lobby
-      if (hasUnits && showLobby.value) {
-        console.log("[GAME] Game already started, skipping lobby");
+      // Mark as connected
+      connectedToGameServer.value = true;
+      
+      // If game has started and we're still showing lobby/connecting, skip to game
+      if (hasUnits && (showLobby.value || loading.value)) {
+        console.log("[GAME] Game already started, showing canvas immediately");
+        loading.value = false;
+        showLobby.value = false;
+      }
+      
+      // Ensure lobby is hidden if game has units
+      if (hasUnits) {
         showLobby.value = false;
       }
       
@@ -226,8 +237,9 @@ const connectToGameServer = () => {
       if (gameCanvas.value && !showLobby.value) {
         console.log("[GAME] Calling updateGameState");
         updateGameState(state);
+        pendingState.value = null;
       } else if (hasUnits) {
-        // Game started but canvas not ready yet, wait and try again
+        // Game started but canvas not ready yet, queue it
         console.log("[GAME] Canvas not ready, queuing state update");
         pendingState.value = state;
       }
@@ -240,23 +252,37 @@ const connectToGameServer = () => {
     console.log("[GAME] Game started! Round:", data.round);
     currentRound.value = data.round;
     showLobby.value = false;
+    connectedToGameServer.value = true;
+    loading.value = false;
     
-    console.log("[GAME] About to call start()");
-    if (gameCanvas.value) {
-      console.log("[GAME] Canvas exists, calling start()");
-      start();
-      
-      // Apply pending state if exists
-      if (pendingState.value) {
-        console.log("[GAME] Applying pending state");
+    // Wait for next tick to ensure canvas is rendered
+    setTimeout(() => {
+      console.log("[GAME] About to call start(), canvas exists:", !!gameCanvas.value);
+      if (gameCanvas.value) {
+        console.log("[GAME] Canvas exists, calling start()");
+        start();
+        
+        // Apply pending state if exists
+        if (pendingState.value) {
+          console.log("[GAME] Applying pending state");
+          setTimeout(() => {
+            updateGameState(pendingState.value!);
+            pendingState.value = null;
+          }, 50);
+        }
+        
+        // Retry mechanism: if still no render after 500ms, try again
         setTimeout(() => {
-          updateGameState(pendingState.value!);
-          pendingState.value = null;
-        }, 50);
+          const canvas = document.querySelector('.game-canvas');
+          if (canvas && !canvas.getAttribute('data-started')) {
+            console.log("[GAME] Retry: Canvas may not have rendered, restarting...");
+            start();
+          }
+        }, 500);
+      } else {
+        console.log("[GAME] ERROR: Canvas does not exist!");
       }
-    } else {
-      console.log("[GAME] ERROR: Canvas does not exist!");
-    }
+    }, 100);
   });
 
   socket.on("turn", (data: { round: number }) => {
@@ -298,6 +324,14 @@ watch(() => showLobby.value, (newVal) => {
       gameCanvas.value?.focus();
       console.log("[GAME] Canvas focused:", document.activeElement === gameCanvas.value);
     }, 100);
+  }
+});
+
+// Backup: If game has started but start() wasn't called, call it when canvas appears
+watch(() => gameCanvas.value, (newVal) => {
+  if (newVal && !showLobby.value && !pendingState.value) {
+    console.log("[GAME] Canvas appeared while game in progress, starting...");
+    start();
   }
 });
 
@@ -449,6 +483,10 @@ onUnmounted(() => {
   image-rendering: crisp-edges;
   outline: none;
   border: 2px solid red; /* DEBUG: remove later */
+}
+
+.game-canvas.hidden {
+  display: none;
 }
 
 .game-hud {

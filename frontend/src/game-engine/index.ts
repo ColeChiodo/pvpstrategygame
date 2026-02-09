@@ -759,9 +759,16 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
         
         console.log('[START] Event listeners added, starting game loop');
         gameLoop();
+        
+        // Mark canvas as started for retry detection
+        if (canvasRef.value) {
+            canvasRef.value.setAttribute('data-started', 'true');
+        }
+        console.log('[START] Game engine started successfully');
     }
 
     function stop() {
+        console.log('[STOP] Stopping game engine');
         if (animationFrameId) cancelAnimationFrame(animationFrameId);
         window.removeEventListener('resize', resizeCanvas);
         window.removeEventListener('keydown', handleKeyDown);
@@ -772,7 +779,10 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
             canvasRef.value.removeEventListener('mouseleave', handleMouseLeave);
             canvasRef.value.removeEventListener('mousemove', handleMouseMove);
             canvasRef.value.removeEventListener('wheel', handleWheel);
+            canvasRef.value.removeAttribute('data-started');
         }
+        isStarted = false;
+        console.log('[STOP] Game engine stopped');
     }
 
     function updateState(state: GameState) {
