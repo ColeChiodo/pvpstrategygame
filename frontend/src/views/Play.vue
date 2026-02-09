@@ -259,7 +259,7 @@ onMounted(async () => {
   window.addEventListener("mousemove", handleMouseMove);
   await fetchLatestVersion();
 
-  matchmakingSocket = io("/", {
+  matchmakingSocket = io(import.meta.env.VITE_API_URL, {
     path: "/socket.io",
     query: {},
   });
@@ -568,7 +568,7 @@ const leaveQueue = async () => {
 
 const fetchGameDetails = async (gameId: string) => {
   try {
-    const response = await fetch(`/api/matchmaking/game/${gameId}`, {
+    const response = await fetch(`${import.meta.env.VITE_API_URL}/api/matchmaking/game/${gameId}`, {
       credentials: "include",
     });
     const data = await response.json();

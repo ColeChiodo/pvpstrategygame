@@ -91,7 +91,7 @@ let socket: Socket | null = null;
 
   const fetchGameDetails = async () => {
   try {
-    const response = await fetch(`/api/matchmaking/game/${props.gameId}`, {
+    const response = await fetch(`${import.meta.env.VITE_API_URL}/api/matchmaking/game/${props.gameId}`, {
       credentials: "include",
     });
     const data = await response.json();
@@ -131,7 +131,7 @@ const connectToGameServer = () => {
     return;
   }
 
-  socket = io(serverUrl, {
+  socket = io(import.meta.env.VITE_GAME_URL, {
     path: `/game/${gameId}/socket.io`,
     query: {
       userId,
@@ -174,7 +174,7 @@ const endGame = async () => {
   isEnding.value = true;
 
   try {
-    const response = await fetch(`/api/matchmaking/game/${gameSession.value.id}/end`, {
+    const response = await fetch(`${import.meta.env.VITE_API_URL}/api/matchmaking/game/${gameSession.value.id}/end`, {
       method: "POST",
       credentials: "include",
     });

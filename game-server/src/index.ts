@@ -12,19 +12,22 @@ const gameId = process.env.GAME_ID || "unknown";
 const port = parseInt(process.env.PORT || "3000");
 
 const httpServer = createServer((req, res) => {
+  console.log(`[${gameId}] HTTP Request: ${req.method} ${req.url} (headers: ${JSON.stringify(req.headers)})`);
   if (req.url === "/health" && req.method === "GET") {
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ status: "healthy", gameId }));
     return;
   }
   res.writeHead(404);
-  res.end();
+  res.end(JSON.stringify({ error: "Not found", url: req.url }));
 });
 
 const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS?.split(",") || [
   "http://localhost:5173",
   "http://127.0.0.1:5173",
   "https://fortezza.colechiodo.cc",
+  "https://apifortezza.colechiodo.cc",
+  "https://gamefortezza.colechiodo.cc"
 ];
 
 console.log(`[${gameId}] ALLOWED_ORIGINS:`, ALLOWED_ORIGINS);
@@ -35,7 +38,7 @@ const io = new Server(httpServer, {
     methods: ["GET", "POST"],
     credentials: true,
   },
-  path: `/game/${gameId}/socket.io`,
+  path: "/socket.io",
 });
 
 io.on("connection", (socket) => {

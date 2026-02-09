@@ -27,7 +27,7 @@ console.log("[K8S] Current cluster:", kc.getCurrentCluster()?.name);
 console.log("[K8S] Cluster server:", kc.getCurrentCluster()?.server);
 
 kc.clusters.forEach(cluster => {
-  console.log(`[K8S] Cluster ${cluster.name}: ${cluster.server}, skipTLSVerify: ${cluster.insecureSkipTLSVerify}`);
+  console.log(`[K8S] Cluster ${cluster.name}: ${cluster.server}`);
 });
 
 const k8sApi = kc.makeApiClient(k8s.CoreV1Api);
@@ -40,9 +40,53 @@ const GAME_SERVER_REPLICAS = 1;
 const GAME_SERVER_PORT = 3000;
 const GAME_SERVER_HOSTNAME = process.env.GAME_SERVER_HOSTNAME || "fortezza.colechiodo.cc";
 
+async function createStripPrefixMiddleware(gameId: string): Promise<boolean> {
+  const middlewareName = `strip-game-prefix-${gameId}`;
+
+  const middleware = {
+    apiVersion: "traefik.io/v1alpha1",
+    kind: "Middleware",
+    metadata: {
+      name: middlewareName,
+      namespace: GAME_SERVER_NAMESPACE,
+    },
+    spec: {
+      stripPrefix: {
+        prefixes: [`/game/${gameId}`],
+      },
+    },
+  };
+
+  try {
+    await k8sCustomApi.createNamespacedCustomObject({
+      group: "traefik.io",
+      version: "v1alpha1",
+      namespace: GAME_SERVER_NAMESPACE,
+      plural: "middlewares",
+      body: middleware,
+    });
+    console.log(`[K8S] StripPrefix middleware created: ${middlewareName}`);
+    return true;
+  } catch (error: any) {
+    if (error.statusCode === 409) {
+      console.log(`[K8S] StripPrefix middleware already exists: ${middlewareName}`);
+      return true;
+    }
+    console.error(`[K8S] Failed to create StripPrefix middleware:`, error.message);
+    return false;
+  }
+}
+
 async function createIngressRoute(gameId: string, serviceName: string): Promise<boolean> {
   const ingressRouteName = `game-server-${gameId}`;
-  
+
+  // Create StripPrefix middleware first
+  const middlewareCreated = await createStripPrefixMiddleware(gameId);
+  if (!middlewareCreated) {
+    console.error(`[K8S] Failed to create middleware, aborting IngressRoute creation`);
+    return false;
+  }
+
   const ingressRoute = {
     apiVersion: "traefik.io/v1alpha1",
     kind: "IngressRoute",
@@ -56,6 +100,16 @@ async function createIngressRoute(gameId: string, serviceName: string): Promise<
         {
           match: `Host(\`${GAME_SERVER_HOSTNAME}\`) && PathPrefix(\`/game/${gameId}\`)`,
           kind: "Rule",
+          middlewares: [
+            {
+              name: "game-headers",
+              namespace: GAME_SERVER_NAMESPACE,
+            },
+            {
+              name: `strip-game-prefix-${gameId}`,
+              namespace: GAME_SERVER_NAMESPACE,
+            },
+          ],
           services: [
             {
               name: serviceName,
@@ -83,9 +137,30 @@ async function createIngressRoute(gameId: string, serviceName: string): Promise<
   }
 }
 
+async function deleteStripPrefixMiddleware(gameId: string): Promise<boolean> {
+  const middlewareName = `strip-game-prefix-${gameId}`;
+
+  try {
+    await k8sCustomApi.deleteNamespacedCustomObject({
+      group: "traefik.io",
+      version: "v1alpha1",
+      namespace: GAME_SERVER_NAMESPACE,
+      plural: "middlewares",
+      name: middlewareName,
+    });
+    console.log(`[K8S] StripPrefix middleware deleted: ${middlewareName}`);
+    return true;
+  } catch (error: any) {
+    if (error.statusCode !== 404) {
+      console.error(`[K8S] Failed to delete StripPrefix middleware:`, error.message);
+    }
+    return false;
+  }
+}
+
 async function deleteIngressRoute(gameId: string): Promise<boolean> {
   const ingressRouteName = `game-server-${gameId}`;
-  
+
   try {
     await k8sCustomApi.deleteNamespacedCustomObject({
       group: "traefik.io",
@@ -95,13 +170,16 @@ async function deleteIngressRoute(gameId: string): Promise<boolean> {
       name: ingressRouteName,
     });
     console.log(`[K8S] IngressRoute deleted: ${ingressRouteName}`);
-    return true;
   } catch (error: any) {
     if (error.statusCode !== 404) {
       console.error(`[K8S] Failed to delete IngressRoute:`, error.message);
     }
-    return false;
   }
+
+  // Also delete the middleware
+  await deleteStripPrefixMiddleware(gameId);
+
+  return true;
 }
 
 export async function createGameServer(gameId: string): Promise<{ url: string; port: number } | null> {

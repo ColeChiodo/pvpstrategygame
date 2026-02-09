@@ -1,0 +1,13 @@
+# Traefik v2 middleware to add path prefix back after PathPrefix strips it
+# This is needed because game-servers expect requests at /game/{gameId}/socket.io
+# but Traefik's PathPrefix strips /game/{gameId} before forwarding
+
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: game-path-prefix
+  namespace: game-servers
+spec:
+  addPrefix:
+    prefix: "/__GAME_PATH_PREFIX__"
