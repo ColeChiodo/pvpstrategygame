@@ -90,16 +90,24 @@ const loading = ref(true);
 let socket: Socket | null = null;
 
   const fetchGameDetails = async () => {
+  console.log("[GAME] fetchGameDetails called for gameId:", props.gameId);
   try {
-    const response = await fetch(`${import.meta.env.VITE_API_URL}/api/matchmaking/game/${props.gameId}`, {
+    const url = `${import.meta.env.VITE_API_URL}/api/matchmaking/game/${props.gameId}`;
+    console.log("[GAME] Fetching from:", url);
+    
+    const response = await fetch(url, {
       credentials: "include",
     });
+    
+    console.log("[GAME] Response status:", response.status);
     const data = await response.json();
-    console.log("[GAME] API response:", data);
+    console.log("[GAME] API response:", JSON.stringify(data, null, 2));
+    
     gameSession.value = data;
     loading.value = false;
 
-    console.log("[GAME] gameSession after set:", gameSession.value);
+    console.log("[GAME] gameSession.value after set:", gameSession.value);
+    console.log("[GAME] opponent displayName:", gameSession.value?.opponent?.displayName);
 
     if (data.serverUrl) {
       connectToGameServer();
@@ -169,7 +177,14 @@ const connectToGameServer = () => {
 };
 
 const endGame = async () => {
-  if (!gameSession.value?.id) return;
+  if (!gameSession.value?.id) {
+    console.log("[END-GAME] No gameSession.id, aborting");
+    return;
+  }
+
+  console.log("[END-GAME] Starting end game for:", gameSession.value.id);
+  console.log("[END-GAME] isHost:", gameSession.value.isHost);
+  console.log("[END-GAME] API URL:", `${import.meta.env.VITE_API_URL}/api/matchmaking/game/${gameSession.value.id}/end`);
 
   isEnding.value = true;
 
@@ -179,15 +194,19 @@ const endGame = async () => {
       credentials: "include",
     });
 
+    console.log("[END-GAME] Response status:", response.status);
+    const result = await response.json();
+    console.log("[END-GAME] Response:", result);
+
     if (response.ok) {
       socket?.disconnect();
       router.push("/play");
       alerts.success("Game ended");
     } else {
-      alerts.error("Failed to end game");
+      alerts.error("Failed to end game: " + (result.error || "Unknown error"));
     }
   } catch (err) {
-    console.error("Failed to end game:", err);
+    console.error("[END-GAME] Error:", err);
     alerts.error("Failed to end game");
   } finally {
     isEnding.value = false;

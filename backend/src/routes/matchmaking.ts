@@ -181,6 +181,7 @@ router.get("/status", isAuthenticated, async (req, res) => {
 });
 
 router.get("/game/:gameId", isAuthenticated, async (req, res) => {
+  console.log(`[GAME-DETAILS] Fetching game ${req.params.gameId} for user ${req.user?.id}`);
   try {
     const { gameId } = req.params;
     const userId = (req.user as any).id;
@@ -188,6 +189,8 @@ router.get("/game/:gameId", isAuthenticated, async (req, res) => {
     const game = await prisma.gameSession.findUnique({
       where: { id: gameId },
     });
+
+    console.log(`[GAME-DETAILS] Game found:`, JSON.stringify(game, null, 2));
 
     if (!game) {
       return res.status(404).json({ error: "Game not found" });
@@ -200,10 +203,14 @@ router.get("/game/:gameId", isAuthenticated, async (req, res) => {
     const isPlayer1 = game.player1Id === userId;
     const opponentId = isPlayer1 ? game.player2Id : game.player1Id;
 
+    console.log(`[GAME-DETAILS] opponentId:`, opponentId);
+
     const opponent = await prisma.user.findUnique({
       where: { id: opponentId },
       select: { displayName: true, avatar: true },
     });
+
+    console.log(`[GAME-DETAILS] opponent found:`, opponent);
 
     res.json({
       gameId: game.id,
@@ -213,6 +220,7 @@ router.get("/game/:gameId", isAuthenticated, async (req, res) => {
       opponent: opponent || { displayName: "Unknown", avatar: null },
     });
   } catch (error) {
+    console.error("[GAME-DETAILS] Error:", error);
     res.status(500).json({ error: "Failed to get game" });
   }
 });
