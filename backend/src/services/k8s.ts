@@ -239,7 +239,7 @@ export async function createGameServer(gameId: string): Promise<{ url: string; p
                 env: [
                   { name: "GAME_ID", value: gameId },
                   { name: "PORT", value: GAME_SERVER_PORT.toString() },
-                  { name: "ALLOWED_ORIGINS", value: process.env.FRONTEND_URL || "" },
+                  { name: "ALLOWED_ORIGINS", value: `${process.env.FRONTEND_URL || ""},${process.env.GAME_URL || ""}` },
                 ],
                 resources: {
                   limits: {
