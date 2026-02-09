@@ -218,6 +218,7 @@ router.get("/game/:gameId", isAuthenticated, async (req, res) => {
 });
 
 router.post("/game/:gameId/end", isAuthenticated, async (req, res) => {
+  console.log(`[END-GAME] Request received from user ${req.user?.id} for game ${req.params.gameId}`);
   try {
     const { gameId } = req.params;
     const userId = (req.user as any).id;
@@ -227,13 +228,16 @@ router.post("/game/:gameId/end", isAuthenticated, async (req, res) => {
     });
 
     if (!game) {
+      console.log(`[END-GAME] Game ${gameId} not found`);
       return res.status(404).json({ error: "Game not found" });
     }
 
     if (game.player1Id !== userId) {
+      console.log(`[END-GAME] User ${userId} is not host (player1 is ${game.player1Id})`);
       return res.status(403).json({ error: "Only host can end game" });
     }
 
+    console.log(`[END-GAME] Destroying game server for ${gameId}`);
     await destroyGameServer(gameId);
 
     await prisma.gameSession.update({
@@ -243,8 +247,10 @@ router.post("/game/:gameId/end", isAuthenticated, async (req, res) => {
 
     activeGames.delete(gameId);
 
+    console.log(`[END-GAME] Game ${gameId} ended successfully`);
     res.json({ success: true });
   } catch (error) {
+    console.error(`[END-GAME] Error ending game ${req.params.gameId}:`, error);
     res.status(500).json({ error: "Failed to end game" });
   }
 });
