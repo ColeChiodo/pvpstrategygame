@@ -39,11 +39,11 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     let healthBarCurrent = 0;
 
     let cameraOffsetX = 0;
-    let cameraOffsetY = 150;
-    let zoomScale = 1.0;
+    let cameraOffsetY = 100;
+    let zoomScale = 2.5;
     let isDragging = false;
-    let lastMouseX = 0;
-    let lastMouseY = 0;
+    let startX = 0;
+    let startY = 0;
 
     let tiles: Tile[] = [];
     let isAction = false;
@@ -54,38 +54,52 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     let lastInputTime: Record<number, number> = {};
 
     function initSocket(gameSocket: Socket, session: any) {
+        console.log('[INIT] initSocket called');
         socket = gameSocket;
         gameSession.value = session;
 
         uiImage = new Image();
         uiImage.src = '/assets/spritesheets/UI.png';
+        console.log('[INIT] UI image src set:', uiImage.src);
     }
 
     function loadArenaImage(newArena: Arena) {
+        console.log('[LOAD] loadArenaImage called, arena name:', newArena?.name);
         arena = newArena;
         arenaImage = new Image();
-        arenaImage.onload = () => draw();
-        arenaImage.onerror = () => console.error('[DRAW] Failed to load arena image:', `/assets/maps/${newArena.name}.png`);
+        arenaImage.onload = () => {
+            console.log('[LOAD] Arena image loaded successfully');
+            draw();
+        };
+        arenaImage.onerror = () => console.error('[LOAD] Failed to load arena image:', `/assets/maps/${newArena.name}.png`);
         arenaImage.src = `/assets/maps/${newArena.name}.png`;
+        console.log('[LOAD] Arena image src set:', arenaImage.src);
     }
 
     function loadPlayers(newPlayers: Player[]) {
+        console.log('[LOAD] loadPlayers called, player count:', newPlayers?.length);
         players.value = newPlayers;
         if (players.value.length === 2) {
             isMyTurn.value = isTurn();
+            console.log('[LOAD] isMyTurn set to:', isMyTurn.value, 'my socket:', socket?.id, 'player1 socket:', players.value[0]?.socket);
         }
     }
 
     function loadUnits(newPlayers: Player[]) {
+        console.log('[LOAD] loadUnits called, player count:', newPlayers?.length);
         const existingUnitIds = new Set(units.value.map(u => String(u.id)));
+        console.log('[LOAD] Existing unit IDs:', Array.from(existingUnitIds));
         
         for (const player of newPlayers) {
+            console.log('[LOAD] Processing player:', player.name, 'units:', player.units?.length);
             for (const unit of player.units) {
                 const unitId = String(unit.id);
+                console.log('[LOAD] Checking unit:', unit.name, 'id:', unitId);
                 
                 if (existingUnitIds.has(unitId)) {
                     const existingUnit = units.value.find(u => String(u.id) === unitId);
                     if (existingUnit) {
+                        console.log('[LOAD] Updating existing unit:', unitId);
                         existingUnit.row = unit.row;
                         existingUnit.col = unit.col;
                         existingUnit.health = unit.health;
@@ -94,10 +108,14 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
                         existingUnit.currentStatus = !unit.canMove && !unit.canAct ? 1 : 0;
                     }
                 } else {
+                    console.log('[LOAD] Adding new unit:', unit.name, 'id:', unitId);
                     unit.owner = player;
                     const newSprite = sprites.find(s => s.name === unit.name);
                     if (newSprite) {
                         unit.sprite = { ...newSprite, currentFrame: 0, direction: 1 };
+                        console.log('[LOAD] Assigned sprite:', unit.sprite.name);
+                    } else {
+                        console.log('[LOAD] WARNING: No sprite found for unit:', unit.name);
                     }
                     unit.currentStatus = unit.canMove || unit.canAct ? 0 : 1;
                     units.value.push(unit);
@@ -105,22 +123,28 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
                 }
             }
         }
+        console.log('[LOAD] Total units after load:', units.value.length);
     }
 
     function resizeCanvas() {
+        console.log('[RESIZE] resizeCanvas called');
         if (canvasRef.value) {
             canvasRef.value.width = window.innerWidth;
             canvasRef.value.height = window.innerHeight;
+            console.log('[RESIZE] Canvas size:', canvasRef.value.width, 'x', canvasRef.value.height);
             draw();
         }
     }
 
     async function animateMove(tempUnit: Unit, origin: { row: number; col: number }, target: { row: number; col: number }) {
-        console.log('[GAME] Animating move');
+        console.log('[ANIMATE] Animating move');
         isAnimating = true;
         const path = astarPath(origin.row, origin.col, target.row, target.col, arena!);
         const realUnit = units.value.find(u => u.row === tempUnit.row && u.col === tempUnit.col);
-        if (!realUnit) return;
+        if (!realUnit) {
+            console.log('[ANIMATE] ERROR: realUnit not found');
+            return;
+        }
 
         realUnit.sprite.currentFrame = 0;
         let lastTile = { x: origin.col, y: origin.row };
@@ -152,6 +176,7 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     }
 
     async function animateAction(tempUnit: Unit) {
+        console.log('[ANIMATE] animateAction called');
         isAnimating = true;
         const realUnit = units.value.find(u => u.row === tempUnit.row && u.col === tempUnit.col);
         if (!realUnit) return;
@@ -173,8 +198,13 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     }
 
     function draw() {
-        if (!ctx || !canvasRef.value) return;
+        console.log('[DRAW] draw() called');
+        if (!ctx || !canvasRef.value) {
+            console.log('[DRAW] draw() returning early - ctx:', !!ctx, 'canvasRef.value:', !!canvasRef.value);
+            return;
+        }
         
+        ctx.imageSmoothingEnabled = false;
         ctx.clearRect(0, 0, canvasRef.value.width, canvasRef.value.height);
         drawBackground();
         drawArena();
@@ -184,78 +214,40 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
         drawInteractionSquares();
     }
 
-    function drawInteractionSquares(): number {
-        console.log('[DRAW] drawInteractionSquares() called, arenaImage:', !!arenaImage, 'arena:', !!arena, 'ctx:', !!ctx);
-        if (!arenaImage || !arena || !canvasRef.value || !ctx) {
-            console.log('[DRAW] drawInteractionSquares() returning early');
-            return 0;
-        }
-        const tileWidth = 32 * SCALE;
-        const tileHeight = 16 * SCALE;
-        const rows = arena.tiles.length;
-        const cols = arena.tiles[0].length;
-        const imgCenterX = canvasRef.value.width / 2;
-        const imgCenterY = canvasRef.value.height / 2;
-        const gridWidth = (cols - 1) * tileWidth / 2;
-        const gridHeight = (rows - 1) * tileHeight / 2;
-        const offsetX = imgCenterX - tileWidth / 2 + cameraOffsetX;
-        const offsetY = imgCenterY - gridHeight - tileHeight - 8 * SCALE + cameraOffsetY;
-
-        tiles = [];
-        for (let row = 0; row < rows; row++) {
-            for (let col = 0; col < cols; col++) {
-                if (arena.tiles[row][col] === 0) continue;
-                const isoX = (col - row) * tileWidth / 2 + offsetX;
-                const isoY = (col + row) * tileHeight / 2 + offsetY - ((getTileHeight(row, col) * 16) * SCALE);
-                tiles.push(drawIsometricTile(isoX, isoY, row, col));
-            }
-        }
-        console.log('[DRAW] tiles created:', tiles.length);
-        return tiles.length;
-    }
-
     function drawBackground() {
+        console.log('[DRAW] drawBackground() called');
         if (!ctx || !canvasRef.value) return;
         ctx.fillStyle = '#0f0f2b';
         ctx.fillRect(0, 0, canvasRef.value.width, canvasRef.value.height);
     }
 
     function drawArena() {
+        console.log('[DRAW] drawArena() called, arenaImage:', !!arenaImage, 'arena:', !!arena);
         if (!ctx || !arenaImage || !arena || !canvasRef.value) return;
-        ctx.imageSmoothingEnabled = false;
         
-        const scale = SCALE * zoomScale;
-        const centerX = canvasRef.value.width / 2 + cameraOffsetX;
-        const centerY = canvasRef.value.height / 2 + cameraOffsetY;
-        
-        ctx.drawImage(
-            arenaImage,
-            centerX - (arena.width * scale) / 2,
-            centerY - (arena.height * scale) / 2,
-            arena.width * scale,
-            arena.height * scale
-        );
-    }
         ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(
-            arenaImage,
-            (canvasRef.value.width - arena.width * SCALE) / 2 + cameraOffsetX,
-            (canvasRef.value.height - arena.height * SCALE - 16 * SCALE) / 2 + cameraOffsetY,
-            arena.width * SCALE,
-            arena.height * SCALE
-        );
+        console.log('[DRAW] Drawing arena with zoomScale:', zoomScale);
+        
+        const drawX = (canvasRef.value.width - arena.width * zoomScale) / 2 + cameraOffsetX;
+        const drawY = (canvasRef.value.height - arena.height * zoomScale - 16 * zoomScale) / 2 + cameraOffsetY;
+        
+        ctx.drawImage(arenaImage, drawX, drawY, arena.width * zoomScale, arena.height * zoomScale);
     }
 
     function drawEntities() {
+        console.log('[DRAW] drawEntities() called, units count:', units.value.length);
         if (!ctx || !arena) return;
-        if (units.value.length === 0) return;
-
-        const scale = SCALE * zoomScale;
+        if (units.value.length === 0) {
+            console.log('[DRAW] No units to draw');
+            return;
+        }
 
         const entities = [
             ...arena.obstacles.map(o => ({ type: 'obstacle' as const, entity: o })),
             ...units.value.map(u => ({ type: 'unit' as const, entity: u }))
         ];
+
+        console.log('[DRAW] Total entities to draw:', entities.length);
 
         entities.sort((a, b) => {
             if (a.entity.row !== b.entity.row) return a.entity.row - b.entity.row;
@@ -264,6 +256,7 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
 
         for (const { type, entity } of entities) {
             const pos = coordToPosition(entity.row, entity.col);
+            console.log('[DRAW] Entity:', type, 'at position:', pos);
             if (pos.x === -9999) continue;
 
             if (type === 'obstacle') {
@@ -272,11 +265,9 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
                 ctx.imageSmoothingEnabled = false;
                 ctx.globalAlpha = 0.75;
                 const obstacleImg = loadImage(obstacle.sprite.name, `/assets/maps/${obstacle.sprite.name}.png`);
-                ctx.drawImage(
-                    obstacleImg, 0, 0, frameSize, frameSize,
-                    pos.x - frameSize * scale, pos.y - frameSize * scale,
-                    frameSize * scale, frameSize * scale
-                );
+                ctx.drawImage(obstacleImg, 0, 0, frameSize, frameSize,
+                    pos.x - frameSize * zoomScale, pos.y - frameSize * zoomScale + (8 * zoomScale),
+                    frameSize * zoomScale, frameSize * zoomScale);
                 ctx.globalAlpha = 1.0;
             } else {
                 const unit = entity as Unit;
@@ -284,23 +275,20 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
                 const frameX = unit.sprite?.currentFrame || 0;
                 const frameY = unit.currentStatus;
                 const direction = unit.sprite?.direction || 1;
-                const unitImg = loadImage(unit.sprite?.name || 'test', `/assets/spritesheets/units/${unit.sprite?.name || 'test'}.png`);
+                const unitName = unit.sprite?.name || 'test';
+                const unitImg = loadImage(unitName, `/assets/spritesheets/units/${unitName}.png`);
 
                 ctx.imageSmoothingEnabled = false;
                 ctx.save();
                 if (direction === -1) {
                     ctx.scale(-1, 1);
-                    ctx.drawImage(
-                        unitImg, frameX * frameSize, frameY * frameSize, frameSize, frameSize,
-                        -(pos.x + frameSize * scale), pos.y - frameSize * scale,
-                        frameSize * scale, frameSize * scale
-                    );
+                    ctx.drawImage(unitImg, frameX * frameSize, frameY * frameSize, frameSize, frameSize,
+                        -(pos.x + frameSize * zoomScale), pos.y - frameSize * zoomScale + (2 * zoomScale),
+                        frameSize * zoomScale, frameSize * zoomScale);
                 } else {
-                    ctx.drawImage(
-                        unitImg, frameX * frameSize, frameY * frameSize, frameSize, frameSize,
-                        pos.x, pos.y - frameSize * scale,
-                        frameSize * scale, frameSize * scale
-                    );
+                    ctx.drawImage(unitImg, frameX * frameSize, frameY * frameSize, frameSize, frameSize,
+                        pos.x, pos.y - frameSize * zoomScale + (2 * zoomScale),
+                        frameSize * zoomScale, frameSize * zoomScale);
                 }
                 ctx.restore();
             }
@@ -308,6 +296,7 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     }
 
     function drawUI() {
+        console.log('[DRAW] drawUI() called');
         drawHoveredTile();
         drawSelectedTile();
         drawMovementTiles();
@@ -318,85 +307,68 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     }
 
     function drawHoveredTile() {
+        console.log('[DRAW] drawHoveredTile() called, hoveredTile:', !!hoveredTile.value);
         if (!hoveredTile.value || !uiImage || !ctx) return;
         const frameSize = 32;
-        const scale = SCALE * zoomScale;
         const highlightFrameX = hasUnit(hoveredTile.value.row, hoveredTile.value.col)
             ? (unitIsTeam(hoveredTile.value.row, hoveredTile.value.col) ? 1 : 2)
             : 0;
         ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(
-            uiImage, highlightFrameX * frameSize, 0, frameSize, frameSize,
-            hoveredTile.value.x, hoveredTile.value.y - 8 * scale,
-            frameSize * scale, frameSize * scale
-        );
+        ctx.drawImage(uiImage, highlightFrameX * frameSize, 0, frameSize, frameSize,
+            hoveredTile.value.x, hoveredTile.value.y - 8 * zoomScale, frameSize * zoomScale, frameSize * zoomScale);
     }
 
     function drawSelectedTile() {
+        console.log('[DRAW] drawSelectedTile() called, selectedTile:', !!selectedTile.value);
         if (!selectedTile.value || !uiImage || !ctx) return;
         const frameSize = 32;
-        const scale = SCALE * zoomScale;
         ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(
-            uiImage, 3 * frameSize, 0, frameSize, frameSize,
-            selectedTile.value.x, selectedTile.value.y - 8 * scale,
-            frameSize * scale, frameSize * scale
-        );
+        ctx.drawImage(uiImage, 3 * frameSize, 0, frameSize, frameSize,
+            selectedTile.value.x, selectedTile.value.y - 8 * zoomScale, frameSize * zoomScale, frameSize * zoomScale);
     }
 
     function drawMoveTile(tile: Tile) {
+        console.log('[DRAW] drawMoveTile() called');
         if (!uiImage || !ctx) return;
         const frameSize = 32;
-        const scale = SCALE * zoomScale;
         ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(
-            uiImage, 3 * frameSize, frameSize, frameSize, frameSize,
-            tile.x, tile.y - 8 * scale,
-            frameSize * scale, frameSize * scale
-        );
+        ctx.drawImage(uiImage, 3 * frameSize, frameSize, frameSize, frameSize,
+            tile.x, tile.y - 8 * zoomScale, frameSize * zoomScale, frameSize * zoomScale);
     }
 
     function drawActionTile(tile: Tile, action: string) {
+        console.log('[DRAW] drawActionTile() called');
         if (!uiImage || !ctx) return;
         validActionTiles.value.push(tile);
         const frameSize = 32;
-        const scale = SCALE * zoomScale;
         const frameX = action === 'attack' ? 2 : 1;
         ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(
-            uiImage, frameX * frameSize, frameSize, frameSize, frameSize,
-            tile.x, tile.y - 8 * scale,
-            frameSize * scale, frameSize * scale
-        );
+        ctx.drawImage(uiImage, frameX * frameSize, frameSize, frameSize, frameSize,
+            tile.x, tile.y - 8 * zoomScale, frameSize * zoomScale, frameSize * zoomScale);
     }
 
     function drawPathTile(tile: Tile) {
+        console.log('[DRAW] drawPathTile() called');
         if (!uiImage || !ctx) return;
         const frameSize = 32;
-        const scale = SCALE * zoomScale;
         ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(
-            uiImage, 0, 4 * frameSize, frameSize, frameSize,
-            tile.x, tile.y - 8 * scale,
-            frameSize * scale, frameSize * scale
-        );
+        ctx.drawImage(uiImage, 0, 4 * frameSize, frameSize, frameSize,
+            tile.x, tile.y - 8 * zoomScale, frameSize * zoomScale, frameSize * zoomScale);
     }
 
     function drawFogTile(row: number, col: number) {
+        console.log('[DRAW] drawFogTile() called');
         if (!uiImage || !ctx) return;
         const pos = coordToPosition(row, col);
         if (pos.x === -9999) return;
         const frameSize = 32;
-        const scale = SCALE * zoomScale;
         ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(
-            uiImage, 4 * frameSize, frameSize, frameSize, frameSize,
-            pos.x, pos.y - 8 * scale,
-            frameSize * scale, frameSize * scale
-        );
+        ctx.drawImage(uiImage, 4 * frameSize, frameSize, frameSize, frameSize,
+            pos.x, pos.y - 8 * zoomScale, frameSize * zoomScale, frameSize * zoomScale);
     }
 
     function drawMovementTiles() {
+        console.log('[DRAW] drawMovementTiles() called, selectedTile:', !!selectedTile.value);
         if (!arena || !selectedTile.value) return;
         const unit = units.value.find(u => u.row === selectedTile.value!.row && u.col === selectedTile.value!.col);
         if (!unit) return;
@@ -437,19 +409,8 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
         }
     }
 
-    function drawMoveTile(tile: Tile) {
-        if (!uiImage || !ctx) return;
-        const frameSize = 32;
-        const scale = SCALE * zoomScale;
-        ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(
-            uiImage, 3 * frameSize, frameSize, frameSize, frameSize,
-            tile.x, tile.y - 8 * scale,
-            frameSize * scale, frameSize * scale
-        );
-    }
-
     function drawActionTiles() {
+        console.log('[DRAW] drawActionTiles() called, isAction:', isAction, 'moveTile:', !!moveTile.value);
         if (!isAction || !moveTile.value || !arena) return;
         const unit = units.value.find(u => u.row === moveTile.value!.row && u.col === moveTile.value!.col);
         if (!unit) return;
@@ -474,21 +435,8 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
         }
     }
 
-    function drawActionTile(tile: Tile, action: string) {
-        if (!uiImage || !ctx) return;
-        validActionTiles.value.push(tile);
-        const frameSize = 32;
-        const scale = SCALE * zoomScale;
-        const frameX = action === 'attack' ? 2 : 1;
-        ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(
-            uiImage, frameX * frameSize, frameSize, frameSize, frameSize,
-            tile.x, tile.y - 8 * scale,
-            frameSize * scale, frameSize * scale
-        );
-    }
-
     function drawPath() {
+        console.log('[DRAW] drawPath() called');
         if (!selectedTile.value || !hoveredTile.value) return;
         const path = astarPath(selectedTile.value.row, selectedTile.value.col, hoveredTile.value.row, hoveredTile.value.col, arena!);
         for (const tile of path) {
@@ -498,48 +446,37 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
         }
     }
 
-    function drawPathTile(tile: Tile) {
-        if (!uiImage || !ctx) return;
-        const frameSize = 32;
-        const scale = SCALE * zoomScale;
-        ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(
-            uiImage, 0, 4 * frameSize, frameSize, frameSize,
-            tile.x, tile.y - 8 * scale,
-            frameSize * scale, frameSize * scale
-        );
-    }
-
     function drawHealthBars() {
+        console.log('[DRAW] drawHealthBars() called, animatingUnit:', !!animatingUnit);
         if ((!isAction && !selectedTile.value) || animatingUnit) return;
-        const scale = SCALE * zoomScale;
         for (const unit of units.value) {
             const pos = coordToPosition(unit.row, unit.col);
             if (pos.x === -9999) continue;
-            const barHeight = 2 * scale;
-            const barWidth = 12 * scale;
+            const barHeight = 2 * zoomScale;
+            const barWidth = 12 * zoomScale;
             ctx!.fillStyle = '#555';
-            ctx!.fillRect(pos.x + barWidth - 2 * scale, pos.y - 16 * scale, barWidth, barHeight);
+            ctx!.fillRect(pos.x + barWidth - 2 * zoomScale, pos.y - 16 * zoomScale, barWidth, barHeight);
             ctx!.fillStyle = '#0f0';
-            ctx!.fillRect(pos.x + barWidth - 2 * scale, pos.y - 16 * scale, barWidth * (unit.health / unit.maxHealth), barHeight);
+            ctx!.fillRect(pos.x + barWidth - 2 * zoomScale, pos.y - 16 * zoomScale, barWidth * (unit.health / unit.maxHealth), barHeight);
         }
     }
 
     function drawAnimatingHealthBar() {
+        console.log('[DRAW] drawAnimatingHealthBar() called');
         if (!animateHealthBar || !animatingHealthBarUnit || !ctx) return;
         const unit = animatingHealthBarUnit;
         const pos = coordToPosition(unit.row, unit.col);
         if (pos.x === -9999) return;
-        const scale = SCALE * zoomScale;
-        const barHeight = 2 * scale;
-        const barWidth = 12 * scale;
+        const barHeight = 2 * zoomScale;
+        const barWidth = 12 * zoomScale;
         ctx.fillStyle = '#555';
-        ctx.fillRect(pos.x + barWidth - 2 * scale, pos.y - 16 * scale, barWidth, barHeight);
+        ctx.fillRect(pos.x + barWidth - 2 * zoomScale, pos.y - 16 * zoomScale, barWidth, barHeight);
         ctx.fillStyle = '#0f0';
-        ctx.fillRect(pos.x + barWidth - 2 * scale, pos.y - 16 * scale, barWidth * (healthBarCurrent / unit.maxHealth), barHeight);
+        ctx.fillRect(pos.x + barWidth - 2 * zoomScale, pos.y - 16 * zoomScale, barWidth * (healthBarCurrent / unit.maxHealth), barHeight);
     }
 
     function drawFogOfWarTiles() {
+        console.log('[DRAW] drawFogOfWarTiles() called');
         if (!arena || !uiImage || !ctx) return;
         for (let row = 0; row < arena.tiles.length; row++) {
             for (let col = 0; col < arena.tiles[row].length; col++) {
@@ -550,44 +487,39 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
         }
     }
 
-    function drawFogTile(row: number, col: number) {
-        if (!uiImage || !ctx) return;
-        const pos = coordToPosition(row, col);
-        if (pos.x === -9999) return;
-        const frameSize = 32;
-        const scale = SCALE * zoomScale;
-        ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(
-            uiImage, 4 * frameSize, frameSize, frameSize, frameSize,
-            pos.x, pos.y - 8 * scale,
-            frameSize * scale, frameSize * scale
-        );
-    }
-
-    function drawInteractionSquares() {
-        if (!arena || !canvasRef.value || !ctx) return 0;
+    function drawInteractionSquares(): number {
+        console.log('[DRAW] drawInteractionSquares() called');
+        if (!arenaImage || !arena || !canvasRef.value || !ctx) {
+            console.log('[DRAW] drawInteractionSquares() returning early');
+            return 0;
+        }
         
-        const scale = SCALE * zoomScale;
-        const tileWidth = 32 * scale;
-        const tileHeight = 16 * scale;
+        const tileWidth = 32 * zoomScale;
+        const tileHeight = 16 * zoomScale;
         const rows = arena.tiles.length;
         const cols = arena.tiles[0].length;
-        const centerX = canvasRef.value.width / 2 + cameraOffsetX;
-        const centerY = canvasRef.value.height / 2 + cameraOffsetY;
+        const imgCenterX = canvasRef.value.width / 2;
+        const imgCenterY = canvasRef.value.height / 2;
+        const gridWidth = (cols - 1) * tileWidth / 2;
+        const gridHeight = (rows - 1) * tileHeight / 2;
+        const offsetX = imgCenterX - tileWidth / 2 + cameraOffsetX;
+        const offsetY = imgCenterY - gridHeight - tileHeight - 8 * zoomScale + cameraOffsetY;
 
         tiles = [];
         for (let row = 0; row < rows; row++) {
             for (let col = 0; col < cols; col++) {
                 if (arena.tiles[row][col] === 0) continue;
-                const isoX = centerX + (col - row) * tileWidth / 2;
-                const isoY = centerY + (col + row) * tileHeight / 2;
+                const isoX = (col - row) * tileWidth / 2 + offsetX;
+                const isoY = (col + row) * tileHeight / 2 + offsetY - ((getTileHeight(row, col) * 16) * zoomScale);
                 tiles.push(drawIsometricTile(isoX, isoY, row, col));
             }
         }
+        console.log('[DRAW] tiles created:', tiles.length);
         return tiles.length;
     }
 
     function drawIsometricTile(x: number, y: number, row: number, col: number): Tile {
+        console.log('[DRAW] drawIsometricTile() called, x:', x, 'y:', y, 'row:', row, 'col:', col);
         return { x, y, row, col };
     }
 
@@ -615,27 +547,39 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     }
 
     function isTurn(): boolean {
-        return players.value[currentRound % 2]?.socket === socket?.id;
+        console.log('[TURN] isTurn() called, currentRound:', currentRound, 'players.length:', players.value.length);
+        if (players.value.length < 2) return false;
+        const currentPlayer = players.value[currentRound % 2];
+        const mySocketId = socket?.id;
+        const result = currentPlayer?.socket === mySocketId;
+        console.log('[TURN] isTurn() result:', result, 'currentPlayer:', currentPlayer?.name, 'mySocketId:', mySocketId);
+        return result;
     }
 
     function loadImage(name: string, src: string): HTMLImageElement {
+        console.log('[IMAGE] loadImage called, name:', name, 'src:', src);
         if (!imageCache.has(name)) {
             const img = new Image();
             img.src = src;
             imageCache.set(name, img);
+            console.log('[IMAGE] New image cached:', name);
         }
         return imageCache.get(name)!;
     }
 
     function playSound(name: string, src: string) {
+        console.log('[AUDIO] playSound called, name:', name);
         try {
             const audio = new Audio(src);
             audio.volume = 0.5;
             audio.play().catch(() => {});
-        } catch (e) {}
+        } catch (e) {
+            console.log('[AUDIO] Audio play failed:', e);
+        }
     }
 
     function gameLoop() {
+        console.log('[LOOP] gameLoop() called');
         draw();
         gamepadHandler();
         animationFrameId = requestAnimationFrame(gameLoop);
@@ -654,15 +598,12 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
             endTurn();
         }
 
-        if (gamepad.buttons[4]?.pressed) {
-            cameraOffsetY += 8 * SCALE;
-        }
-        if (gamepad.buttons[5]?.pressed) {
-            cameraOffsetY -= 8 * SCALE;
-        }
+        if (gamepad.buttons[4]?.pressed) cameraOffsetY += 8 * zoomScale;
+        if (gamepad.buttons[5]?.pressed) cameraOffsetY -= 8 * zoomScale;
     }
 
     function endTurn() {
+        console.log('[TURN] endTurn() called');
         if (!socket) return;
         socket.emit('endTurn');
         selectedTile.value = null;
@@ -671,57 +612,110 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     }
 
     function handleClick(event: MouseEvent) {
-        if (event.button !== 0) return;
-        if (!isMyTurn.value) return;
-        if (players.value.length !== 2) return;
+        console.log('[EVENT] handleClick called, button:', event.button, 'offsetX:', event.offsetX, 'offsetY:', event.offsetY);
+        if (event.button !== 0) {
+            console.log('[EVENT] handleClick ignored - not left click');
+            return;
+        }
+        if (!isMyTurn.value) {
+            console.log('[EVENT] handleClick ignored - not my turn');
+            return;
+        }
+        if (players.value.length !== 2) {
+            console.log('[EVENT] handleClick ignored - not 2 players');
+            return;
+        }
 
         const clickX = event.offsetX;
         const clickY = event.offsetY;
+        console.log('[EVENT] handleClick click position:', clickX, clickY);
+        console.log('[EVENT] tiles array length:', tiles.length);
+        console.log('[EVENT] hoveredTile before:', hoveredTile.value);
 
+        let found = false;
         for (const tile of tiles) {
             if (!hoveredTile.value) break;
+            console.log('[EVENT] Checking tile:', tile.row, tile.col);
             if (isPointInsideTile(clickX, clickY, tile)) {
+                console.log('[EVENT] Clicked inside tile:', tile.row, tile.col);
+                
                 if (!isAction && !selectedTile.value && unitIsTeam(hoveredTile.value.row, hoveredTile.value.col)) {
-                    selectedTile.value = hoveredTile.value;
+                    console.log('[EVENT] First click - selecting unit');
+                    selectedTile.value = tile;
                 } else if (!isAction && selectedTile.value && tile.row === selectedTile.value.row && tile.col === selectedTile.value.col) {
+                    console.log('[EVENT] Clicked same tile - staying in place');
                     const unit = units.value.find(u => u.row === selectedTile.value!.row && u.col === selectedTile.value!.col);
                     if (unit && validMoveTiles.value.find(t => t.row === tile.row && t.col === tile.col)) {
+                        console.log('[EVENT] Emitting player-unit-move (stay)');
                         socket?.emit('player-unit-move', unit.id, tile);
                     }
                     selectedTile.value = null;
                 } else if (!isAction && selectedTile.value && unitIsTeam(selectedTile.value.row, selectedTile.value.col)) {
                     if (validMoveTiles.value.find(t => t.row === tile.row && t.col === tile.col)) {
                         const unit = units.value.find(u => u.row === selectedTile.value!.row && u.col === selectedTile.value!.col);
+                        console.log('[EVENT] Emitting player-unit-move');
                         socket?.emit('player-unit-move', unit?.id, tile);
                     }
                     selectedTile.value = null;
                 } else if (isAction && hasUnit(tile.row, tile.col)) {
                     if (validActionTiles.value.find(t => t.row === tile.row && t.col === tile.col)) {
                         const unit = units.value.find(u => u.row === moveTile.value!.row && u.col === moveTile.value!.col);
+                        console.log('[EVENT] Emitting player-unit-action');
                         socket?.emit('player-unit-action', unit?.id, tile);
                     }
                     isAction = false;
                     moveTile.value = null;
                 }
+                found = true;
                 break;
-            } else {
-                hoveredTile.value = null;
             }
+        }
+        if (!found) {
+            console.log('[EVENT] No tile found at click position');
+            selectedTile.value = null;
         }
     }
 
-    function handleMouseMove(e: MouseEvent) {
-        const clickX = e.offsetX;
-        const clickY = e.offsetY;
+    function handleMouseDown(event: MouseEvent) {
+        console.log('[EVENT] handleMouseDown called, button:', event.button);
+        if (event.button !== 1) {
+            console.log('[EVENT] handleMouseDown ignored - not middle click');
+            return;
+        }
+        isDragging = true;
+        startX = event.clientX - cameraOffsetX;
+        startY = event.clientY - cameraOffsetY;
+        console.log('[EVENT] Started dragging, startX:', startX, 'startY:', startY);
+    }
 
-        if (isDragging && e.buttons === 2) {
-            cameraOffsetX += e.movementX;
-            cameraOffsetY += e.movementY;
+    function handleMouseUp() {
+        console.log('[EVENT] handleMouseUp called, isDragging:', isDragging);
+        isDragging = false;
+    }
+
+    function handleMouseLeave() {
+        console.log('[EVENT] handleMouseLeave called');
+        isDragging = false;
+    }
+
+    function handleMouseMove(event: MouseEvent) {
+        console.log('[EVENT] handleMouseMove called, movementX:', event.movementX, 'movementY:', event.movementY);
+        
+        const clickX = event.offsetX;
+        const clickY = event.offsetY;
+        console.log('[EVENT] Mouse position:', clickX, clickY);
+
+        if (isDragging) {
+            console.log('[EVENT] Dragging, updating camera offset');
+            cameraOffsetX = event.clientX - startX;
+            cameraOffsetY = event.clientY - startY;
+            console.log('[EVENT] New camera offset:', cameraOffsetX, cameraOffsetY);
             return;
         }
 
         for (const tile of tiles) {
             if (isPointInsideTile(clickX, clickY, tile)) {
+                console.log('[EVENT] Hovering tile:', tile.row, tile.col);
                 hoveredTile.value = tile;
                 break;
             } else {
@@ -731,116 +725,159 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     }
 
     function handleKeyDown(e: KeyboardEvent) {
+        console.log('[EVENT] handleKeyDown called, key:', e.key);
         switch (e.key) {
             case 'z':
+                console.log('[EVENT] Z pressed - zoom out');
+                if (zoomScale > MIN_SCALE) {
+                    zoomScale = Math.max(MIN_SCALE, zoomScale - 0.125);
+                    console.log('[EVENT] New zoomScale:', zoomScale);
+                }
                 break;
             case 'x':
+                console.log('[EVENT] X pressed - zoom in');
+                if (zoomScale < MAX_SCALE) {
+                    zoomScale = Math.min(MAX_SCALE, zoomScale + 0.125);
+                    console.log('[EVENT] New zoomScale:', zoomScale);
+                }
                 break;
             case 'ArrowUp':
             case 'w':
-                cameraOffsetY += 8 * SCALE;
+                console.log('[EVENT] Up/W pressed - moving camera up');
+                cameraOffsetY += 8 * zoomScale;
+                console.log('[EVENT] New cameraOffsetY:', cameraOffsetY);
                 break;
             case 'ArrowDown':
             case 's':
-                cameraOffsetY -= 8 * SCALE;
+                console.log('[EVENT] Down/S pressed - moving camera down');
+                cameraOffsetY -= 8 * zoomScale;
+                console.log('[EVENT] New cameraOffsetY:', cameraOffsetY);
                 break;
             case 'ArrowLeft':
             case 'a':
-                cameraOffsetX += 8 * SCALE;
+                console.log('[EVENT] Left/A pressed - moving camera left');
+                cameraOffsetX += 8 * zoomScale;
+                console.log('[EVENT] New cameraOffsetX:', cameraOffsetX);
                 break;
             case 'ArrowRight':
             case 'd':
-                cameraOffsetX -= 8 * SCALE;
+                console.log('[EVENT] Right/D pressed - moving camera right');
+                cameraOffsetX -= 8 * zoomScale;
+                console.log('[EVENT] New cameraOffsetX:', cameraOffsetX);
                 break;
             case 'Enter':
+                console.log('[EVENT] Enter pressed - ending turn');
                 endTurn();
                 break;
         }
     }
 
     function handleWheel(e: WheelEvent) {
-        e.preventDefault();
-        const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
-        const newZoom = Math.max(MIN_SCALE, Math.min(MAX_SCALE, zoomScale * zoomFactor));
-        
-        if (newZoom !== zoomScale) {
-            const rect = canvasRef.value?.getBoundingClientRect();
-            if (rect) {
-                const mouseX = e.clientX - rect.left;
-                const mouseY = e.clientY - rect.top;
-                
-                const worldX = (mouseX - rect.width / 2 - cameraOffsetX) / zoomScale;
-                const worldY = (mouseY - rect.height / 2 - cameraOffsetY) / zoomScale;
-                
-                zoomScale = newZoom;
-                
-                cameraOffsetX = mouseX - rect.width / 2 - worldX * zoomScale;
-                cameraOffsetY = mouseY - rect.height / 2 - worldY * zoomScale;
+        console.log('[EVENT] handleWheel called, deltaY:', e.deltaY);
+        if (e.deltaY < 0) {
+            console.log('[EVENT] Zooming in');
+            if (zoomScale < MAX_SCALE) {
+                zoomScale = Math.min(MAX_SCALE, zoomScale * 1.1);
+                console.log('[EVENT] New zoomScale:', zoomScale);
+            }
+        } else if (e.deltaY > 0) {
+            console.log('[EVENT] Zooming out');
+            if (zoomScale > MIN_SCALE) {
+                zoomScale = Math.max(MIN_SCALE, zoomScale * 0.9);
+                console.log('[EVENT] New zoomScale:', zoomScale);
             }
         }
     }
 
     function start() {
+        console.log('[START] start() called');
         if (!canvasRef.value) return;
         canvasRef.value.width = window.innerWidth;
         canvasRef.value.height = window.innerHeight;
         ctx = canvasRef.value.getContext('2d');
-        if (ctx) ctx.imageSmoothingEnabled = false;
+        if (ctx) {
+            ctx.imageSmoothingEnabled = false;
+            console.log('[START] Context created, imageSmoothingEnabled set to false');
+        }
         
+        console.log('[START] Adding event listeners');
         window.addEventListener('resize', handleResize);
         window.addEventListener('keydown', handleKeyDown);
         canvasRef.value.addEventListener('click', handleClick);
+        canvasRef.value.addEventListener('mousedown', handleMouseDown);
+        canvasRef.value.addEventListener('mouseup', handleMouseUp);
+        canvasRef.value.addEventListener('mouseleave', handleMouseLeave);
         canvasRef.value.addEventListener('mousemove', handleMouseMove);
-        canvasRef.value.addEventListener('wheel', handleWheel, { passive: false });
-        canvasRef.value.addEventListener('contextmenu', (e) => e.preventDefault());
+        canvasRef.value.addEventListener('wheel', handleWheel);
         
+        console.log('[START] Adding gamepad listeners');
         window.addEventListener('gamepadconnected', (e: GamepadEvent) => {
+            console.log('[GAMEPAD] Connected:', e.gamepad.id);
             gamepadIndex = e.gamepad.index;
         });
         window.addEventListener('gamepaddisconnected', (e: GamepadEvent) => {
+            console.log('[GAMEPAD] Disconnected:', e.gamepad.id);
             if (gamepadIndex === e.gamepad.index) gamepadIndex = null;
         });
         
+        console.log('[START] Calling handleResize and gameLoop');
         handleResize();
         gameLoop();
     }
 
     function handleResize() {
+        console.log('[RESIZE] handleResize() called');
         if (!canvasRef.value || !ctx) return;
         canvasRef.value.width = window.innerWidth;
         canvasRef.value.height = window.innerHeight;
         if (ctx) ctx.imageSmoothingEnabled = false;
+        console.log('[RESIZE] Canvas size set to:', canvasRef.value.width, 'x', canvasRef.value.height);
         draw();
     }
 
     function stop() {
-        if (animationFrameId) cancelAnimationFrame(animationFrameId);
-        window.removeEventListener('resize', resizeCanvas);
+        console.log('[STOP] stop() called');
+        if (animationFrameId) {
+            cancelAnimationFrame(animationFrameId);
+            console.log('[STOP] Animation frame cancelled');
+        }
+        window.removeEventListener('resize', handleResize);
         window.removeEventListener('keydown', handleKeyDown);
         if (canvasRef.value) {
             canvasRef.value.removeEventListener('click', handleClick);
+            canvasRef.value.removeEventListener('mousedown', handleMouseDown);
+            canvasRef.value.removeEventListener('mouseup', handleMouseUp);
+            canvasRef.value.removeEventListener('mouseleave', handleMouseLeave);
             canvasRef.value.removeEventListener('mousemove', handleMouseMove);
             canvasRef.value.removeEventListener('wheel', handleWheel);
+            console.log('[STOP] Event listeners removed');
         }
     }
 
     function updateState(state: GameState) {
+        console.log('[UPDATE] updateState() called');
         if (!ctx && canvasRef.value) {
             ctx = canvasRef.value.getContext('2d');
+            console.log('[UPDATE] Context created from updateState');
         }
         if (state.arena) {
+            console.log('[UPDATE] Loading arena');
             loadArenaImage(state.arena);
         }
         if (state.players) {
+            console.log('[UPDATE] Loading players and units');
             loadPlayers(state.players as any);
             loadUnits(state.players as any);
         }
         if (state.visibleTiles) {
             visibleTiles.value = state.visibleTiles;
+            console.log('[UPDATE] Visible tiles count:', visibleTiles.value.length);
         }
         if (state.round !== undefined) {
             currentRound = state.round;
+            console.log('[UPDATE] Current round:', currentRound);
         }
+        console.log('[UPDATE] Calling draw()');
         draw();
     }
 

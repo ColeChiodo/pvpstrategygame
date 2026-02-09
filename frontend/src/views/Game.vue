@@ -172,7 +172,15 @@ const connectToGameServer = () => {
   socket.on("connect", () => {
     console.log("[GAME] Socket connected! ID:", socket?.id);
     console.log("[GAME] Emitting join...");
+    console.log("[GAME] About to call initSocket");
+    initSocket(socket, {
+      gameId: gameSessionId,
+      isHost: gameSession.value.isHost,
+      opponent: gameSession.value.opponent
+    });
+    console.log("[GAME] initSocket called successfully");
     socket?.emit('join', { gameId: gameSessionId, name: userName, avatar: userAvatar });
+    console.log("[GAME] Join emitted");
   });
 
   socket.on("connect_error", (err: Error) => {
@@ -190,20 +198,27 @@ const connectToGameServer = () => {
   });
 
   socket.on("state", (compressedData: any) => {
+    console.log("[GAME] Received state event");
     try {
       const decompressed = inflate(compressedData, { to: 'string' });
       const state = JSON.parse(decompressed);
-      console.log("[GAME] Received state, players:", state.players?.length, "round:", state.round);
-      
+      console.log("[GAME] Parsed state:", JSON.stringify(state, null, 2));
+      console.log("[GAME] Players in state:", state.players?.length);
+      console.log("[GAME] Round in state:", state.round);
+       
       if (state.player1Time !== undefined) player1Time.value = state.player1Time;
       if (state.player2Time !== undefined) player2Time.value = state.player2Time;
       if (state.round !== undefined) currentRound.value = state.round;
       
       console.log("[GAME] Timer update:", player1Time.value, player2Time.value);
       console.log("[GAME] isPlayer1Turn:", isPlayer1Turn.value, "isHost:", gameSession.value?.isHost);
+      console.log("[GAME] showLobby.value:", showLobby.value);
       
       if (gameCanvas.value && !showLobby.value) {
+        console.log("[GAME] Calling updateGameState");
         updateGameState(state);
+      } else {
+        console.log("[GAME] Skipping updateGameState (lobby still showing or no canvas)");
       }
     } catch (err) {
       console.error("[GAME] Error parsing state:", err);
@@ -212,11 +227,17 @@ const connectToGameServer = () => {
 
   socket.on("start", (data: { round: number }) => {
     console.log("[GAME] Game started! Round:", data.round, "playerIndex:", playerIndex.value);
+    console.log("[GAME] Game session value:", gameSession.value);
+    console.log("[GAME] isHost:", gameSession.value?.isHost);
     currentRound.value = data.round;
     showLobby.value = false;
     
+    console.log("[GAME] About to call start() on game engine");
     if (gameCanvas.value) {
+      console.log("[GAME] Canvas exists, calling start()");
       start();
+    } else {
+      console.log("[GAME] ERROR: Canvas does not exist!");
     }
   });
 
@@ -236,6 +257,7 @@ const connectToGameServer = () => {
 };
 
 function updateGameState(state: GameState) {
+  console.log("[GAME] updateGameState called");
   updateState(state);
 }
 
@@ -385,6 +407,8 @@ onUnmounted(() => {
   width: 100%;
   height: 100%;
   display: block;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
 }
 
 .game-hud {
