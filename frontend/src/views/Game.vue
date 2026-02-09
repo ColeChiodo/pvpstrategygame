@@ -71,7 +71,9 @@ import { RouterLink } from "vue-router";
 import { useAuthStore } from "../stores/auth";
 import { alerts } from "../composables/useAlerts";
 import { io, Socket } from "socket.io-client";
+import { inflate } from 'pako';
 import { useGameEngine } from "../game-engine";
+import { GameState } from "../game-engine/types";
 
 const props = defineProps<{
   gameId: string;
@@ -135,25 +137,32 @@ const connectToGameServer = () => {
   }
 
   const serverUrl = gameSession.value.serverUrl;
-  const gameId = gameSession.value.gameId;
+  const gameSessionId = gameSession.value.gameId;
   const userId = authStore.user?.id;
+  const userName = authStore.displayName;
+  const userAvatar = authStore.user?.avatar || "";
 
   console.log("[GAME] Connecting to game server URL:", serverUrl);
-  console.log("[GAME] Game ID:", gameId);
-  console.log("[GAME] User ID:", userId);
+  console.log("[GAME] Game Session ID:", gameSessionId);
+  console.log("[GAME] User:", userId, userName);
 
-  if (!gameId || !userId) {
-    console.error("[GAME] ERROR: gameId or userId is undefined!");
+  if (!gameSessionId || !userId) {
+    console.error("[GAME] ERROR: gameSessionId or userId is undefined!");
     return;
   }
 
   socket = io(import.meta.env.VITE_GAME_URL, {
-    path: `/game/${gameId}/socket.io`,
+    path: `/game/${gameSessionId}/socket.io`,
     query: { userId },
   });
 
   socket.on("connect", () => {
-    console.log("Connected to game server");
+    console.log("[GAME] Socket connected, joining game...");
+    socket?.emit('join-game', gameSessionId, userName, userAvatar);
+  });
+
+  socket.on("game-joined", (data: any) => {
+    console.log("[GAME] Joined game:", data);
     connectedToGameServer.value = true;
 
     setTimeout(() => {
@@ -167,26 +176,26 @@ const connectToGameServer = () => {
     }, 3000);
   });
 
-  socket.on("game:joined", (data: any) => {
-    console.log("Joined game:", data);
-  });
-
-  socket.on("player:joined", (data: any) => {
-    console.log("Player joined:", data);
-  });
-
-  socket.on("game:started", () => {
-    alerts.success("Game started!");
+  socket.on("gameState", (compressedData: any) => {
+    try {
+      const decompressed = inflate(compressedData, { to: 'string' });
+      const gameState = JSON.parse(decompressed);
+      console.log("[GAME] Received gameState");
+      if (gameCanvas.value && ctx) {
+        updateGameState(gameState);
+      }
+    } catch (err) {
+      console.error("[GAME] Error parsing gameState:", err);
+    }
   });
 
   socket.on("nextRound", (data: { socket: string }) => {
+    console.log("[GAME] Next round, current socket:", socket?.id, "turn socket:", data.socket);
     isMyTurn.value = data.socket === socket?.id;
   });
 
-  socket.on("game:ended", () => {
-    alerts.info("Game ended");
-    socket?.disconnect();
-    router.push("/play");
+  socket.on("gameOver", (data: { socket: string }) => {
+    console.log("[GAME] Game over, winner socket:", data.socket);
   });
 
   socket.on("disconnect", (reason) => {
@@ -197,9 +206,23 @@ const connectToGameServer = () => {
       router.push("/play");
     }
   });
-
-  initSocket(socket, gameSession.value);
 };
+
+function updateGameState(gameState: GameState) {
+  console.log("[GAME] Updating game state:", {
+    players: gameState.players.length,
+    arena: gameState.arena.name,
+    round: gameState.round,
+    p1Time: gameState.player1Time,
+    p2Time: gameState.player2Time,
+  });
+
+  player1Time.value = gameState.player1Time;
+  player2Time.value = gameState.player2Time;
+
+  const { updateState } = useGameEngine(gameCanvas);
+  updateState(gameState);
+}
 
 const endGame = async () => {
   if (!gameSession.value?.gameId) {

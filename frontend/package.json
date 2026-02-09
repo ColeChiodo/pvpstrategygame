@@ -11,6 +11,7 @@
     "type-check": "vue-tsc --noEmit"
   },
   "dependencies": {
+    "pako": "^2.1.0",
     "pinia": "^2.1.7",
     "socket.io-client": "^4.8.3",
     "vue": "^3.4.15",

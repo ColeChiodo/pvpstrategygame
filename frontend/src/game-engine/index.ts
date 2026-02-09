@@ -721,6 +721,23 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
         }
     }
 
+    function updateState(state: GameState) {
+        if (state.arena) {
+            loadArenaImage(state.arena);
+        }
+        if (state.players) {
+            loadPlayers(state.players as any);
+            loadUnits(state.players as any);
+        }
+        if (state.visibleTiles) {
+            visibleTiles.value = state.visibleTiles;
+        }
+        currentRound = state.round || 0;
+        player1Time.value = state.player1Time || 0;
+        player2Time.value = state.player2Time || 0;
+        draw();
+    }
+
     return {
         gameSession,
         players,
@@ -730,6 +747,7 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
         player2Time,
         initSocket,
         start,
-        stop
+        stop,
+        updateState
     };
 }
