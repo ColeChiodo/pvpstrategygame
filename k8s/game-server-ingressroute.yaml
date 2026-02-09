@@ -1,0 +1,77 @@
+# Traefik IngressRoute for game servers
+# Supports both traefik.io and traefik.containo.us CRD versions
+
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: game-servers
+  namespace: game-servers
+spec:
+  entryPoints:
+    - web
+    - websecure
+  routes:
+    - match: Host(`fortezza.colechiodo.cc`) && PathPrefix(`/game/`)
+      kind: Rule
+      services:
+        - kind: Service
+          name: game-server
+          port: 3000
+      middlewares:
+        - name: game-headers
+          namespace: game-servers
+
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: game-servers
+  namespace: game-servers
+spec:
+  entryPoints:
+    - web
+    - websecure
+  routes:
+    - match: Host(`fortezza.colechiodo.cc`) && PathPrefix(`/game/`)
+      kind: Rule
+      services:
+        - kind: Service
+          name: game-server
+          port: 3000
+      middlewares:
+        - name: game-headers
+
+---
+apiVersion: traefik.io/v1alpha1
+kind: MiddlewareConfig
+metadata:
+  name: game-headers
+  namespace: game-servers
+spec:
+  headers:
+    stsSeconds: 31536000
+    stsIncludeSubdomains: true
+    stsPreload: true
+    forceSTSHeader: true
+    contentTypeNosniff: true
+    browserXssFilter: true
+    referrerPolicy: "strict-origin-when-cross-origin"
+    customFrameOptionsValue: "SAMEORIGIN"
+
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: game-headers
+  namespace: game-servers
+spec:
+  headers:
+    stsSeconds: 31536000
+    stsIncludeSubdomains: true
+    stsPreload: true
+    forceSTSHeader: true
+    contentTypeNosniff: true
+    browserXssFilter: true
+    referrerPolicy: "strict-origin-when-cross-origin"
+    customFrameOptionsValue: "SAMEORIGIN"

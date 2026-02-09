@@ -24,7 +24,10 @@ const httpServer = createServer((req, res) => {
 const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS?.split(",") || [
   "http://localhost:5173",
   "http://127.0.0.1:5173",
+  "https://fortezza.colechiodo.cc",
 ];
+
+console.log(`[${gameId}] ALLOWED_ORIGINS:`, ALLOWED_ORIGINS);
 
 const io = new Server(httpServer, {
   cors: {

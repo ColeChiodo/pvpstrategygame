@@ -36,7 +36,7 @@ const k8sAppsApi = kc.makeApiClient(k8s.AppsV1Api);
 const GAME_SERVER_NAMESPACE = "game-servers";
 const GAME_SERVER_IMAGE = "colechiodo/fortezza-game-server:latest";
 const GAME_SERVER_REPLICAS = 1;
-const GAME_SERVER_NODE_PORT = 30080;
+const GAME_SERVER_PORT = 3000;
 
 export async function createGameServer(gameId: string): Promise<{ url: string; port: number } | null> {
   console.log(`[K8S] createGameServer called for ${gameId}`);
@@ -59,7 +59,6 @@ export async function createGameServer(gameId: string): Promise<{ url: string; p
   try {
     const deploymentName = `game-server-${gameId}`;
     const serviceName = `game-server-${gameId}`;
-    const containerPort = 3000;
 
     const deployment = {
       apiVersion: "apps/v1",
@@ -92,10 +91,10 @@ export async function createGameServer(gameId: string): Promise<{ url: string; p
                 name: "game-server",
                 image: GAME_SERVER_IMAGE,
                 imagePullPolicy: "Always",
-                ports: [{ containerPort, name: "game" }],
+                ports: [{ containerPort: GAME_SERVER_PORT, name: "game" }],
                 env: [
                   { name: "GAME_ID", value: gameId },
-                  { name: "PORT", value: containerPort.toString() },
+                  { name: "PORT", value: GAME_SERVER_PORT.toString() },
                   { name: "ALLOWED_ORIGINS", value: process.env.FRONTEND_URL || "" },
                 ],
                 resources: {
@@ -111,7 +110,7 @@ export async function createGameServer(gameId: string): Promise<{ url: string; p
                 livenessProbe: {
                   httpGet: {
                     path: "/health",
-                    port: containerPort,
+                    port: GAME_SERVER_PORT,
                   },
                   initialDelaySeconds: 5,
                   periodSeconds: 10,
@@ -119,7 +118,7 @@ export async function createGameServer(gameId: string): Promise<{ url: string; p
                 readinessProbe: {
                   httpGet: {
                     path: "/health",
-                    port: containerPort,
+                    port: GAME_SERVER_PORT,
                   },
                   initialDelaySeconds: 3,
                   periodSeconds: 5,
@@ -147,9 +146,9 @@ export async function createGameServer(gameId: string): Promise<{ url: string; p
           app: deploymentName,
         },
         ports: [
-          { protocol: "TCP", port: containerPort, targetPort: containerPort, name: "game", nodePort: GAME_SERVER_NODE_PORT },
+          { protocol: "TCP", port: GAME_SERVER_PORT, targetPort: GAME_SERVER_PORT, name: "game" },
         ],
-        type: "NodePort",
+        type: "ClusterIP",
       },
     };
 
@@ -164,8 +163,9 @@ export async function createGameServer(gameId: string): Promise<{ url: string; p
       body: service,
     });
 
-    const nodeIp = process.env.K8S_NODE_IP || "localhost";
-    const serverUrl = `ws://${nodeIp}:${GAME_SERVER_NODE_PORT}`;
+    const hostname = process.env.GAME_SERVER_HOSTNAME || "fortezza.colechiodo.cc";
+    const serverUrl = `ws://${hostname}/game/${gameId}`;
+    console.log(`[K8S] Game server URL: ${serverUrl}`);
 
     await prisma.gameSession.update({
       where: { id: gameId },
@@ -176,7 +176,7 @@ export async function createGameServer(gameId: string): Promise<{ url: string; p
     });
 
     console.log(`Game server created: ${deploymentName} at ${serverUrl}`);
-    return { url: serverUrl, port: GAME_SERVER_NODE_PORT };
+    return { url: serverUrl, port: GAME_SERVER_PORT };
 
   } catch (error) {
     console.error("Failed to create game server:", error);
