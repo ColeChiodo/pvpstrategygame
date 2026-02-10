@@ -231,9 +231,10 @@ function handleJoin(socket: Socket, sessionId: string, userId: string, name: str
 
     gameState.players.push(player);
     const playerIndex = gameState.players.length - 1;
+    const playerLabel = playerIndex === 0 ? 'Player 1' : 'Player 2';
 
     socket.emit("joined", { playerIndex });
-    console.log(`[${gameId}] Player ${name} joined as player ${playerIndex + 1}`);
+    console.log(`[${gameId}] ${playerLabel} (${player.name}) joined at index ${playerIndex}`);
 
     if (gameState.players.length === 2) {
         startGame();
@@ -247,7 +248,7 @@ function startGame() {
     gameState.round = 0;
     gameState.player1Time = 600;
     gameState.player2Time = 600;
-    console.log(`[${gameId}] Game started! Round 0, Player 1's turn`);
+    console.log(`[${gameId}] Game started! Round 0, Player 1's turn (${gameState.players[0].name})`);
     io?.emit("start", { round: 0 });
 
     if (gameInterval) clearInterval(gameInterval);
@@ -381,7 +382,7 @@ function handleEndTurn(socket: Socket, userId: string) {
     oldPlayer.units.forEach(u => { u.canAct = false; u.canMove = false; });
     newPlayer.units.forEach(u => { u.canAct = true; u.canMove = true; });
 
-    console.log(`[${gameId}] Turn ended. Round ${gameState.round}, Player ${(gameState.round % 2) + 1}'s turn`);
+    console.log(`[${gameId}] Turn ended. Round ${gameState.round}, ${gameState.round % 2 === 0 ? 'Player 1' : 'Player 2'}'s turn (${newPlayer.name})`);
     io?.emit("turn", { round: gameState.round });
 
     broadcastState();
@@ -398,14 +399,17 @@ function broadcastState() {
     });
 }
 
+const VISIBILITY_RADIUS_MULTIPLIER = 2;
+
 function getPlayerGameState(gs: GameState, player: Player): GameState {
     const temp = { ...gs, arena: { ...gs.arena }, players: gs.players.map(p => ({ ...p, units: p.units.map(u => ({ ...u })) })), visibleTiles: [] as { row: number; col: number }[] };
 
     const visible: { row: number; col: number }[] = [];
     for (const unit of player.units) {
-        for (let i = -6; i <= 6; i++) {
-            for (let j = -6; j <= 6; j++) {
-                if (Math.abs(i) + Math.abs(j) <= 6) {
+        const viewRadius = (unit.mobility + unit.range) * VISIBILITY_RADIUS_MULTIPLIER;
+        for (let i = -viewRadius; i <= viewRadius; i++) {
+            for (let j = -viewRadius; j <= viewRadius; j++) {
+                if (Math.abs(i) + Math.abs(j) <= viewRadius) {
                     const r = unit.row + i, c = unit.col + j;
                     if (r >= 0 && r < gs.arena.tiles.length && c >= 0 && c < gs.arena.tiles[0].length) {
                         if (!visible.some(v => v.row === r && v.col === c)) visible.push({ row: r, col: c });
@@ -420,21 +424,8 @@ function getPlayerGameState(gs: GameState, player: Player): GameState {
     if (other) {
         const beforeFilter = other.units.length;
         const visibleEnemyUnits = other.units.filter(u => visible.some(v => v.row === u.row && v.col === u.col));
-        const hiddenEnemyUnits = other.units.filter(u => !visible.some(v => v.row === u.row && v.col === u.col));
-
-        if (hiddenEnemyUnits.length > 0) {
-            console.log(`[${gameId}] VISIBILITY BUG CHECK: ${player.name} hiding ${hiddenEnemyUnits.length} enemy units:`);
-            hiddenEnemyUnits.forEach(u => {
-                console.log(`[${gameId}]   Hidden: ${u.name} at (${u.row}, ${u.col})`);
-            });
-        }
-
         other.units = visibleEnemyUnits;
-        console.log(`[${gameId}] Fog of war: ${player.name} sees ${other.units.length}/${beforeFilter} enemy units`);
     }
-
-    const thisPlayer = temp.players.find(p => p.id === player.id);
-    console.log(`[${gameId}] Sending state to ${player.name}: ${thisPlayer?.units.length} own units, ${other?.units.length || 0} visible enemy units`);
 
     return temp;
 }

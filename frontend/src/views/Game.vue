@@ -16,15 +16,15 @@
         <div class="lobby-content">
           <div class="lobby-players">
             <div class="lobby-player">
-              <img :src="gameSession.isHost ? authStore.user?.avatar : gameSession.opponent?.avatar" class="lobby-avatar" />
-              <span class="lobby-name">{{ gameSession.isHost ? authStore.displayName : gameSession.opponent?.displayName }}</span>
-              <span class="lobby-label">HOST</span>
+              <img :src="playerIndex === 0 ? authStore.user?.avatar : gameSession.opponent?.avatar" class="lobby-avatar" />
+              <span class="lobby-name">{{ playerIndex === 0 ? authStore.displayName : gameSession.opponent?.displayName }}</span>
+              <span class="lobby-label">PLAYER 1</span>
             </div>
             <div class="vs-badge-large">VS</div>
             <div class="lobby-player">
-              <img :src="gameSession.isHost ? gameSession.opponent?.avatar : authStore.user?.avatar" class="lobby-avatar" />
-              <span class="lobby-name">{{ gameSession.isHost ? gameSession.opponent?.displayName : authStore.displayName }}</span>
-              <span class="lobby-label">CHALLENGER</span>
+              <img :src="playerIndex === 0 ? gameSession.opponent?.avatar : authStore.user?.avatar" class="lobby-avatar" />
+              <span class="lobby-name">{{ playerIndex === 0 ? gameSession.opponent?.displayName : authStore.displayName }}</span>
+              <span class="lobby-label">PLAYER 2</span>
             </div>
           </div>
           <p class="lobby-subtitle">Game starting soon...</p>
@@ -37,31 +37,31 @@
       <div class="game-hud">
         <div class="game-info-bar">
           <div class="player-timer" :class="{ 'active-turn': isPlayer1Turn }">
-            <img :src="gameSession.isHost ? authStore.user?.avatar : gameSession.opponent?.avatar" class="timer-avatar" />
-            <span class="timer-name">{{ gameSession.isHost ? authStore.displayName : gameSession.opponent?.displayName }}</span>
+            <img :src="playerIndex === 0 ? authStore.user?.avatar : gameSession.opponent?.avatar" class="timer-avatar" />
+            <span class="timer-name">{{ playerIndex === 0 ? authStore.displayName : gameSession.opponent?.displayName }}</span>
             <span class="timer-value">{{ formatTime(player1Time) }}</span>
           </div>
 
           <div class="turn-indicator" :class="{ 'my-turn': isPlayer1Turn }">
-            {{ isPlayer1Turn ? 'HOST TURN' : 'CHALLENGER TURN' }}
+            {{ isPlayer1Turn ? 'PLAYER 1 TURN' : 'PLAYER 2 TURN' }}
           </div>
 
           <div class="player-timer opponent" :class="{ 'active-turn': !isPlayer1Turn }">
-            <img :src="gameSession.isHost ? gameSession.opponent?.avatar : authStore.user?.avatar" class="timer-avatar" />
-            <span class="timer-name">{{ gameSession.isHost ? gameSession.opponent?.displayName : authStore.displayName }}</span>
+            <img :src="playerIndex === 0 ? gameSession.opponent?.avatar : authStore.user?.avatar" class="timer-avatar" />
+            <span class="timer-name">{{ playerIndex === 0 ? gameSession.opponent?.displayName : authStore.displayName }}</span>
             <span class="timer-value">{{ formatTime(player2Time) }}</span>
           </div>
         </div>
 
         <div class="game-controls">
           <PlayButton
-            v-if="isPlayer1Turn && gameSession.isHost"
+            v-if="isPlayer1Turn && playerIndex === 0"
             text="END TURN"
             color="cyan"
             @click="endTurn"
           />
           <PlayButton
-            v-else-if="!isPlayer1Turn && !gameSession.isHost"
+            v-else-if="!isPlayer1Turn && playerIndex === 1"
             text="END TURN"
             color="cyan"
             @click="endTurn"
@@ -182,12 +182,11 @@ const connectToGameServer = () => {
     console.log("[GAME] Emitting join...");
     console.log("[GAME] About to call initSocket");
     loading.value = false;
-    initSocket(socket, {
-      gameId: gameSessionId,
-      isHost: gameSession.value.isHost,
-      opponent: gameSession.value.opponent,
-      userId: userId
-    });
+     initSocket(socket, {
+       gameId: gameSessionId,
+       opponent: gameSession.value.opponent,
+       userId: userId
+     });
     console.log("[GAME] initSocket called successfully");
     
     // Small delay to ensure server is ready
