@@ -426,9 +426,13 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     function drawPath() {
         if (!selectedTile.value || !hoveredTile.value) return;
         const path = astarPath(selectedTile.value.row, selectedTile.value.col, hoveredTile.value.row, hoveredTile.value.col, arena!);
-        for (const tile of path) {
-            if (validMoveTiles.value.find(t => t.row === tile.row && t.col === tile.col)) {
-                drawPathTile(tile);
+        for (const pathTile of path) {
+            if (validMoveTiles.value.find(t => t.row === pathTile.row && t.col === pathTile.col)) {
+                const pos = coordToPosition(pathTile.row, pathTile.col);
+                if (pos.x !== -9999) {
+                    const tile = { x: pos.x, y: pos.y, row: pathTile.row, col: pathTile.col };
+                    drawPathTile(tile);
+                }
             }
         }
     }
@@ -613,19 +617,22 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
                 } else if (!isAction && selectedTile.value && tile.row === selectedTile.value.row && tile.col === selectedTile.value.col) {
                     const unit = units.value.find(u => u.row === selectedTile.value!.row && u.col === selectedTile.value!.col);
                     if (unit && validMoveTiles.value.find(t => t.row === tile.row && t.col === tile.col)) {
-                        socket?.emit('player-unit-move', unit.id, tile);
+                        socket?.emit('move', { unitId: unit.id, row: tile.row, col: tile.col });
+                        console.log('[SOCKET] Emitting move:', { unitId: unit.id, row: tile.row, col: tile.col });
                     }
                     selectedTile.value = null;
                 } else if (!isAction && selectedTile.value && unitIsTeam(selectedTile.value.row, selectedTile.value.col)) {
                     if (validMoveTiles.value.find(t => t.row === tile.row && t.col === tile.col)) {
                         const unit = units.value.find(u => u.row === selectedTile.value!.row && u.col === selectedTile.value!.col);
-                        socket?.emit('player-unit-move', unit?.id, tile);
+                        socket?.emit('move', { unitId: unit?.id, row: tile.row, col: tile.col });
+                        console.log('[SOCKET] Emitting move:', { unitId: unit?.id, row: tile.row, col: tile.col });
                     }
                     selectedTile.value = null;
                 } else if (isAction && hasUnit(tile.row, tile.col)) {
                     if (validActionTiles.value.find(t => t.row === tile.row && t.col === tile.col)) {
                         const unit = units.value.find(u => u.row === moveTile.value!.row && u.col === moveTile.value!.col);
-                        socket?.emit('player-unit-action', unit?.id, tile);
+                        socket?.emit('action', { unitId: unit?.id, row: tile.row, col: tile.col });
+                        console.log('[SOCKET] Emitting action:', { unitId: unit?.id, row: tile.row, col: tile.col });
                     }
                     isAction = false;
                     moveTile.value = null;
