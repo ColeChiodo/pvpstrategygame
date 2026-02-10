@@ -316,8 +316,14 @@ function handleMove(socket: Socket, userId: string, unitId: number, row: number,
         unit.col = col;
         unit.canMove = false;
         console.log(`[${gameId}] Move: ${unit.name} to (${row}, ${col})`);
-        // Broadcast move event to all clients so they can animate and enter action mode
-        io?.emit("unit-moving", { unit, origin, target: { row, col } });
+
+        // Broadcast move event only to players who can see the movement
+        const moveEvent = { unit, origin, target: { row, col } };
+        for (const p of gameState.players) {
+            if (p.id === userId || isTileVisibleToPlayer(gameState, p, row, col)) {
+                io?.to(p.socketId).emit("unit-moving", moveEvent);
+            }
+        }
     }
 
     broadcastState();
@@ -355,8 +361,17 @@ function handleAction(socket: Socket, userId: string, unitId: number, row: numbe
             console.log(`[${gameId}] Heal: ${unit.name} healed for ${unit.attack}`);
         }
         unit.canAct = false;
-        // Broadcast action event to all clients
-        io?.emit("unit-acting", { unit, target: targetUnit });
+
+        // Broadcast action event only to players who can see the action
+        const actionEvent = { unit, target: targetUnit };
+        for (const p of gameState.players) {
+            const canSee = p.id === userId || 
+                           isTileVisibleToPlayer(gameState, p, unit.row, unit.col) ||
+                           isTileVisibleToPlayer(gameState, p, targetUnit.row, targetUnit.col);
+            if (canSee) {
+                io?.to(p.socketId).emit("unit-acting", actionEvent);
+            }
+        }
     }
 
     broadcastState();
@@ -442,6 +457,21 @@ function isValidAction(unit: Unit, tile: { row: number; col: number }, gs: GameS
     return dist <= unit.range && dist > 0;
 }
 
+function isTileVisibleToPlayer(gs: GameState, player: Player, row: number, col: number): boolean {
+    for (const unit of player.units) {
+        const viewRadius = unit.mobility + unit.range;
+        for (let i = -viewRadius; i <= viewRadius; i++) {
+            for (let j = -viewRadius; j <= viewRadius; j++) {
+                if (Math.abs(i) + Math.abs(j) <= viewRadius) {
+                    const r = unit.row + i, c = unit.col + j;
+                    if (r === row && c === col) return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
 function initializeGame(id: string): GameState {
     return {
         id, privacy: "public", players: [],
@@ -494,7 +524,7 @@ function initializeGame(id: string): GameState {
             obstacles: [
                 {
                     name: "well1",
-                    row: 4,
+                    row: 0,
                     col: 19,
                     sprite: {
                         width: 32,
@@ -505,7 +535,7 @@ function initializeGame(id: string): GameState {
                 },
                 {
                     name: "well2",
-                    row: 19,
+                    row: 15,
                     col: 4,
                     sprite: {
                         width: 32,

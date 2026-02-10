@@ -687,10 +687,28 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
         for (const tile of tiles) {
             if (!hoveredTile.value) break;
             if (isPointInsideTile(clickX, clickY, tile)) {
-                const clickedUnit = units.value.find(u => u.row === hoveredTile.value!.row && u.col === hoveredTile.value!.col);
+                const clickedUnit = units.value.find(u => u.row === tile.row && u.col === tile.col);
+                const isMyUnit = clickedUnit && players.value[myPlayerIndex]?.units.some(u => u.id === clickedUnit.id);
+                const canMove = clickedUnit && clickedUnit.canMove;
 
-                if (!isAction.value && !selectedTile.value) {
+                if (!isAction.value && !selectedTile.value && isMyUnit && canMove) {
+                    selectedTile.value = tile;
+                } else if (!isAction.value && selectedTile.value && tile.row === selectedTile.value.row && tile.col === selectedTile.value.col) {
+                    const unit = units.value.find(u => u.row === selectedTile.value!.row && u.col === selectedTile.value!.col);
+                    if (unit) {
+                        console.log('[MOVE] Staying in place:', unit.name, '->', tile.row, tile.col);
+                        socket?.emit('move', { unitId: unit.id, row: tile.row, col: tile.col });
+                    }
+                    selectedTile.value = null;
                 } else if (!isAction.value && selectedTile.value) {
+                    if (validMoveTiles.value.find(t => t.row === tile.row && t.col === tile.col)) {
+                        const unit = units.value.find(u => u.row === selectedTile.value!.row && u.col === selectedTile.value!.col);
+                        if (unit) {
+                            console.log('[MOVE]', unit.name, '->', tile.row, tile.col);
+                            socket?.emit('move', { unitId: unit.id, row: tile.row, col: tile.col });
+                        }
+                    }
+                    selectedTile.value = null;
                 } else if (isAction.value && moveTile.value) {
                     const actingUnit = units.value.find(u => u.row === moveTile.value!.row && u.col === moveTile.value!.col);
 
@@ -739,13 +757,16 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
             return;
         }
 
-        for (const tile of tiles) {
-            if (isPointInsideTile(clickX, clickY, tile)) {
-                hoveredTile.value = tile;
+        let found = false;
+        for (let i = tiles.length - 1; i >= 0; i--) {
+            if (isPointInsideTile(clickX, clickY, tiles[i])) {
+                hoveredTile.value = tiles[i];
+                found = true;
                 break;
-            } else {
-                hoveredTile.value = null;
             }
+        }
+        if (!found) {
+            hoveredTile.value = null;
         }
     }
 
