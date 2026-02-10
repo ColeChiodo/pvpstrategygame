@@ -151,17 +151,21 @@ function handleJoin(socket: Socket, sessionId: string, userId: string, name: str
             console.log(`[${gameId}] Re-assigning units to rejoined player ${name}`);
             const isPlayer1 = playerIndex === 0;
             const startRow = isPlayer1 ? gameState.arena.p1Start.row : gameState.arena.p2Start.row;
-            const startCol = isPlayer1 ? gameState.arena.p2Start.col : gameState.arena.p2Start.col;
+            const startCol = isPlayer1 ? gameState.arena.p1Start.col : gameState.arena.p2Start.col;
+            
+            // Use offset direction based on player (positive for P1, negative for P2 to stay in bounds)
+            const rowOffset = isPlayer1 ? 1 : -1;
+            const colOffset = isPlayer1 ? 1 : -1;
             
             existingPlayer.units.push(
                 { id: Date.now() + 1, row: startRow, col: startCol, name: "king", action: "attack", canMove: true, canAct: true, health: 40, maxHealth: 40, attack: 30, defense: 10, range: 2, mobility: 3 },
-                { id: Date.now() + 2, row: startRow + 2, col: startCol, name: "melee", action: "attack", canMove: true, canAct: true, health: 30, maxHealth: 30, attack: 30, defense: 10, range: 1, mobility: 2 },
-                { id: Date.now() + 3, row: startRow, col: startCol + 2, name: "ranged", action: "attack", canMove: true, canAct: true, health: 20, maxHealth: 20, attack: 20, defense: 0, range: 3, mobility: 3 },
-                { id: Date.now() + 4, row: startRow + 1, col: startCol, name: "mage", action: "attack", canMove: true, canAct: true, health: 20, maxHealth: 20, attack: 40, defense: 0, range: 2, mobility: 2 },
-                { id: Date.now() + 5, row: startRow, col: startCol + 1, name: "healer", action: "heal", canMove: true, canAct: true, health: 10, maxHealth: 10, attack: 30, defense: 0, range: 2, mobility: 4 },
-                { id: Date.now() + 6, row: startRow + 2, col: startCol + 1, name: "cavalry", action: "attack", canMove: true, canAct: true, health: 20, maxHealth: 20, attack: 20, defense: 10, range: 1, mobility: 4 },
-                { id: Date.now() + 7, row: startRow + 2, col: startCol + 2, name: "scout", action: "attack", canMove: true, canAct: true, health: 20, maxHealth: 20, attack: 10, defense: 10, range: 1, mobility: 5 },
-                { id: Date.now() + 8, row: startRow + 1, col: startCol + 2, name: "tank", action: "attack", canMove: true, canAct: true, health: 40, maxHealth: 40, attack: 10, defense: 20, range: 1, mobility: 2 }
+                { id: Date.now() + 2, row: startRow + (2 * rowOffset), col: startCol, name: "melee", action: "attack", canMove: true, canAct: true, health: 30, maxHealth: 30, attack: 30, defense: 10, range: 1, mobility: 2 },
+                { id: Date.now() + 3, row: startRow, col: startCol + (2 * colOffset), name: "ranged", action: "attack", canMove: true, canAct: true, health: 20, maxHealth: 20, attack: 20, defense: 0, range: 3, mobility: 3 },
+                { id: Date.now() + 4, row: startRow + (1 * rowOffset), col: startCol, name: "mage", action: "attack", canMove: true, canAct: true, health: 20, maxHealth: 20, attack: 40, defense: 0, range: 2, mobility: 2 },
+                { id: Date.now() + 5, row: startRow, col: startCol + (1 * colOffset), name: "healer", action: "heal", canMove: true, canAct: true, health: 10, maxHealth: 10, attack: 30, defense: 0, range: 2, mobility: 4 },
+                { id: Date.now() + 6, row: startRow + (2 * rowOffset), col: startCol + (1 * colOffset), name: "cavalry", action: "attack", canMove: true, canAct: true, health: 20, maxHealth: 20, attack: 20, defense: 10, range: 1, mobility: 4 },
+                { id: Date.now() + 7, row: startRow + (2 * rowOffset), col: startCol + (2 * colOffset), name: "scout", action: "attack", canMove: true, canAct: true, health: 20, maxHealth: 20, attack: 10, defense: 10, range: 1, mobility: 5 },
+                { id: Date.now() + 8, row: startRow + (1 * rowOffset), col: startCol + (2 * colOffset), name: "tank", action: "attack", canMove: true, canAct: true, health: 40, maxHealth: 40, attack: 10, defense: 20, range: 1, mobility: 2 }
             );
         }
         
@@ -200,15 +204,19 @@ function handleJoin(socket: Socket, sessionId: string, userId: string, name: str
     
     console.log(`[${gameId}] Spawning units for ${name} (Player ${isPlayer1 ? 1 : 2}) at row:${startRow} col:${startCol}`);
 
+    // Use offset direction based on player (positive for P1, negative for P2 to stay in bounds)
+    const rowOffset = isPlayer1 ? 1 : -1;
+    const colOffset = isPlayer1 ? 1 : -1;
+
     player.units.push(
         { id: 1, row: startRow, col: startCol, name: "king", action: "attack", canMove: true, canAct: true, health: 40, maxHealth: 40, attack: 30, defense: 10, range: 2, mobility: 3 },
-        { id: 2, row: startRow + 2, col: startCol, name: "melee", action: "attack", canMove: true, canAct: true, health: 30, maxHealth: 30, attack: 30, defense: 10, range: 1, mobility: 2 },
-        { id: 3, row: startRow, col: startCol + 2, name: "ranged", action: "attack", canMove: true, canAct: true, health: 20, maxHealth: 20, attack: 20, defense: 0, range: 3, mobility: 3 },
-        { id: 4, row: startRow + 1, col: startCol, name: "mage", action: "attack", canMove: true, canAct: true, health: 20, maxHealth: 20, attack: 40, defense: 0, range: 2, mobility: 2 },
-        { id: 5, row: startRow, col: startCol + 1, name: "healer", action: "heal", canMove: true, canAct: true, health: 10, maxHealth: 10, attack: 30, defense: 0, range: 2, mobility: 4 },
-        { id: 6, row: startRow + 2, col: startCol + 1, name: "cavalry", action: "attack", canMove: true, canAct: true, health: 20, maxHealth: 20, attack: 20, defense: 10, range: 1, mobility: 4 },
-        { id: 7, row: startRow + 2, col: startCol + 2, name: "scout", action: "attack", canMove: true, canAct: true, health: 20, maxHealth: 20, attack: 10, defense: 10, range: 1, mobility: 5 },
-        { id: 8, row: startRow + 1, col: startCol + 2, name: "tank", action: "attack", canMove: true, canAct: true, health: 40, maxHealth: 40, attack: 10, defense: 20, range: 1, mobility: 2 }
+        { id: 2, row: startRow + (2 * rowOffset), col: startCol, name: "melee", action: "attack", canMove: true, canAct: true, health: 30, maxHealth: 30, attack: 30, defense: 10, range: 1, mobility: 2 },
+        { id: 3, row: startRow, col: startCol + (2 * colOffset), name: "ranged", action: "attack", canMove: true, canAct: true, health: 20, maxHealth: 20, attack: 20, defense: 0, range: 3, mobility: 3 },
+        { id: 4, row: startRow + (1 * rowOffset), col: startCol, name: "mage", action: "attack", canMove: true, canAct: true, health: 20, maxHealth: 20, attack: 40, defense: 0, range: 2, mobility: 2 },
+        { id: 5, row: startRow, col: startCol + (1 * colOffset), name: "healer", action: "heal", canMove: true, canAct: true, health: 10, maxHealth: 10, attack: 30, defense: 0, range: 2, mobility: 4 },
+        { id: 6, row: startRow + (2 * rowOffset), col: startCol + (1 * colOffset), name: "cavalry", action: "attack", canMove: true, canAct: true, health: 20, maxHealth: 20, attack: 20, defense: 10, range: 1, mobility: 4 },
+        { id: 7, row: startRow + (2 * rowOffset), col: startCol + (2 * colOffset), name: "scout", action: "attack", canMove: true, canAct: true, health: 20, maxHealth: 20, attack: 10, defense: 10, range: 1, mobility: 5 },
+        { id: 8, row: startRow + (1 * rowOffset), col: startCol + (2 * colOffset), name: "tank", action: "attack", canMove: true, canAct: true, health: 40, maxHealth: 40, attack: 10, defense: 20, range: 1, mobility: 2 }
     );
     
     console.log(`[${gameId}] Player ${name} has ${player.units.length} units`);
@@ -416,26 +424,26 @@ function initializeGame(id: string): GameState {
         arena: {
             width: 1024, height: 512, name: "field",
             tiles: [
-                [1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1],
-                [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-                [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,3,1,1],
-                [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-                [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-                [0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0],
-                [0,1,1,1,1,1,1,1,0,0,0,0,1,1,1,1,1,1,1,0],
-                [0,1,1,1,1,1,1,0,0,0,0,0,0,1,1,1,1,1,1,0],
-                [0,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0],
-                [0,0,0,1,1,1,0,0,0,0,0,0,0,0,1,1,1,0,0,0],
-                [0,0,0,1,1,1,0,0,0,0,0,0,0,0,1,1,1,0,0,0],
-                [0,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0],
-                [0,1,1,1,1,1,1,0,0,0,0,0,0,1,1,1,1,1,1,0],
-                [0,1,1,1,1,1,1,1,0,0,0,0,1,1,1,1,1,1,1,0],
-                [0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0],
-                [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-                [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-                [1,1,3,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-                [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-                [1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1]
+                [1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
+                [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 1, 1],
+                [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                [0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
+                [0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0],
+                [0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0],
+                [0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0],
+                [0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0],
+                [0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0],
+                [0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0],
+                [0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0],
+                [0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0],
+                [0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
+                [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                [1, 1, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                [1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1]
             ],
             heightMap: [
                 [3.5, 3.5, 3.5, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 2.5, 2.5, 2.5, 2.5],
@@ -457,7 +465,7 @@ function initializeGame(id: string): GameState {
                 [2.5, 2, 2, 1.5, 1.5, 1.5, 1.5, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
                 [2.5, 2, 2, 1.5, 1.5, 1.5, 1.5, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.5, 0.5, 0.5],
                 [2.5, 2, 2, 1.5, 1.5, 1.5, 1.5, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.5, 0.5, 0.5],
-                [2.5, 2, 2, 1.5, 1.5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0.5, 0.5, 0.5],
+                [2.5, 2, 2, 1.5, 1.5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0.5, 0.5, 0.5]
             ],
             obstacles: [
                 {
@@ -468,7 +476,7 @@ function initializeGame(id: string): GameState {
                         width: 32,
                         height: 64,
                         name: "well",
-                        image: "well",
+                        image: "well"
                     }
                 },
                 {
@@ -479,12 +487,12 @@ function initializeGame(id: string): GameState {
                         width: 32,
                         height: 64,
                         name: "well",
-                        image: "well",
+                        image: "well"
                     }
                 }
             ],
             p1Start: { row: 0, col: 0 },
-            p2Start: { row: 19, col: 19 },
+            p2Start: { row: 19, col: 19 }
         },
         round: 0, player1Time: 600, player2Time: 600, visibleTiles: [{ row: -1, col: -1 }]
     };
