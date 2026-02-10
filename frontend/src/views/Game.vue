@@ -168,12 +168,17 @@ const connectToGameServer = () => {
   socket = io(import.meta.env.VITE_GAME_URL, {
     path: `/game/${gameSessionId}/socket.io`,
     query: { userId },
+    transports: ['websocket', 'polling'],
+    reconnectionAttempts: 5,
+    reconnectionDelay: 1000,
+    timeout: 20000,
   });
 
   console.log("[GAME] Socket connecting to:", `${import.meta.env.VITE_GAME_URL}/game/${gameSessionId}/socket.io`);
 
   socket.on("connect", () => {
     console.log("[GAME] Socket connected! ID:", socket?.id);
+    console.log("[GAME] Socket connected state:", socket?.connected);
     console.log("[GAME] Emitting join...");
     console.log("[GAME] About to call initSocket");
     loading.value = false;
@@ -183,8 +188,13 @@ const connectToGameServer = () => {
       opponent: gameSession.value.opponent
     });
     console.log("[GAME] initSocket called successfully");
-    socket?.emit('join', { gameId: gameSessionId, name: userName, avatar: userAvatar });
-    console.log("[GAME] Join emitted");
+    
+    // Small delay to ensure server is ready
+    setTimeout(() => {
+      console.log("[GAME] Emitting join event with data:", { gameId: gameSessionId, name: userName, avatar: userAvatar });
+      socket?.emit('join', { gameId: gameSessionId, name: userName, avatar: userAvatar });
+      console.log("[GAME] Join emitted");
+    }, 100);
   });
 
   socket.on("connect_error", (err: Error) => {

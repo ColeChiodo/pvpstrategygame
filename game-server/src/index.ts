@@ -98,6 +98,9 @@ const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "").split(",").filter(Bo
 const io = new Server(httpServer, {
     cors: { origin: ALLOWED_ORIGINS, credentials: true },
     path: "/socket.io",
+    transports: ['websocket', 'polling'],
+    pingTimeout: 60000,
+    pingInterval: 25000,
 });
 
 console.log(`[${gameId}] Server starting, allowed origins:`, ALLOWED_ORIGINS);
@@ -112,8 +115,13 @@ io.on("connection", (socket: Socket) => {
         return;
     }
 
+    // Log all incoming events for debugging
+    socket.onAny((eventName, ...args) => {
+        console.log(`[${gameId}] Received event '${eventName}' from ${socket.id}:`, args);
+    });
+
     socket.on("join", (data: { gameId: string; name: string; avatar: string }) => {
-        console.log(`[${gameId}] JOIN event:`, data);
+        console.log(`[${gameId}] JOIN event received:`, data);
         handleJoin(socket, data.gameId, userId, data.name, data.avatar);
     });
 
