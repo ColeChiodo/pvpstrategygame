@@ -45,7 +45,7 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     let startY = 0;
 
     let tiles: Tile[] = [];
-    let isAction = false;
+    let isAction = ref(false);
     let isMyTurn = ref(false);
 
     let gamepadIndex: number | null = null;
@@ -370,7 +370,7 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
 
     function drawMovementTiles() {
         // Don't draw movement tiles when in action mode
-        if (isAction || !arena || !selectedTile.value) return;
+        if (isAction.value || !arena || !selectedTile.value) return;
         const unit = units.value.find(u => u.row === selectedTile.value!.row && u.col === selectedTile.value!.col);
         if (!unit) return;
 
@@ -414,11 +414,11 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     }
 
     function drawActionTiles() {
-        if (!isAction || !moveTile.value || !arena) return;
+        if (!isAction.value || !moveTile.value || !arena) return;
         const unit = units.value.find(u => u.row === moveTile.value!.row && u.col === moveTile.value!.col);
         if (!unit) {
             // No unit found at moveTile, exit action mode
-            isAction = false;
+            isAction.value = false;
             moveTile.value = null;
             return;
         }
@@ -454,7 +454,7 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
         
         // If no valid action targets, exit action mode
         if (!hasValidTargets) {
-            isAction = false;
+            isAction.value = false;
             moveTile.value = null;
             selectedTile.value = null;
         }
@@ -462,7 +462,7 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
 
     function drawPath() {
         // Don't draw path when in action mode
-        if (isAction || !selectedTile.value || !hoveredTile.value) return;
+        if (isAction.value || !selectedTile.value || !hoveredTile.value) return;
         const path = astarPath(selectedTile.value.row, selectedTile.value.col, hoveredTile.value.row, hoveredTile.value.col, arena!);
         for (const pathTile of path) {
             if (validMoveTiles.value.find(t => t.row === pathTile.row && t.col === pathTile.col)) {
@@ -476,7 +476,7 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     }
 
     function drawHealthBars() {
-        if ((!isAction && !selectedTile.value) || animatingUnit) return;
+        if ((!isAction.value && !selectedTile.value) || animatingUnit) return;
         for (const unit of units.value) {
             const pos = coordToPosition(unit.row, unit.col);
             if (pos.x === -9999) continue;
@@ -669,7 +669,7 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
         if (!socket) return;
         socket.emit('endTurn');
         selectedTile.value = null;
-        isAction = false;
+        isAction.value = false;
         moveTile.value = null;
     }
 
@@ -689,27 +689,9 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
             if (isPointInsideTile(clickX, clickY, tile)) {
                 const clickedUnit = units.value.find(u => u.row === hoveredTile.value!.row && u.col === hoveredTile.value!.col);
 
-                if (!isAction && !selectedTile.value) {
-                    if (clickedUnit && unitIsTeam(hoveredTile.value.row, hoveredTile.value.col) && clickedUnit.canMove) {
-                        selectedTile.value = tile;
-                    }
-                } else if (!isAction && selectedTile.value) {
-                    const selectedUnit = units.value.find(u => u.row === selectedTile.value!.row && u.col === selectedTile.value!.col);
-
-                    if (tile.row === selectedTile.value.row && tile.col === selectedTile.value.col) {
-                        if (selectedUnit) {
-                            console.log('[MOVE]', selectedUnit.name, '->', tile.row, tile.col);
-                            socket?.emit('move', { unitId: selectedUnit.id, row: tile.row, col: tile.col });
-                        }
-                        selectedTile.value = null;
-                    } else if (validMoveTiles.value.find(t => t.row === tile.row && t.col === tile.col)) {
-                        console.log('[MOVE]', selectedUnit?.name, '->', tile.row, tile.col);
-                        socket?.emit('move', { unitId: selectedUnit?.id, row: tile.row, col: tile.col });
-                        selectedTile.value = null;
-                    } else {
-                        selectedTile.value = null;
-                    }
-                } else if (isAction && moveTile.value) {
+                if (!isAction.value && !selectedTile.value) {
+                } else if (!isAction.value && selectedTile.value) {
+                } else if (isAction.value && moveTile.value) {
                     const actingUnit = units.value.find(u => u.row === moveTile.value!.row && u.col === moveTile.value!.col);
 
                     if (validActionTiles.value.find(t => t.row === tile.row && t.col === tile.col)) {
@@ -717,7 +699,7 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
                         socket?.emit('action', { unitId: actingUnit?.id, row: tile.row, col: tile.col });
                     }
 
-                    isAction = false;
+                    isAction.value = false;
                     moveTile.value = null;
                     selectedTile.value = null;
                 }
@@ -727,7 +709,7 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
         }
         if (!found) {
             selectedTile.value = null;
-            isAction = false;
+            isAction.value = false;
             moveTile.value = null;
         }
     }

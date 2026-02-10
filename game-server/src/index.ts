@@ -399,14 +399,12 @@ function broadcastState() {
     });
 }
 
-const VISIBILITY_RADIUS_MULTIPLIER = 2;
-
 function getPlayerGameState(gs: GameState, player: Player): GameState {
     const temp = { ...gs, arena: { ...gs.arena }, players: gs.players.map(p => ({ ...p, units: p.units.map(u => ({ ...u })) })), visibleTiles: [] as { row: number; col: number }[] };
 
     const visible: { row: number; col: number }[] = [];
     for (const unit of player.units) {
-        const viewRadius = (unit.mobility + unit.range) * VISIBILITY_RADIUS_MULTIPLIER;
+        const viewRadius = unit.mobility + unit.range;
         for (let i = -viewRadius; i <= viewRadius; i++) {
             for (let j = -viewRadius; j <= viewRadius; j++) {
                 if (Math.abs(i) + Math.abs(j) <= viewRadius) {
@@ -422,7 +420,6 @@ function getPlayerGameState(gs: GameState, player: Player): GameState {
 
     const other = temp.players.find(p => p.id !== player.id);
     if (other) {
-        const beforeFilter = other.units.length;
         const visibleEnemyUnits = other.units.filter(u => visible.some(v => v.row === u.row && v.col === u.col));
         other.units = visibleEnemyUnits;
     }
