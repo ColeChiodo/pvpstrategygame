@@ -185,7 +185,8 @@ const connectToGameServer = () => {
     initSocket(socket, {
       gameId: gameSessionId,
       isHost: gameSession.value.isHost,
-      opponent: gameSession.value.opponent
+      opponent: gameSession.value.opponent,
+      userId: userId
     });
     console.log("[GAME] initSocket called successfully");
     

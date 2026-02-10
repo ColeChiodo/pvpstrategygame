@@ -51,10 +51,15 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     let gamepadIndex: number | null = null;
     let lastInputTime: Record<number, number> = {};
 
+    let myUserId: string | null = null;
+
     function initSocket(gameSocket: Socket, session: any) {
         console.log('[INIT] initSocket called');
         socket = gameSocket;
         gameSession.value = session;
+        // Extract userId from socket query or session
+        myUserId = (socket.handshake?.query?.userId as string) || session?.userId || null;
+        console.log('[INIT] My userId:', myUserId);
 
         uiImage = new Image();
         uiImage.src = '/assets/spritesheets/UI.png';
@@ -295,6 +300,11 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
         const highlightFrameX = hasUnit(hoveredTile.value.row, hoveredTile.value.col)
             ? (unitIsTeam(hoveredTile.value.row, hoveredTile.value.col) ? 1 : 2)
             : 0;
+        
+        // Debug hover colors: 0=green (empty), 1=cyan (my unit), 2=red (enemy)
+        const colors = ['green', 'cyan', 'red'];
+        console.log('[HOVER] Tile:', hoveredTile.value.row, hoveredTile.value.col, 'Color:', colors[highlightFrameX], 'HasUnit:', hasUnit(hoveredTile.value.row, hoveredTile.value.col));
+        
         ctx.imageSmoothingEnabled = false;
         ctx.drawImage(uiImage, highlightFrameX * frameSize, 0, frameSize, frameSize,
             hoveredTile.value.x, hoveredTile.value.y - 8 * SCALE, frameSize * SCALE, frameSize * SCALE);
@@ -524,13 +534,19 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
 
     function unitIsTeam(row: number, col: number): boolean {
         const unit = units.value.find(u => u.row === row && u.col === col);
-        return unit?.owner.socket === socket?.id;
+        if (!unit || !myUserId) return false;
+        // Use userId instead of socket ID since socket changes on reconnect
+        const isMine = unit.owner.id === myUserId;
+        console.log('[TEAM] unitIsTeam check:', { unitOwnerId: unit.owner.id, myUserId, isMine, unit: unit.name });
+        return isMine;
     }
 
     function isTurn(): boolean {
-        if (players.value.length < 2) return false;
+        if (players.value.length < 2 || !myUserId) return false;
         const currentPlayer = players.value[currentRound % 2];
-        return currentPlayer?.socket === socket?.id;
+        const isMyTurn = currentPlayer?.id === myUserId;
+        console.log('[TURN] isTurn check:', { currentPlayerId: currentPlayer?.id, myUserId, isMyTurn, round: currentRound });
+        return isMyTurn;
     }
 
     function loadImage(name: string, src: string): HTMLImageElement {
