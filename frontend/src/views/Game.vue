@@ -109,7 +109,7 @@ const pendingState = ref<GameState | null>(null);
 
 let socket: Socket | null = null;
 
-const { initSocket, start, stop, updateState, animateMove, animateAction, isAction, selectedTile, moveTile } = useGameEngine(gameCanvas);
+const { initSocket, start, stop, updateState, animateMove, animateAction, isAction, selectedTile, moveTile, setPlayerIndex } = useGameEngine(gameCanvas);
 
 const isPlayer1Turn = computed(() => {
   return currentRound.value % 2 === 0;
@@ -122,7 +122,6 @@ const formatTime = (seconds: number): string => {
 };
 
 const fetchGameDetails = async () => {
-  console.log("[GAME] fetchGameDetails called for gameId:", props.gameId);
   connectedToGameServer.value = false;
   showLobby.value = true;
   lobbyExiting.value = false;
@@ -130,24 +129,20 @@ const fetchGameDetails = async () => {
     const url = `${import.meta.env.VITE_API_URL}/api/matchmaking/game/${props.gameId}`;
     const response = await fetch(url, { credentials: "include" });
     const data = await response.json();
-    console.log("[GAME] API response:", JSON.stringify(data, null, 2));
     gameSession.value = data;
     loading.value = false;
     if (data.serverUrl) {
       connectToGameServer();
     }
   } catch (err) {
-    console.error("Failed to fetch game details:", err);
+    console.error("Failed to fetch game:", err);
     alerts.error("Failed to load game");
     loading.value = false;
   }
 };
 
 const connectToGameServer = () => {
-  if (!gameSession.value?.serverUrl) {
-    console.log("[GAME] No serverUrl, skipping game server connection");
-    return;
-  }
+  if (!gameSession.value?.serverUrl) return;
 
   const serverUrl = gameSession.value.serverUrl;
   const gameSessionId = gameSession.value.gameId;
@@ -155,13 +150,8 @@ const connectToGameServer = () => {
   const userName = authStore.displayName;
   const userAvatar = authStore.user?.avatar || "";
 
-  console.log("[GAME] Connecting to game server URL:", serverUrl);
-  console.log("[GAME] Game Session ID:", gameSessionId);
-  console.log("[GAME] User:", userId, userName);
-  console.log("[GAME] isHost:", gameSession.value.isHost);
-
   if (!gameSessionId || !userId) {
-    console.error("[GAME] ERROR: gameSessionId or userId is undefined!");
+    console.error("[GAME] Missing gameSessionId or userId");
     return;
   }
 
@@ -174,26 +164,15 @@ const connectToGameServer = () => {
     timeout: 20000,
   });
 
-  console.log("[GAME] Socket connecting to:", `${import.meta.env.VITE_GAME_URL}/game/${gameSessionId}/socket.io`);
-
   socket.on("connect", () => {
-    console.log("[GAME] Socket connected! ID:", socket?.id);
-    console.log("[GAME] Socket connected state:", socket?.connected);
-    console.log("[GAME] Emitting join...");
-    console.log("[GAME] About to call initSocket");
-    loading.value = false;
-     initSocket(socket, {
-       gameId: gameSessionId,
-       opponent: gameSession.value.opponent,
-       userId: userId
-     });
-    console.log("[GAME] initSocket called successfully");
-    
-    // Small delay to ensure server is ready
+    initSocket(socket, {
+      gameId: gameSessionId,
+      opponent: gameSession.value.opponent,
+      userId: userId
+    });
+
     setTimeout(() => {
-      console.log("[GAME] Emitting join event with data:", { gameId: gameSessionId, name: userName, avatar: userAvatar });
       socket?.emit('join', { gameId: gameSessionId, name: userName, avatar: userAvatar });
-      console.log("[GAME] Join emitted");
     }, 100);
   });
 
@@ -201,69 +180,51 @@ const connectToGameServer = () => {
     console.error("[GAME] Connect error:", err.message);
   });
 
-  socket.on("joined", (data: any) => {
-    console.log("[GAME] Joined game:", data);
-    connectedToGameServer.value = true;
-    playerIndex.value = data.playerIndex;
-  });
+   socket.on("joined", (data: any) => {
+     connectedToGameServer.value = true;
+     playerIndex.value = data.playerIndex;
+     setPlayerIndex(data.playerIndex);
+   });
 
   socket.on("error", (err: any) => {
     console.error("[GAME] Server error:", err);
   });
 
   socket.on("state", (compressedData: any) => {
-    console.log("[GAME] Received state event");
     try {
       const decompressed = inflate(compressedData, { to: 'string' });
       const state = JSON.parse(decompressed);
-      console.log("[GAME] Players in state:", state.players?.length);
-      console.log("[GAME] Round in state:", state.round);
-      
-      // Always update timers and round
+
       if (state.player1Time !== undefined) player1Time.value = state.player1Time;
       if (state.player2Time !== undefined) player2Time.value = state.player2Time;
       if (state.round !== undefined) currentRound.value = state.round;
-      
-      // Check if game has already started (has units)
+
       const hasUnits = state.players?.some((p: any) => p.units?.length > 0);
-      console.log("[GAME] Has units:", hasUnits, "showLobby:", showLobby.value, "connected:", connectedToGameServer.value);
-      
-      // Mark as connected
       connectedToGameServer.value = true;
-      
-      // If game has started and we're still showing lobby/connecting, skip to game and start
+
       if (hasUnits && (showLobby.value || loading.value)) {
-        console.log("[GAME] Game already started, showing canvas immediately and starting engine");
         loading.value = false;
         showLobby.value = false;
-        
-        // Start game engine on next tick when canvas is rendered
+
         setTimeout(() => {
           if (gameCanvas.value) {
-            console.log("[GAME] Starting game engine from state handler");
             start();
             updateGameState(state);
           } else {
-            console.log("[GAME] Canvas not ready, queuing state");
             pendingState.value = state;
           }
         }, 100);
         return;
       }
-      
-      // Ensure lobby is hidden if game has units
+
       if (hasUnits) {
         showLobby.value = false;
       }
-      
-      // Update game state if canvas is ready and engine is running
+
       if (gameCanvas.value && !showLobby.value) {
-        console.log("[GAME] Calling updateGameState");
         updateGameState(state);
         pendingState.value = null;
       } else if (hasUnits) {
-        // Game started but canvas not ready yet, queue it
-        console.log("[GAME] Canvas not ready, queuing state update");
         pendingState.value = state;
       }
     } catch (err) {
@@ -272,85 +233,56 @@ const connectToGameServer = () => {
   });
 
   socket.on("start", (data: { round: number }) => {
-    console.log("[GAME] Game started! Round:", data.round);
     currentRound.value = data.round;
     showLobby.value = false;
     connectedToGameServer.value = true;
     loading.value = false;
-    
-    // Wait for next tick to ensure canvas is rendered
+
     setTimeout(() => {
-      console.log("[GAME] About to call start(), canvas exists:", !!gameCanvas.value);
       if (gameCanvas.value) {
-        console.log("[GAME] Canvas exists, calling start()");
         start();
-        
-        // Apply pending state if exists
+
         if (pendingState.value) {
-          console.log("[GAME] Applying pending state");
           setTimeout(() => {
             updateGameState(pendingState.value!);
             pendingState.value = null;
           }, 50);
         }
-        
-        // Retry mechanism: if still no render after 500ms, try again
+
         setTimeout(() => {
           const canvas = document.querySelector('.game-canvas');
           if (canvas && !canvas.getAttribute('data-started')) {
-            console.log("[GAME] Retry: Canvas may not have rendered, restarting...");
             start();
           }
         }, 500);
-      } else {
-        console.log("[GAME] ERROR: Canvas does not exist!");
       }
     }, 100);
   });
 
   socket.on("turn", (data: { round: number }) => {
-    console.log("[GAME] Turn changed, round:", data.round, "playerIndex:", playerIndex.value);
     currentRound.value = data.round;
-    // Reset action state on turn change
     isAction.value = false;
     selectedTile.value = null;
     moveTile.value = null;
   });
 
   socket.on("unit-moving", (data: { unit: any; origin: { row: number; col: number }; target: { row: number; col: number } }) => {
-    console.log("[GAME] Unit moving:", data);
-    // Check if this unit belongs to current player
-    const isMyUnit = data.unit.owner?.id === authStore.user?.id;
-    
-    // Enter action mode after move
     isAction.value = true;
     moveTile.value = data.target;
-    selectedTile.value = null; // Clear selection since we're now in action mode
-    
-    console.log("[GAME] Entered action mode at:", data.target, "isMyUnit:", isMyUnit);
-    
-    // Trigger move animation
+    selectedTile.value = null;
     animateMove(data.unit.id, data.origin, data.target);
   });
 
   socket.on("unit-acting", (data: { unit: any; target: any }) => {
-    console.log("[GAME] Unit acting:", data);
-    
-    // Exit action mode
     isAction.value = false;
     moveTile.value = null;
     selectedTile.value = null;
-    
-    // Trigger action animation
     animateAction(data.unit.id);
   });
 
   socket.on("disconnect", (reason) => {
-    console.log("[GAME] Disconnected from game server:", reason);
     if (gameSession.value && !isEnding.value) {
-      console.log("[GAME] Calling stop()");
       stop();
-      console.log("[GAME] Navigating to /play");
       alerts.info("Game ended - disconnected");
       router.push("/play");
     }
@@ -358,41 +290,30 @@ const connectToGameServer = () => {
 };
 
 function updateGameState(state: GameState) {
-  console.log("[GAME] updateGameState called");
   updateState(state);
 }
 
 const endTurn = () => {
-  console.log("[GAME] End turn clicked");
   socket?.emit('endTurn');
 };
 
-watch([() => player1Time.value, () => player2Time.value], () => {
-  console.log("[GAME] Timer update:", player1Time.value, player2Time.value);
-});
+watch([() => player1Time.value, () => player2Time.value], () => {});
 
-// Watch for lobby closing and focus canvas
 watch(() => showLobby.value, (newVal) => {
   if (!newVal) {
-    console.log("[GAME] Lobby closed, focusing canvas");
     setTimeout(() => {
       gameCanvas.value?.focus();
-      console.log("[GAME] Canvas focused:", document.activeElement === gameCanvas.value);
     }, 100);
   }
 });
 
-// Backup: If game has started but start() wasn't called, call it when canvas appears
 watch(() => gameCanvas.value, (newVal) => {
   if (newVal && !showLobby.value && !pendingState.value) {
-    console.log("[GAME] Canvas appeared while game in progress, starting...");
     start();
   }
 });
 
 onMounted(() => {
-  console.log("[GAME] onMounted called");
-  console.log("[GAME] gameCanvas.value:", !!gameCanvas.value);
   fetchGameDetails();
 });
 

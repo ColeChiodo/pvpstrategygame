@@ -52,48 +52,38 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     let lastInputTime: Record<number, number> = {};
 
     let myUserId: string | null = null;
+    let myPlayerIndex: number = -1;
+
+    function setPlayerIndex(index: number) {
+        myPlayerIndex = index;
+    }
 
     function initSocket(gameSocket: Socket, session: any) {
-        console.log('[INIT] initSocket called');
         socket = gameSocket;
         gameSession.value = session;
-        // Extract userId from socket query or session
         myUserId = (socket.handshake?.query?.userId as string) || session?.userId || null;
-        console.log('[INIT] My userId:', myUserId);
 
         uiImage = new Image();
         uiImage.src = '/assets/spritesheets/UI.png';
     }
 
     function loadArenaImage(newArena: Arena) {
-        // Only load if arena changed
-        if (arena?.name === newArena.name && arenaImage?.complete) {
-            return;
-        }
-        console.log('[LOAD] loadArenaImage called for:', newArena.name);
+        if (arena?.name === newArena.name && arenaImage?.complete) return;
         arena = newArena;
-        
-        // Check if image already cached
+
         const cacheKey = `arena_${newArena.name}`;
         if (imageCache.has(cacheKey)) {
-            console.log('[LOAD] Using cached arena image');
             arenaImage = imageCache.get(cacheKey)!;
             return;
         }
-        
+
         arenaImage = new Image();
-        arenaImage.onload = () => {
-            console.log('[LOAD] Arena image loaded and cached');
-            imageCache.set(cacheKey, arenaImage!);
-        };
-        arenaImage.onerror = () => {
-            console.error('[LOAD] Failed to load arena image:', `/assets/maps/${newArena.name}.png`);
-        };
+        arenaImage.onload = () => imageCache.set(cacheKey, arenaImage!);
+        arenaImage.onerror = () => console.error('[LOAD] Failed to load arena');
         arenaImage.src = `/assets/maps/${newArena.name}.png`;
     }
 
     function loadPlayers(newPlayers: Player[]) {
-        console.log('[LOAD] loadPlayers called');
         players.value = newPlayers;
         if (players.value.length === 2) {
             isMyTurn.value = isTurn();
@@ -101,54 +91,46 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     }
 
     function loadUnits(newPlayers: Player[]) {
-        console.log('[LOAD] loadUnits called, received', newPlayers.length, 'players');
-        const existingUnitIds = new Set(units.value.map(u => String(u.id)));
         const receivedUnitIds = new Set<string>();
+        const receivedMyUnitIds = new Set<string>();
 
-        // First, identify which units are MINE (by player index matching myUserId)
-        // and which are ENEMY (different player)
-        let myPlayerIndex = -1;
-        const allPlayers = players.value.length > 0 ? players.value : newPlayers;
-        for (let i = 0; i < allPlayers.length; i++) {
-            if (allPlayers[i].id === myUserId) {
-                myPlayerIndex = i;
-                break;
+        for (const player of newPlayers) {
+            const isMyPlayer = myPlayerIndex >= 0
+                ? newPlayers.indexOf(player) === myPlayerIndex
+                : player.id === myUserId;
+
+            for (const unit of player.units) {
+                receivedUnitIds.add(String(unit.id));
+                if (isMyPlayer) {
+                    receivedMyUnitIds.add(String(unit.id));
+                }
             }
         }
 
-        console.log('[LOAD] My player index:', myPlayerIndex, 'myUserId:', myUserId);
+        const existingUnitIds = new Set(units.value.map(u => String(u.id)));
 
         for (const player of newPlayers) {
-            const isMyPlayer = allPlayers.findIndex(p => p.id === myUserId) === newPlayers.indexOf(player);
-            console.log('[LOAD] Processing player:', player.name, 'isMyPlayer:', isMyPlayer, 'units:', player.units.length);
+            const isMyPlayer = myPlayerIndex >= 0
+                ? newPlayers.indexOf(player) === myPlayerIndex
+                : player.id === myUserId;
 
             for (const unit of player.units) {
                 const unitId = String(unit.id);
-                receivedUnitIds.add(unitId);
 
                 if (existingUnitIds.has(unitId)) {
-                    // Update existing unit
                     const existingUnit = units.value.find(u => String(u.id) === unitId);
                     if (existingUnit) {
-                        const wasVisible = units.value.includes(unit);
                         existingUnit.row = unit.row;
                         existingUnit.col = unit.col;
                         existingUnit.health = unit.health;
                         existingUnit.canMove = unit.canMove;
                         existingUnit.canAct = unit.canAct;
                         existingUnit.currentStatus = !unit.canMove && !unit.canAct ? 1 : 0;
-
-                        // Update owner if needed
                         if (isMyPlayer) {
                             existingUnit.owner = player;
                         }
-
-                        if (!wasVisible && units.value.includes(existingUnit)) {
-                            console.log('[LOAD] Updated and now visible:', unit.name, 'at', unit.row, unit.col);
-                        }
                     }
                 } else {
-                    // New unit - add it
                     unit.owner = player;
                     const newSprite = sprites.find(s => s.name === unit.name);
                     if (newSprite) {
@@ -156,30 +138,20 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
                     }
                     unit.currentStatus = unit.canMove || unit.canAct ? 0 : 1;
                     units.value.push(unit);
-                    existingUnitIds.add(unitId);
-                    console.log('[LOAD] Added new unit:', unit.name, 'at', unit.row, unit.col, 'isMyUnit:', isMyPlayer);
                 }
             }
         }
 
-        // Remove units that are no longer visible (enemy units that moved out of range)
-        // But NEVER remove my own units
-        const unitsToRemove = units.value.filter(u => {
-            if (!u.owner) return false; // Keep units without owner (shouldn't happen)
-            const isMyUnit = u.owner.id === myUserId;
-            if (isMyUnit) return false; // Never remove my own units
-            return !receivedUnitIds.has(String(u.id));
-        });
+        for (let i = units.value.length - 1; i >= 0; i--) {
+            const existingUnit = units.value[i];
+            const unitId = String(existingUnit.id);
 
-        if (unitsToRemove.length > 0) {
-            console.log('[LOAD] Removing', unitsToRemove.length, 'enemy units that are no longer visible');
-            unitsToRemove.forEach(u => {
-                console.log('[LOAD] Removing:', u.name, 'at', u.row, u.col);
-            });
-            units.value = units.value.filter(u => !unitsToRemove.includes(u));
+            if (receivedMyUnitIds.has(unitId)) continue;
+
+            if (!receivedUnitIds.has(unitId)) {
+                units.value.splice(i, 1);
+            }
         }
-
-        console.log('[LOAD] Total units after load:', units.value.length);
     }
 
     function resizeCanvas() {
@@ -194,7 +166,6 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
         const path = astarPath(origin.row, origin.col, target.row, target.col, arena!);
         const realUnit = units.value.find(u => u.id === unitId);
         if (!realUnit) {
-            console.log('[ANIMATE] Unit not found for animation:', unitId);
             isAnimating = false;
             return;
         }
@@ -231,7 +202,6 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
         isAnimating = true;
         const realUnit = units.value.find(u => u.id === unitId);
         if (!realUnit) {
-            console.log('[ANIMATE] Unit not found for animation:', unitId);
             isAnimating = false;
             return;
         }
@@ -254,14 +224,13 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
 
     function draw() {
         if (!ctx || !canvasRef.value) return;
-        
+
         ctx.imageSmoothingEnabled = false;
         ctx.clearRect(0, 0, canvasRef.value.width, canvasRef.value.height);
-        
-        // Draw background
+
         ctx.fillStyle = '#0f0f2b';
         ctx.fillRect(0, 0, canvasRef.value.width, canvasRef.value.height);
-        
+
         drawArena();
         drawFogOfWarTiles();
         drawEntities();
@@ -270,21 +239,14 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     }
 
     function drawArena() {
-        if (!ctx || !arenaImage || !arena || !canvasRef.value) {
-            console.log('[DRAW] drawArena early return - ctx:', !!ctx, 'arenaImage:', !!arenaImage, 'arena:', !!arena, 'canvas:', !!canvasRef.value);
-            return;
-        }
-        
-        if (!arenaImage.complete) {
-            console.log('[DRAW] Arena image not loaded yet');
-            return;
-        }
-        
+        if (!ctx || !arenaImage || !arena || !canvasRef.value) return;
+
+        if (!arenaImage.complete) return;
+
         ctx.imageSmoothingEnabled = false;
         const drawX = (canvasRef.value.width - arena.width * SCALE) / 2 + cameraOffsetX;
         const drawY = (canvasRef.value.height - arena.height * SCALE - 16 * SCALE) / 2 + cameraOffsetY;
-        
-        console.log('[DRAW] Drawing arena at:', drawX, drawY, 'size:', arena.width * SCALE, 'x', arena.height * SCALE);
+
         ctx.drawImage(arenaImage, drawX, drawY, arena.width * SCALE, arena.height * SCALE);
     }
 
@@ -492,7 +454,6 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
         
         // If no valid action targets, exit action mode
         if (!hasValidTargets) {
-            console.log('[ACTION] No valid action targets, exiting action mode');
             isAction = false;
             moveTile.value = null;
             selectedTile.value = null;
@@ -554,7 +515,7 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
 
     function drawInteractionSquares(): number {
         if (!arenaImage || !arena || !canvasRef.value || !ctx) return 0;
-        
+
         const tileWidth = 32 * SCALE;
         const tileHeight = 16 * SCALE;
         const rows = arena.tiles.length;
@@ -577,7 +538,6 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
                 tiles.push(drawIsometricTile(isoX, isoY, row, col));
             }
         }
-        console.log(`[TILES] Created ${tiles.length} tiles`);
         return tiles.length;
     }
 
@@ -613,31 +573,10 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     }
 
     function isTurn(): boolean {
-        if (players.value.length < 2 || !myUserId) {
-            console.log('[TURN] isTurn early exit: players.length=', players.value.length, 'myUserId=', myUserId);
-            return false;
-        }
+        if (players.value.length < 2 || !myUserId) return false;
         const currentPlayerIndex = currentRound % 2;
         const currentPlayer = players.value[currentPlayerIndex];
-        const isMyTurn = currentPlayer?.id === myUserId;
-
-        console.log('[TURN] isTurn CHECK:', {
-            currentRound,
-            currentPlayerIndex,
-            currentPlayerId: currentPlayer?.id,
-            currentPlayerName: currentPlayer?.name,
-            myUserId,
-            isMyTurn,
-            allPlayers: players.value.map((p, i) => ({ index: i, id: p.id, name: p.name }))
-        });
-
-        if (!isMyTurn) {
-            console.log('[TURN] NOT MY TURN - ignoring input');
-        } else {
-            console.log('[TURN] MY TURN - allowing input');
-        }
-
-        return isMyTurn;
+        return currentPlayer?.id === myUserId;
     }
 
     function loadImage(name: string, src: string): HTMLImageElement {
@@ -727,12 +666,7 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     }
 
     function endTurn() {
-        console.log('[TURN] endTurn() called, socket:', !!socket);
-        if (!socket) {
-            console.log('[TURN] No socket, cannot end turn');
-            return;
-        }
-        console.log('[TURN] Emitting endTurn event');
+        if (!socket) return;
         socket.emit('endTurn');
         selectedTile.value = null;
         isAction = false;
@@ -740,85 +674,58 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     }
 
     function handleClick(event: MouseEvent) {
-        console.log('[EVENT] Click at:', event.offsetX, event.offsetY, 'button:', event.button, 'isMyTurn:', isMyTurn.value, 'isAction:', isAction);
-        if (event.button !== 0) {
-            console.log('[EVENT] Ignoring non-left click');
-            return;
-        }
-        if (!isMyTurn.value) {
-            console.log('[EVENT] Not my turn, ignoring click');
-            return;
-        }
-        if (players.value.length !== 2) {
-            console.log('[EVENT] Not 2 players, ignoring click');
-            return;
-        }
-        
-        // Focus canvas for keyboard events
+        if (event.button !== 0) return;
+        if (!isMyTurn.value) return;
+        if (players.value.length !== 2) return;
+
         canvasRef.value?.focus();
 
         const clickX = event.offsetX;
         const clickY = event.offsetY;
-        console.log('[EVENT] Processing click, tiles count:', tiles.length);
 
         let found = false;
         for (const tile of tiles) {
             if (!hoveredTile.value) break;
             if (isPointInsideTile(clickX, clickY, tile)) {
                 const clickedUnit = units.value.find(u => u.row === hoveredTile.value!.row && u.col === hoveredTile.value!.col);
-                
+
                 if (!isAction && !selectedTile.value) {
-                    // Selecting a unit to move - must be my unit and must be able to move
                     if (clickedUnit && unitIsTeam(hoveredTile.value.row, hoveredTile.value.col) && clickedUnit.canMove) {
                         selectedTile.value = tile;
-                        console.log('[CLICK] Selected unit:', clickedUnit.name, 'at', tile.row, tile.col);
-                    } else if (clickedUnit && !unitIsTeam(hoveredTile.value.row, hoveredTile.value.col)) {
-                        console.log('[CLICK] Cannot select enemy unit');
-                    } else if (clickedUnit && !clickedUnit.canMove) {
-                        console.log('[CLICK] Cannot select unit - already moved');
                     }
                 } else if (!isAction && selectedTile.value) {
                     const selectedUnit = units.value.find(u => u.row === selectedTile.value!.row && u.col === selectedTile.value!.col);
-                    
+
                     if (tile.row === selectedTile.value.row && tile.col === selectedTile.value.col) {
-                        // Clicked same tile - stay in place
                         if (selectedUnit) {
+                            console.log('[MOVE]', selectedUnit.name, '->', tile.row, tile.col);
                             socket?.emit('move', { unitId: selectedUnit.id, row: tile.row, col: tile.col });
-                            console.log('[SOCKET] Emitting stay/move:', { unitId: selectedUnit.id, row: tile.row, col: tile.col });
                         }
                         selectedTile.value = null;
                     } else if (validMoveTiles.value.find(t => t.row === tile.row && t.col === tile.col)) {
-                        // Moving to a new tile
+                        console.log('[MOVE]', selectedUnit?.name, '->', tile.row, tile.col);
                         socket?.emit('move', { unitId: selectedUnit?.id, row: tile.row, col: tile.col });
-                        console.log('[SOCKET] Emitting move:', { unitId: selectedUnit?.id, row: tile.row, col: tile.col });
-                        
-                        // Clear selection - action mode will be entered by server event
                         selectedTile.value = null;
                     } else {
                         selectedTile.value = null;
-                        console.log('[CLICK] Invalid move tile, deselecting');
                     }
                 } else if (isAction && moveTile.value) {
-                    // In action mode - can attack enemies or heal allies
                     const actingUnit = units.value.find(u => u.row === moveTile.value!.row && u.col === moveTile.value!.col);
-                    
+
                     if (validActionTiles.value.find(t => t.row === tile.row && t.col === tile.col)) {
+                        console.log('[ACTION]', actingUnit?.name, '->', tile.row, tile.col);
                         socket?.emit('action', { unitId: actingUnit?.id, row: tile.row, col: tile.col });
-                        console.log('[SOCKET] Emitting action:', { unitId: actingUnit?.id, row: tile.row, col: tile.col });
                     }
-                    
-                    // Reset state after action
+
                     isAction = false;
                     moveTile.value = null;
                     selectedTile.value = null;
-                    console.log('[CLICK] Action complete, resetting state');
                 }
                 found = true;
                 break;
             }
         }
         if (!found) {
-            console.log('[CLICK] Clicked outside tiles, deselecting');
             selectedTile.value = null;
             isAction = false;
             moveTile.value = null;
@@ -861,40 +768,32 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     }
 
     function handleKeyDown(e: KeyboardEvent) {
-        console.log('[EVENT] Key pressed:', e.key, 'SCALE:', SCALE, 'camera:', cameraOffsetX, cameraOffsetY);
         switch (e.key) {
             case 'z':
                 if (SCALE > MIN_SCALE) SCALE -= 0.125;
                 if (SCALE < MIN_SCALE) SCALE = MIN_SCALE;
-                console.log('[EVENT] Zoom out, SCALE:', SCALE);
                 break;
             case 'x':
                 if (SCALE < MAX_SCALE) SCALE += 0.125;
                 if (SCALE > MAX_SCALE) SCALE = MAX_SCALE;
-                console.log('[EVENT] Zoom in, SCALE:', SCALE);
                 break;
             case 'ArrowUp':
             case 'w':
                 cameraOffsetY += 8 * SCALE;
-                console.log('[EVENT] Move up, cameraY:', cameraOffsetY);
                 break;
             case 'ArrowDown':
             case 's':
                 cameraOffsetY -= 8 * SCALE;
-                console.log('[EVENT] Move down, cameraY:', cameraOffsetY);
                 break;
             case 'ArrowLeft':
             case 'a':
                 cameraOffsetX += 8 * SCALE;
-                console.log('[EVENT] Move left, cameraX:', cameraOffsetX);
                 break;
             case 'ArrowRight':
             case 'd':
                 cameraOffsetX -= 8 * SCALE;
-                console.log('[EVENT] Move right, cameraX:', cameraOffsetX);
                 break;
             case 'Enter':
-                console.log('[EVENT] Enter pressed, ending turn');
                 endTurn();
                 break;
         }
@@ -913,32 +812,20 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     let isStarted = false;
 
     function start() {
-        console.log('[START] start() called, isStarted:', isStarted);
-        if (isStarted) {
-            console.log('[START] Already started, skipping');
-            return;
-        }
-        if (!canvasRef.value) {
-            console.log('[START] ERROR: canvasRef.value is null');
-            return;
-        }
-        
+        if (isStarted) return;
+        if (!canvasRef.value) return;
+
         isStarted = true;
-        
-        // Get context and set up canvas like old game
+
         ctx = canvasRef.value.getContext('2d');
         if (!ctx) {
-            console.log('[START] ERROR: Could not get context');
             isStarted = false;
             return;
         }
-        
+
         ctx.imageSmoothingEnabled = false;
-        
-        // Set canvas size like old game
         resizeCanvas();
-        
-        // Add event listeners like old game
+
         window.addEventListener('resize', resizeCanvas);
         window.addEventListener('keydown', handleKeyDown);
         window.addEventListener('gamepadconnected', (e: GamepadEvent) => {
@@ -947,26 +834,22 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
         window.addEventListener('gamepaddisconnected', (e: GamepadEvent) => {
             if (gamepadIndex === e.gamepad.index) gamepadIndex = null;
         });
-        
+
         canvasRef.value.addEventListener('click', handleClick);
         canvasRef.value.addEventListener('mousedown', handleMouseDown);
         canvasRef.value.addEventListener('mouseup', handleMouseUp);
         canvasRef.value.addEventListener('mouseleave', handleMouseLeave);
         canvasRef.value.addEventListener('mousemove', handleMouseMove);
         canvasRef.value.addEventListener('wheel', handleWheel);
-        
-        console.log('[START] Event listeners added, starting game loop');
+
         gameLoop();
-        
-        // Mark canvas as started for retry detection
+
         if (canvasRef.value) {
             canvasRef.value.setAttribute('data-started', 'true');
         }
-        console.log('[START] Game engine started successfully');
     }
 
     function stop() {
-        console.log('[STOP] Stopping game engine');
         if (animationFrameId) cancelAnimationFrame(animationFrameId);
         window.removeEventListener('resize', resizeCanvas);
         window.removeEventListener('keydown', handleKeyDown);
@@ -980,29 +863,22 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
             canvasRef.value.removeAttribute('data-started');
         }
         isStarted = false;
-        console.log('[STOP] Game engine stopped');
     }
 
     function updateState(state: GameState) {
-        console.log('[UPDATE] updateState called');
         if (state.arena) {
-            console.log('[UPDATE] Loading arena:', state.arena.name);
             loadArenaImage(state.arena);
         }
         if (state.players) {
-            console.log('[UPDATE] Loading players and units');
             loadPlayers(state.players as any);
             loadUnits(state.players as any);
         }
         if (state.visibleTiles) {
-            console.log('[UPDATE] Setting visible tiles:', state.visibleTiles.length);
             visibleTiles.value = state.visibleTiles;
         }
         if (state.round !== undefined) {
-            console.log('[UPDATE] Setting round:', state.round);
             currentRound = state.round;
         }
-        console.log('[UPDATE] State update complete');
     }
 
     return {
@@ -1020,6 +896,7 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
         stop,
         updateState,
         animateMove,
-        animateAction
+        animateAction,
+        setPlayerIndex
     };
 }

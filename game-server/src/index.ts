@@ -497,8 +497,8 @@ function initializeGame(id: string): GameState {
             obstacles: [
                 {
                     name: "well1",
-                    row: 2,
-                    col: 17,
+                    row: 4,
+                    col: 19,
                     sprite: {
                         width: 32,
                         height: 64,
@@ -508,8 +508,8 @@ function initializeGame(id: string): GameState {
                 },
                 {
                     name: "well2",
-                    row: 17,
-                    col: 2,
+                    row: 19,
+                    col: 4,
                     sprite: {
                         width: 32,
                         height: 64,
