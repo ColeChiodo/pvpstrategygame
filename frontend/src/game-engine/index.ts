@@ -331,7 +331,6 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
 
     function drawActionTile(tile: Tile, action: string) {
         if (!uiImage || !ctx) return;
-        validActionTiles.value.push(tile);
         const frameSize = 32;
         const frameX = action === 'attack' ? 2 : 1;
         ctx.imageSmoothingEnabled = false;
@@ -358,7 +357,8 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     }
 
     function drawMovementTiles() {
-        if (!arena || !selectedTile.value) return;
+        // Don't draw movement tiles when in action mode
+        if (isAction || !arena || !selectedTile.value) return;
         const unit = units.value.find(u => u.row === selectedTile.value!.row && u.col === selectedTile.value!.col);
         if (!unit) return;
 
@@ -404,12 +404,20 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     function drawActionTiles() {
         if (!isAction || !moveTile.value || !arena) return;
         const unit = units.value.find(u => u.row === moveTile.value!.row && u.col === moveTile.value!.col);
-        if (!unit) return;
+        if (!unit) {
+            // No unit found at moveTile, exit action mode
+            isAction = false;
+            moveTile.value = null;
+            return;
+        }
 
         const range = unit.range;
         const row = moveTile.value.row;
         const col = moveTile.value.col;
         const unitAction = unit.action;
+        
+        validActionTiles.value = [];
+        let hasValidTargets = false;
 
         for (let i = -range; i <= range; i++) {
             for (let j = -range; j <= range; j++) {
@@ -424,15 +432,26 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
                     const pos = coordToPosition(targetRow, targetCol);
                     if (pos.x !== -9999) {
                         const tile = { x: pos.x, y: pos.y, row: targetRow, col: targetCol };
+                        validActionTiles.value.push(tile);
                         drawActionTile(tile, unitAction);
+                        hasValidTargets = true;
                     }
                 }
             }
         }
+        
+        // If no valid action targets, exit action mode
+        if (!hasValidTargets) {
+            console.log('[ACTION] No valid action targets, exiting action mode');
+            isAction = false;
+            moveTile.value = null;
+            selectedTile.value = null;
+        }
     }
 
     function drawPath() {
-        if (!selectedTile.value || !hoveredTile.value) return;
+        // Don't draw path when in action mode
+        if (isAction || !selectedTile.value || !hoveredTile.value) return;
         const path = astarPath(selectedTile.value.row, selectedTile.value.col, hoveredTile.value.row, hoveredTile.value.col, arena!);
         for (const pathTile of path) {
             if (validMoveTiles.value.find(t => t.row === pathTile.row && t.col === pathTile.col)) {
@@ -690,28 +709,19 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
                     const selectedUnit = units.value.find(u => u.row === selectedTile.value!.row && u.col === selectedTile.value!.col);
                     
                     if (tile.row === selectedTile.value.row && tile.col === selectedTile.value.col) {
-                        // Clicked same tile - stay in place and enter action mode
-                        if (selectedUnit && selectedUnit.canAct) {
-                            isAction = true;
-                            moveTile.value = tile;
-                            console.log('[CLICK] Staying in place, entering action mode');
-                        } else {
-                            selectedTile.value = null;
-                            console.log('[CLICK] Cannot act, deselecting');
+                        // Clicked same tile - stay in place
+                        if (selectedUnit) {
+                            socket?.emit('move', { unitId: selectedUnit.id, row: tile.row, col: tile.col });
+                            console.log('[SOCKET] Emitting stay/move:', { unitId: selectedUnit.id, row: tile.row, col: tile.col });
                         }
+                        selectedTile.value = null;
                     } else if (validMoveTiles.value.find(t => t.row === tile.row && t.col === tile.col)) {
                         // Moving to a new tile
                         socket?.emit('move', { unitId: selectedUnit?.id, row: tile.row, col: tile.col });
                         console.log('[SOCKET] Emitting move:', { unitId: selectedUnit?.id, row: tile.row, col: tile.col });
                         
-                        // Enter action mode after move if unit can act
-                        if (selectedUnit?.canAct) {
-                            isAction = true;
-                            moveTile.value = tile;
-                            console.log('[CLICK] Moved, entering action mode');
-                        } else {
-                            selectedTile.value = null;
-                        }
+                        // Clear selection - action mode will be entered by server event
+                        selectedTile.value = null;
                     } else {
                         selectedTile.value = null;
                         console.log('[CLICK] Invalid move tile, deselecting');

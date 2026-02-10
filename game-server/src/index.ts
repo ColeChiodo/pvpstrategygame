@@ -298,7 +298,8 @@ function handleMove(socket: Socket, userId: string, unitId: number, row: number,
         unit.col = col;
         unit.canMove = false;
         console.log(`[${gameId}] Move: ${unit.name} to (${row}, ${col})`);
-        io?.emit("moved", { unitId, row, col, origin });
+        // Broadcast move event to all clients so they can animate and enter action mode
+        io?.emit("unit-moving", { unit, origin, target: { row, col } });
     }
 
     broadcastState();
@@ -336,7 +337,8 @@ function handleAction(socket: Socket, userId: string, unitId: number, row: numbe
             console.log(`[${gameId}] Heal: ${unit.name} healed for ${unit.attack}`);
         }
         unit.canAct = false;
-        io?.emit("acted", { unitId, row, col, targetHealth: targetUnit.health });
+        // Broadcast action event to all clients
+        io?.emit("unit-acting", { unit, target: targetUnit });
     }
 
     broadcastState();

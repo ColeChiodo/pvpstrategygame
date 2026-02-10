@@ -318,16 +318,32 @@ const connectToGameServer = () => {
     moveTile.value = null;
   });
 
-  socket.on("moved", (data: { unitId: number; row: number; col: number; origin: { row: number; col: number } }) => {
-    console.log("[GAME] Unit moved:", data);
+  socket.on("unit-moving", (data: { unit: any; origin: { row: number; col: number }; target: { row: number; col: number } }) => {
+    console.log("[GAME] Unit moving:", data);
+    // Check if this unit belongs to current player
+    const isMyUnit = data.unit.owner?.id === authStore.user?.id;
+    
+    // Enter action mode after move
+    isAction.value = true;
+    moveTile.value = data.target;
+    selectedTile.value = null; // Clear selection since we're now in action mode
+    
+    console.log("[GAME] Entered action mode at:", data.target, "isMyUnit:", isMyUnit);
+    
     // Trigger move animation
-    animateMove(data.unitId, data.origin, { row: data.row, col: data.col });
+    animateMove(data.unit.id, data.origin, data.target);
   });
 
-  socket.on("acted", (data: { unitId: number; row: number; col: number; targetHealth: number }) => {
-    console.log("[GAME] Unit acted:", data);
+  socket.on("unit-acting", (data: { unit: any; target: any }) => {
+    console.log("[GAME] Unit acting:", data);
+    
+    // Exit action mode
+    isAction.value = false;
+    moveTile.value = null;
+    selectedTile.value = null;
+    
     // Trigger action animation
-    animateAction(data.unitId);
+    animateAction(data.unit.id);
   });
 
   socket.on("disconnect", (reason) => {
