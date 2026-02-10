@@ -300,11 +300,6 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
         const highlightFrameX = hasUnit(hoveredTile.value.row, hoveredTile.value.col)
             ? (unitIsTeam(hoveredTile.value.row, hoveredTile.value.col) ? 1 : 2)
             : 0;
-        
-        // Debug hover colors: 0=green (empty), 1=cyan (my unit), 2=red (enemy)
-        const colors = ['green', 'cyan', 'red'];
-        console.log('[HOVER] Tile:', hoveredTile.value.row, hoveredTile.value.col, 'Color:', colors[highlightFrameX], 'HasUnit:', hasUnit(hoveredTile.value.row, hoveredTile.value.col));
-        
         ctx.imageSmoothingEnabled = false;
         ctx.drawImage(uiImage, highlightFrameX * frameSize, 0, frameSize, frameSize,
             hoveredTile.value.x, hoveredTile.value.y - 8 * SCALE, frameSize * SCALE, frameSize * SCALE);
@@ -386,9 +381,12 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
                     }
 
                     if (canMove && (mobility - mobilityPenalty >= 0)) {
-                        const tile = { x: 0, y: 0, row: targetRow, col: targetCol };
-                        validMoveTiles.value.push(tile);
-                        drawMoveTile(tile);
+                        const pos = coordToPosition(targetRow, targetCol);
+                        if (pos.x !== -9999) {
+                            const tile = { x: pos.x, y: pos.y, row: targetRow, col: targetCol };
+                            validMoveTiles.value.push(tile);
+                            drawMoveTile(tile);
+                        }
                     }
                 }
             }
@@ -413,8 +411,13 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
                     if (unitAction === 'heal' && !unitIsTeam(row + i, col + j)) continue;
                     if (unitAction === 'attack' && unitIsTeam(row + i, col + j)) continue;
 
-                    const tile = { x: 0, y: 0, row: row + i, col: col + j };
-                    drawActionTile(tile, unitAction);
+                    const targetRow = row + i;
+                    const targetCol = col + j;
+                    const pos = coordToPosition(targetRow, targetCol);
+                    if (pos.x !== -9999) {
+                        const tile = { x: pos.x, y: pos.y, row: targetRow, col: targetCol };
+                        drawActionTile(tile, unitAction);
+                    }
                 }
             }
         }
@@ -482,12 +485,6 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
         const offsetX = imgCenterX - tileWidth / 2 + cameraOffsetX;
         const offsetY = imgCenterY - gridHeight - tileHeight - 8 * SCALE + cameraOffsetY;
 
-        // Debug: log first few tile heights
-        if (arena.heightMap.length > 0) {
-            console.log('[HEIGHT] First row heights:', arena.heightMap[0].slice(0, 5));
-            console.log('[HEIGHT] Tile (2,2) height:', getTileHeight(2, 2), 'raw:', arena.heightMap[2]?.[2]);
-        }
-
         tiles = [];
         for (let row = 0; row < rows; row++) {
             for (let col = 0; col < cols; col++) {
@@ -496,15 +493,10 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
                 const height = getTileHeight(row, col);
                 const heightOffset = height * 16 * SCALE;
                 const isoY = (col + row) * tileHeight / 2 + offsetY - heightOffset;
-                
-                // Debug: log tiles with height > 0
-                if (height > 0 && row < 3 && col < 3) {
-                    console.log(`[HEIGHT] Tile (${row},${col}): height=${height}, offset=${heightOffset}, isoY=${isoY}`);
-                }
-                
                 tiles.push(drawIsometricTile(isoX, isoY, row, col));
             }
         }
+        console.log(`[TILES] Created ${tiles.length} tiles`);
         return tiles.length;
     }
 
@@ -536,17 +528,13 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
         const unit = units.value.find(u => u.row === row && u.col === col);
         if (!unit || !myUserId) return false;
         // Use userId instead of socket ID since socket changes on reconnect
-        const isMine = unit.owner.id === myUserId;
-        console.log('[TEAM] unitIsTeam check:', { unitOwnerId: unit.owner.id, myUserId, isMine, unit: unit.name });
-        return isMine;
+        return unit.owner.id === myUserId;
     }
 
     function isTurn(): boolean {
         if (players.value.length < 2 || !myUserId) return false;
         const currentPlayer = players.value[currentRound % 2];
-        const isMyTurn = currentPlayer?.id === myUserId;
-        console.log('[TURN] isTurn check:', { currentPlayerId: currentPlayer?.id, myUserId, isMyTurn, round: currentRound });
-        return isMyTurn;
+        return currentPlayer?.id === myUserId;
     }
 
     function loadImage(name: string, src: string): HTMLImageElement {
