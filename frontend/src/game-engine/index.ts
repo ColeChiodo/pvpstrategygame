@@ -101,24 +101,54 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     }
 
     function loadUnits(newPlayers: Player[]) {
-        console.log('[LOAD] loadUnits called');
+        console.log('[LOAD] loadUnits called, received', newPlayers.length, 'players');
         const existingUnitIds = new Set(units.value.map(u => String(u.id)));
-        
+        const receivedUnitIds = new Set<string>();
+
+        // First, identify which units are MINE (by player index matching myUserId)
+        // and which are ENEMY (different player)
+        let myPlayerIndex = -1;
+        const allPlayers = players.value.length > 0 ? players.value : newPlayers;
+        for (let i = 0; i < allPlayers.length; i++) {
+            if (allPlayers[i].id === myUserId) {
+                myPlayerIndex = i;
+                break;
+            }
+        }
+
+        console.log('[LOAD] My player index:', myPlayerIndex, 'myUserId:', myUserId);
+
         for (const player of newPlayers) {
+            const isMyPlayer = allPlayers.findIndex(p => p.id === myUserId) === newPlayers.indexOf(player);
+            console.log('[LOAD] Processing player:', player.name, 'isMyPlayer:', isMyPlayer, 'units:', player.units.length);
+
             for (const unit of player.units) {
                 const unitId = String(unit.id);
-                
+                receivedUnitIds.add(unitId);
+
                 if (existingUnitIds.has(unitId)) {
+                    // Update existing unit
                     const existingUnit = units.value.find(u => String(u.id) === unitId);
                     if (existingUnit) {
+                        const wasVisible = units.value.includes(unit);
                         existingUnit.row = unit.row;
                         existingUnit.col = unit.col;
                         existingUnit.health = unit.health;
                         existingUnit.canMove = unit.canMove;
                         existingUnit.canAct = unit.canAct;
                         existingUnit.currentStatus = !unit.canMove && !unit.canAct ? 1 : 0;
+
+                        // Update owner if needed
+                        if (isMyPlayer) {
+                            existingUnit.owner = player;
+                        }
+
+                        if (!wasVisible && units.value.includes(existingUnit)) {
+                            console.log('[LOAD] Updated and now visible:', unit.name, 'at', unit.row, unit.col);
+                        }
                     }
                 } else {
+                    // New unit - add it
                     unit.owner = player;
                     const newSprite = sprites.find(s => s.name === unit.name);
                     if (newSprite) {
@@ -127,9 +157,29 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
                     unit.currentStatus = unit.canMove || unit.canAct ? 0 : 1;
                     units.value.push(unit);
                     existingUnitIds.add(unitId);
+                    console.log('[LOAD] Added new unit:', unit.name, 'at', unit.row, unit.col, 'isMyUnit:', isMyPlayer);
                 }
             }
         }
+
+        // Remove units that are no longer visible (enemy units that moved out of range)
+        // But NEVER remove my own units
+        const unitsToRemove = units.value.filter(u => {
+            if (!u.owner) return false; // Keep units without owner (shouldn't happen)
+            const isMyUnit = u.owner.id === myUserId;
+            if (isMyUnit) return false; // Never remove my own units
+            return !receivedUnitIds.has(String(u.id));
+        });
+
+        if (unitsToRemove.length > 0) {
+            console.log('[LOAD] Removing', unitsToRemove.length, 'enemy units that are no longer visible');
+            unitsToRemove.forEach(u => {
+                console.log('[LOAD] Removing:', u.name, 'at', u.row, u.col);
+            });
+            units.value = units.value.filter(u => !unitsToRemove.includes(u));
+        }
+
+        console.log('[LOAD] Total units after load:', units.value.length);
     }
 
     function resizeCanvas() {
@@ -563,12 +613,15 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     }
 
     function isTurn(): boolean {
-        if (players.value.length < 2 || !myUserId) return false;
+        if (players.value.length < 2 || !myUserId) {
+            console.log('[TURN] isTurn early exit: players.length=', players.value.length, 'myUserId=', myUserId);
+            return false;
+        }
         const currentPlayerIndex = currentRound % 2;
         const currentPlayer = players.value[currentPlayerIndex];
         const isMyTurn = currentPlayer?.id === myUserId;
-        
-        console.log('[TURN] isTurn check:', {
+
+        console.log('[TURN] isTurn CHECK:', {
             currentRound,
             currentPlayerIndex,
             currentPlayerId: currentPlayer?.id,
@@ -577,7 +630,13 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
             isMyTurn,
             allPlayers: players.value.map((p, i) => ({ index: i, id: p.id, name: p.name }))
         });
-        
+
+        if (!isMyTurn) {
+            console.log('[TURN] NOT MY TURN - ignoring input');
+        } else {
+            console.log('[TURN] MY TURN - allowing input');
+        }
+
         return isMyTurn;
     }
 

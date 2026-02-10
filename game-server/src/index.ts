@@ -287,19 +287,24 @@ function handleMove(socket: Socket, userId: string, unitId: number, row: number,
     if (!gameState) return;
     const player = gameState.players.find(p => p.id === userId);
     if (!player) {
-        console.log(`[${gameId}] Move rejected: Player not found for userId ${userId}`);
+        console.log(`[${gameId}] Move REJECTED: Player not found for userId ${userId}`);
         return;
     }
+    const playerIndex = gameState.players.indexOf(player);
     const currentPlayerIndex = gameState.round % 2;
     const currentPlayer = gameState.players[currentPlayerIndex];
     const isPlayerTurn = currentPlayer === player;
-    
-    console.log(`[${gameId}] Move attempt: ${player.name} (index: ${gameState.players.indexOf(player)}) trying to move, current turn: ${currentPlayer?.name} (index: ${currentPlayerIndex}), isPlayerTurn: ${isPlayerTurn}`);
-    
+
+    console.log(`[${gameId}] Move ATTEMPT: ${player.name} (userId=${userId}, playerIndex=${playerIndex})`);
+    console.log(`[${gameId}] Current round: ${gameState.round}, currentPlayerIndex: ${currentPlayerIndex}, currentPlayer: ${currentPlayer?.name} (id=${currentPlayer?.id})`);
+    console.log(`[${gameId}] isPlayerTurn=${isPlayerTurn}, comparing currentPlayer.id=${currentPlayer?.id} === player.id=${player.id}`);
+
     if (!isPlayerTurn) {
-        console.log(`[${gameId}] Move rejected: Not ${player.name}'s turn`);
+        console.log(`[${gameId}] Move REJECTED: Not ${player.name}'s turn (expected player ${currentPlayerIndex}, got player ${playerIndex})`);
         return;
     }
+
+    console.log(`[${gameId}] Move ACCEPTED for ${player.name}`);
 
     const unit = player.units.find(u => u.id === unitId);
     if (!unit || !unit.canMove) return;
@@ -414,11 +419,20 @@ function getPlayerGameState(gs: GameState, player: Player): GameState {
     const other = temp.players.find(p => p.id !== player.id);
     if (other) {
         const beforeFilter = other.units.length;
-        other.units = other.units.filter(u => visible.some(v => v.row === u.row && v.col === u.col));
+        const visibleEnemyUnits = other.units.filter(u => visible.some(v => v.row === u.row && v.col === u.col));
+        const hiddenEnemyUnits = other.units.filter(u => !visible.some(v => v.row === u.row && v.col === u.col));
+
+        if (hiddenEnemyUnits.length > 0) {
+            console.log(`[${gameId}] VISIBILITY BUG CHECK: ${player.name} hiding ${hiddenEnemyUnits.length} enemy units:`);
+            hiddenEnemyUnits.forEach(u => {
+                console.log(`[${gameId}]   Hidden: ${u.name} at (${u.row}, ${u.col})`);
+            });
+        }
+
+        other.units = visibleEnemyUnits;
         console.log(`[${gameId}] Fog of war: ${player.name} sees ${other.units.length}/${beforeFilter} enemy units`);
     }
 
-    // Log units for this player
     const thisPlayer = temp.players.find(p => p.id === player.id);
     console.log(`[${gameId}] Sending state to ${player.name}: ${thisPlayer?.units.length} own units, ${other?.units.length || 0} visible enemy units`);
 
