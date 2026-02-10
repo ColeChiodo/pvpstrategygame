@@ -121,7 +121,7 @@ io.on("connection", (socket: Socket) => {
     });
 
     socket.on("join", (data: { gameId: string; name: string; avatar: string }) => {
-        console.log(`[${gameId}] JOIN event received:`, data);
+        console.log(`[${gameId}] JOIN event received from ${socket.id} (userId: ${userId}):`, JSON.stringify(data));
         handleJoin(socket, data.gameId, userId, data.name, data.avatar);
     });
 

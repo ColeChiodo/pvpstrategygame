@@ -159,12 +159,14 @@ const connectToGameServer = () => {
     path: `/game/${gameSessionId}/socket.io`,
     query: { userId },
     transports: ['websocket', 'polling'],
-    reconnectionAttempts: 5,
-    reconnectionDelay: 1000,
-    timeout: 20000,
+    reconnectionAttempts: 10,
+    reconnectionDelay: 500,
+    reconnectionDelayMax: 3000,
+    timeout: 30000,
   });
 
   socket.on("connect", () => {
+    console.log("[GAME] Socket connected:", socket?.id);
     initSocket(socket, {
       gameId: gameSessionId,
       opponent: gameSession.value.opponent,
@@ -172,12 +174,32 @@ const connectToGameServer = () => {
     });
 
     setTimeout(() => {
+      console.log("[GAME] Sending join event:", { gameId: gameSessionId, name: userName, avatar: userAvatar });
       socket?.emit('join', { gameId: gameSessionId, name: userName, avatar: userAvatar });
     }, 100);
   });
 
   socket.on("connect_error", (err: Error) => {
     console.error("[GAME] Connect error:", err.message);
+  });
+
+  socket.on("disconnect", (reason) => {
+    console.log("[GAME] Socket disconnected:", reason);
+    if (reason === "io server disconnect") {
+      console.log("[GAME] Server initiated disconnect, reconnecting...");
+      socket?.connect();
+    }
+  });
+
+  socket.on("reconnect_attempt", (attemptNumber) => {
+    console.log("[GAME] Reconnection attempt:", attemptNumber);
+  });
+
+  socket.on("reconnect", (attemptNumber) => {
+    console.log("[GAME] Reconnected after", attemptNumber, "attempts");
+    setTimeout(() => {
+      socket?.emit('join', { gameId: gameSessionId, name: userName, avatar: userAvatar });
+    }, 100);
   });
 
    socket.on("joined", (data: any) => {
