@@ -197,6 +197,8 @@ function handleJoin(socket: Socket, sessionId: string, userId: string, name: str
 
     const startRow = isPlayer1 ? gameState.arena.p1Start.row : gameState.arena.p2Start.row;
     const startCol = isPlayer1 ? gameState.arena.p1Start.col : gameState.arena.p2Start.col;
+    
+    console.log(`[${gameId}] Spawning units for ${name} (Player ${isPlayer1 ? 1 : 2}) at row:${startRow} col:${startCol}`);
 
     player.units.push(
         { id: 1, row: startRow, col: startCol, name: "king", action: "attack", canMove: true, canAct: true, health: 40, maxHealth: 40, attack: 30, defense: 10, range: 2, mobility: 3 },
@@ -208,6 +210,8 @@ function handleJoin(socket: Socket, sessionId: string, userId: string, name: str
         { id: 7, row: startRow + 2, col: startCol + 2, name: "scout", action: "attack", canMove: true, canAct: true, health: 20, maxHealth: 20, attack: 10, defense: 10, range: 1, mobility: 5 },
         { id: 8, row: startRow + 1, col: startCol + 2, name: "tank", action: "attack", canMove: true, canAct: true, health: 40, maxHealth: 40, attack: 10, defense: 20, range: 1, mobility: 2 }
     );
+    
+    console.log(`[${gameId}] Player ${name} has ${player.units.length} units`);
 
     gameState.players.push(player);
     const playerIndex = gameState.players.length - 1;
@@ -379,8 +383,14 @@ function getPlayerGameState(gs: GameState, player: Player): GameState {
 
     const other = temp.players.find(p => p.id !== player.id);
     if (other) {
+        const beforeFilter = other.units.length;
         other.units = other.units.filter(u => visible.some(v => v.row === u.row && v.col === u.col));
+        console.log(`[${gameId}] Fog of war: ${player.name} sees ${other.units.length}/${beforeFilter} enemy units`);
     }
+
+    // Log units for this player
+    const thisPlayer = temp.players.find(p => p.id === player.id);
+    console.log(`[${gameId}] Sending state to ${player.name}: ${thisPlayer?.units.length} own units, ${other?.units.length || 0} visible enemy units`);
 
     return temp;
 }
@@ -428,28 +438,51 @@ function initializeGame(id: string): GameState {
                 [1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1]
             ],
             heightMap: [
-                [1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1],
-                [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-                [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2,1,1],
-                [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-                [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-                [0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0],
-                [0,1,1,1,1,1,1,1,0,0,0,0,1,1,1,1,1,1,1,0],
-                [0,1,1,1,1,1,1,0,0,0,0,0,0,1,1,1,1,1,1,0],
-                [0,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0],
-                [0,0,0,1,1,1,0,0,0,0,0,0,0,0,1,1,1,0,0,0],
-                [0,0,0,1,1,1,0,0,0,0,0,0,0,0,1,1,1,0,0,0],
-                [0,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0],
-                [0,1,1,1,1,1,1,0,0,0,0,0,0,1,1,1,1,1,1,0],
-                [0,1,1,1,1,1,1,1,0,0,0,0,1,1,1,1,1,1,1,0],
-                [0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0],
-                [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-                [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-                [1,1,2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-                [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-                [1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1]
+                [3.5, 3.5, 3.5, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 2.5, 2.5, 2.5, 2.5],
+                [3.5, 3.5, 3.5, 3, 3, 3, 3, 3, 3, 3, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5, 2, 2],
+                [3.5, 3.5, 3.5, 3, 3, 3, 3, 3, 3, 3, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5, 2, 2, 2],
+                [3, 3, 3, 3, 3, 3, 3, 3, 2.5, 2.5, 2.5, 2.5, 2.5, 2, 2, 2, 2, 2, 2, 2],
+                [3, 3, 3, 3, 3, 3, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5, 2, 2, 2, 2, 2, 2, 2, 2],
+                [0, 3, 3, 3, 3, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5, 2, 2, 2, 2, 2, 2, 2, 0],
+                [0, 3, 3, 3, 2.5, 2.5, 2.5, 2.5, 0, 0, 0, 0, 2, 2, 2, 2, 2, 2, 2, 0],
+                [0, 3, 2.5, 2.5, 2.5, 2, 2, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 2, 2, 0],
+                [0, 0, 2.5, 2.5, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 1.5, 1.5, 1.5, 1.5, 0, 0],
+                [0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 1.5, 1.5, 1.5, 0, 0, 0],
+                [0, 0, 0, 2, 1.5, 1.5, 0, 0, 0, 0, 0, 0, 0, 0, 1.5, 1.5, 1.5, 0, 0, 0],
+                [0, 0, 2, 2, 1.5, 1.5, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0],
+                [0, 2, 2, 1.5, 1.5, 1.5, 1.5, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0],
+                [0, 2, 2, 1.5, 1.5, 1.5, 1.5, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0],
+                [0, 2, 2, 1.5, 1.5, 1.5, 1.5, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
+                [2.5, 2, 2, 1.5, 1.5, 1.5, 1.5, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                [2.5, 2, 2, 1.5, 1.5, 1.5, 1.5, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                [2.5, 2, 2, 1.5, 1.5, 1.5, 1.5, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.5, 0.5, 0.5],
+                [2.5, 2, 2, 1.5, 1.5, 1.5, 1.5, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.5, 0.5, 0.5],
+                [2.5, 2, 2, 1.5, 1.5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0.5, 0.5, 0.5],
             ],
-            obstacles: [],
+            obstacles: [
+                {
+                    name: "well1",
+                    row: 1,
+                    col: 18,
+                    sprite: {
+                        width: 32,
+                        height: 64,
+                        name: "well",
+                        image: "well",
+                    }
+                },
+                {
+                    name: "well2",
+                    row: 16,
+                    col: 3,
+                    sprite: {
+                        width: 32,
+                        height: 64,
+                        name: "well",
+                        image: "well",
+                    }
+                }
+            ],
             p1Start: { row: 0, col: 0 },
             p2Start: { row: 19, col: 19 },
         },
