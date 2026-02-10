@@ -405,10 +405,10 @@ function handleEndTurn(socket: Socket, userId: string) {
 
 function broadcastState() {
     if (!gameState || !io) return;
-    const state = getPlayerGameState(gameState, gameState.players[0]);
-    const compressed = deflate(JSON.stringify(state));
+    console.log(`[${gameId}] broadcastState: Broadcasting to ${gameState.players.length} players`);
     gameState.players.forEach(p => {
         const playerState = getPlayerGameState(gameState!, p);
+        console.log(`[${gameId}]   Sending to ${p.name} (socketId=${p.socketId}): visibleTiles=${playerState.visibleTiles.length}, enemyUnits=${playerState.players.find(op => op.id !== p.id)?.units.length || 0}`);
         const compressedPlayer = deflate(JSON.stringify(playerState));
         io!.to(p.socketId).emit("state", compressedPlayer);
     });
@@ -435,7 +435,20 @@ function getPlayerGameState(gs: GameState, player: Player): GameState {
 
     const other = temp.players.find(p => p.id !== player.id);
     if (other) {
-        const visibleEnemyUnits = other.units.filter(u => visible.some(v => v.row === u.row && v.col === u.col));
+        const visibleEnemyUnits = other.units.filter(u => {
+            const isVisible = visible.some(v => v.row === u.row && v.col === u.col);
+            if (!isVisible) {
+                console.log(`[${gameId}] HIDDEN: ${player.name} cannot see enemy ${u.name} at (${u.row},${u.col})`);
+            } else {
+                console.log(`[${gameId}] VISIBLE: ${player.name} CAN see enemy ${u.name} at (${u.row},${u.col})`);
+            }
+            return isVisible;
+        });
+        console.log(`[${gameId}] getPlayerGameState for ${player.name} (id=${player.id}):`);
+        console.log(`[${gameId}]   My units: ${player.units.map(u => `${u.name}(${u.row},${u.col})`).join(', ')}`);
+        console.log(`[${gameId}]   Enemy units: ${other.units.map(u => `${u.name}(${u.row},${u.col})`).join(', ')}`);
+        console.log(`[${gameId}]   Visible tiles count: ${visible.length}`);
+        console.log(`[${gameId}]   Visible enemy units: ${visibleEnemyUnits.length} - ${visibleEnemyUnits.map(u => `${u.name}(${u.row},${u.col})`).join(', ')}`);
         other.units = visibleEnemyUnits;
     }
 
@@ -535,8 +548,8 @@ function initializeGame(id: string): GameState {
                 },
                 {
                     name: "well2",
-                    row: 15,
-                    col: 4,
+                    row: 16,
+                    col: 5,
                     sprite: {
                         width: 32,
                         height: 64,

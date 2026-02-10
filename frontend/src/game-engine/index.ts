@@ -85,12 +85,24 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
 
     function loadPlayers(newPlayers: Player[]) {
         players.value = newPlayers;
+        console.log('[GAME-ENGINE] loadPlayers:', {
+            myPlayerIndex,
+            myUserId,
+            players: newPlayers.map((p, i) => `${p.name}[${i}](${p.id})`)
+        });
         if (players.value.length === 2) {
             isMyTurn.value = isTurn();
         }
     }
 
     function loadUnits(newPlayers: Player[]) {
+        console.log('[GAME-ENGINE] loadUnits START:', {
+            myPlayerIndex,
+            myUserId,
+            newPlayersCount: newPlayers.length,
+            newPlayers: newPlayers.map(p => `${p.name}: ${p.units.length} units`)
+        });
+
         const receivedUnitIds = new Set<string>();
         const receivedMyUnitIds = new Set<string>();
 
@@ -142,6 +154,14 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
             }
         }
 
+        console.log('[GAME-ENGINE] loadUnits END:', {
+            myPlayerIndex,
+            myUserId,
+            receivedMyUnitIds: Array.from(receivedMyUnitIds),
+            totalUnitsAfter: units.value.length,
+            totalUnitsAfterIds: units.value.map(u => `${u.name}(${u.row},${u.col})`)
+        });
+
         for (let i = units.value.length - 1; i >= 0; i--) {
             const existingUnit = units.value[i];
             const unitId = String(existingUnit.id);
@@ -149,6 +169,7 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
             if (receivedMyUnitIds.has(unitId)) continue;
 
             if (!receivedUnitIds.has(unitId)) {
+                console.log('[GAME-ENGINE] Removing invisible unit:', existingUnit.name, existingUnit.row, existingUnit.col);
                 units.value.splice(i, 1);
             }
         }
@@ -233,9 +254,9 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
 
         drawArena();
         drawFogOfWarTiles();
+        drawInteractionSquares();
         drawEntities();
         drawUI();
-        drawInteractionSquares();
     }
 
     function drawArena() {
