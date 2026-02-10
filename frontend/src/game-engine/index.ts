@@ -189,18 +189,8 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
         realUnit.sprite.currentFrame = 0;
     }
 
-    let frameCount = 0;
-    
     function draw() {
-        frameCount++;
-        if (frameCount % 60 === 0) {
-            console.log('[DRAW] frame', frameCount, 'ctx:', !!ctx, 'canvas:', !!canvasRef.value, 'arenaImage:', !!arenaImage, 'units:', units.value.length);
-        }
-        
-        if (!ctx || !canvasRef.value) {
-            console.log('[DRAW] Missing ctx or canvas');
-            return;
-        }
+        if (!ctx || !canvasRef.value) return;
         
         ctx.imageSmoothingEnabled = false;
         ctx.clearRect(0, 0, canvasRef.value.width, canvasRef.value.height);
@@ -482,12 +472,26 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
         const offsetX = imgCenterX - tileWidth / 2 + cameraOffsetX;
         const offsetY = imgCenterY - gridHeight - tileHeight - 8 * SCALE + cameraOffsetY;
 
+        // Debug: log first few tile heights
+        if (arena.heightMap.length > 0) {
+            console.log('[HEIGHT] First row heights:', arena.heightMap[0].slice(0, 5));
+            console.log('[HEIGHT] Tile (2,2) height:', getTileHeight(2, 2), 'raw:', arena.heightMap[2]?.[2]);
+        }
+
         tiles = [];
         for (let row = 0; row < rows; row++) {
             for (let col = 0; col < cols; col++) {
                 if (arena.tiles[row][col] === 0) continue;
                 const isoX = (col - row) * tileWidth / 2 + offsetX;
-                const isoY = (col + row) * tileHeight / 2 + offsetY - ((getTileHeight(row, col) * 16) * SCALE);
+                const height = getTileHeight(row, col);
+                const heightOffset = height * 16 * SCALE;
+                const isoY = (col + row) * tileHeight / 2 + offsetY - heightOffset;
+                
+                // Debug: log tiles with height > 0
+                if (height > 0 && row < 3 && col < 3) {
+                    console.log(`[HEIGHT] Tile (${row},${col}): height=${height}, offset=${heightOffset}, isoY=${isoY}`);
+                }
+                
                 tiles.push(drawIsometricTile(isoX, isoY, row, col));
             }
         }
@@ -505,7 +509,9 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
 
     function getTileHeight(row: number, col: number): number {
         if (!arena) return 0;
-        return (arena.heightMap[row]?.[col] || 1) - 1;
+        const rawHeight = arena.heightMap[row]?.[col];
+        const result = (rawHeight || 1) - 1;
+        return result;
     }
 
     function isVisibleTile(row: number, col: number): boolean {

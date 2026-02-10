@@ -221,11 +221,24 @@ const connectToGameServer = () => {
       // Mark as connected
       connectedToGameServer.value = true;
       
-      // If game has started and we're still showing lobby/connecting, skip to game
+      // If game has started and we're still showing lobby/connecting, skip to game and start
       if (hasUnits && (showLobby.value || loading.value)) {
-        console.log("[GAME] Game already started, showing canvas immediately");
+        console.log("[GAME] Game already started, showing canvas immediately and starting engine");
         loading.value = false;
         showLobby.value = false;
+        
+        // Start game engine on next tick when canvas is rendered
+        setTimeout(() => {
+          if (gameCanvas.value) {
+            console.log("[GAME] Starting game engine from state handler");
+            start();
+            updateGameState(state);
+          } else {
+            console.log("[GAME] Canvas not ready, queuing state");
+            pendingState.value = state;
+          }
+        }, 100);
+        return;
       }
       
       // Ensure lobby is hidden if game has units
@@ -233,7 +246,7 @@ const connectToGameServer = () => {
         showLobby.value = false;
       }
       
-      // Update game state if canvas is ready
+      // Update game state if canvas is ready and engine is running
       if (gameCanvas.value && !showLobby.value) {
         console.log("[GAME] Calling updateGameState");
         updateGameState(state);
