@@ -564,8 +564,21 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
 
     function isTurn(): boolean {
         if (players.value.length < 2 || !myUserId) return false;
-        const currentPlayer = players.value[currentRound % 2];
-        return currentPlayer?.id === myUserId;
+        const currentPlayerIndex = currentRound % 2;
+        const currentPlayer = players.value[currentPlayerIndex];
+        const isMyTurn = currentPlayer?.id === myUserId;
+        
+        console.log('[TURN] isTurn check:', {
+            currentRound,
+            currentPlayerIndex,
+            currentPlayerId: currentPlayer?.id,
+            currentPlayerName: currentPlayer?.name,
+            myUserId,
+            isMyTurn,
+            allPlayers: players.value.map((p, i) => ({ index: i, id: p.id, name: p.name }))
+        });
+        
+        return isMyTurn;
     }
 
     function loadImage(name: string, src: string): HTMLImageElement {

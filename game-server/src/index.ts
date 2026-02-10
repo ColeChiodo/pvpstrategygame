@@ -286,8 +286,20 @@ function endGame(winnerIndex: number) {
 function handleMove(socket: Socket, userId: string, unitId: number, row: number, col: number) {
     if (!gameState) return;
     const player = gameState.players.find(p => p.id === userId);
-    if (!player) return;
-    if (gameState.players[gameState.round % 2] !== player) return;
+    if (!player) {
+        console.log(`[${gameId}] Move rejected: Player not found for userId ${userId}`);
+        return;
+    }
+    const currentPlayerIndex = gameState.round % 2;
+    const currentPlayer = gameState.players[currentPlayerIndex];
+    const isPlayerTurn = currentPlayer === player;
+    
+    console.log(`[${gameId}] Move attempt: ${player.name} (index: ${gameState.players.indexOf(player)}) trying to move, current turn: ${currentPlayer?.name} (index: ${currentPlayerIndex}), isPlayerTurn: ${isPlayerTurn}`);
+    
+    if (!isPlayerTurn) {
+        console.log(`[${gameId}] Move rejected: Not ${player.name}'s turn`);
+        return;
+    }
 
     const unit = player.units.find(u => u.id === unitId);
     if (!unit || !unit.canMove) return;
