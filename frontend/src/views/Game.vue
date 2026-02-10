@@ -109,7 +109,7 @@ const pendingState = ref<GameState | null>(null);
 
 let socket: Socket | null = null;
 
-const { initSocket, start, stop, updateState } = useGameEngine(gameCanvas);
+const { initSocket, start, stop, updateState, animateMove, animateAction, isAction, selectedTile, moveTile } = useGameEngine(gameCanvas);
 
 const isPlayer1Turn = computed(() => {
   return currentRound.value % 2 === 0;
@@ -312,6 +312,22 @@ const connectToGameServer = () => {
   socket.on("turn", (data: { round: number }) => {
     console.log("[GAME] Turn changed, round:", data.round, "playerIndex:", playerIndex.value);
     currentRound.value = data.round;
+    // Reset action state on turn change
+    isAction.value = false;
+    selectedTile.value = null;
+    moveTile.value = null;
+  });
+
+  socket.on("moved", (data: { unitId: number; row: number; col: number; origin: { row: number; col: number } }) => {
+    console.log("[GAME] Unit moved:", data);
+    // Trigger move animation
+    animateMove(data.unitId, data.origin, { row: data.row, col: data.col });
+  });
+
+  socket.on("acted", (data: { unitId: number; row: number; col: number; targetHealth: number }) => {
+    console.log("[GAME] Unit acted:", data);
+    // Trigger action animation
+    animateAction(data.unitId);
   });
 
   socket.on("disconnect", (reason) => {

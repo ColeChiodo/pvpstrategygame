@@ -1,4 +1,4 @@
-import { ref } from 'vue';
+import { ref, readonly } from 'vue';
 import { Socket } from 'socket.io-client';
 import { MIN_SCALE, MAX_SCALE, INPUT_DELAY } from './constants';
 import { sprites } from './sprites';
@@ -139,11 +139,15 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
         draw();
     }
 
-    async function animateMove(tempUnit: Unit, origin: { row: number; col: number }, target: { row: number; col: number }) {
+    async function animateMove(unitId: number, origin: { row: number; col: number }, target: { row: number; col: number }) {
         isAnimating = true;
         const path = astarPath(origin.row, origin.col, target.row, target.col, arena!);
-        const realUnit = units.value.find(u => u.row === tempUnit.row && u.col === tempUnit.col);
-        if (!realUnit) return;
+        const realUnit = units.value.find(u => u.id === unitId);
+        if (!realUnit) {
+            console.log('[ANIMATE] Unit not found for animation:', unitId);
+            isAnimating = false;
+            return;
+        }
 
         realUnit.sprite.currentFrame = 0;
         let lastTile = { x: origin.col, y: origin.row };
@@ -173,10 +177,14 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
         realUnit.sprite.currentFrame = 0;
     }
 
-    async function animateAction(tempUnit: Unit) {
+    async function animateAction(unitId: number) {
         isAnimating = true;
-        const realUnit = units.value.find(u => u.row === tempUnit.row && u.col === tempUnit.col);
-        if (!realUnit) return;
+        const realUnit = units.value.find(u => u.id === unitId);
+        if (!realUnit) {
+            console.log('[ANIMATE] Unit not found for animation:', unitId);
+            isAnimating = false;
+            return;
+        }
 
         animatingUnit = realUnit;
         realUnit.sprite.currentFrame = 0;
@@ -550,7 +558,61 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
         return imageCache.get(name)!;
     }
 
+    function updateAnimations() {
+        // Update sprite animations
+        for (const unit of units.value) {
+            if (!unit.sprite) continue;
+            
+            unit.sprite.framesElapsed++;
+            
+            if (unit.sprite.framesElapsed % unit.sprite.framesHold === 0) {
+                const status = unit.currentStatus;
+                
+                if (status === 0 || status === 1) {
+                    // Idle animation
+                    if (unit.sprite.currentFrame < unit.sprite.idleFrames - 1) {
+                        unit.sprite.currentFrame++;
+                    } else {
+                        unit.sprite.currentFrame = 0;
+                    }
+                } else if (status === 2) {
+                    // Walk animation
+                    if (unit.sprite.currentFrame < unit.sprite.walkFrames - 1) {
+                        unit.sprite.currentFrame++;
+                    } else {
+                        unit.sprite.currentFrame = 0;
+                    }
+                } else if (status === 3) {
+                    // Action animation
+                    if (unit.sprite.currentFrame < unit.sprite.actionFrames - 1) {
+                        unit.sprite.currentFrame++;
+                    } else {
+                        unit.sprite.currentFrame = 0;
+                        // Reset to idle after action completes
+                        unit.currentStatus = unit.canMove || unit.canAct ? 0 : 1;
+                    }
+                }
+            }
+        }
+        
+        // Update obstacle animations
+        if (arena) {
+            for (const obstacle of arena.obstacles) {
+                if (!obstacle.sprite) continue;
+                obstacle.sprite.framesElapsed++;
+                if (obstacle.sprite.framesElapsed % obstacle.sprite.framesHold === 0) {
+                    if (obstacle.sprite.currentFrame < obstacle.sprite.idleFrames - 1) {
+                        obstacle.sprite.currentFrame++;
+                    } else {
+                        obstacle.sprite.currentFrame = 0;
+                    }
+                }
+            }
+        }
+    }
+
     function gameLoop() {
+        updateAnimations();
         draw();
         gamepadHandler();
         animationFrameId = requestAnimationFrame(gameLoop);
@@ -587,7 +649,7 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     }
 
     function handleClick(event: MouseEvent) {
-        console.log('[EVENT] Click at:', event.offsetX, event.offsetY, 'button:', event.button, 'isMyTurn:', isMyTurn.value);
+        console.log('[EVENT] Click at:', event.offsetX, event.offsetY, 'button:', event.button, 'isMyTurn:', isMyTurn.value, 'isAction:', isAction);
         if (event.button !== 0) {
             console.log('[EVENT] Ignoring non-left click');
             return;
@@ -612,36 +674,73 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
         for (const tile of tiles) {
             if (!hoveredTile.value) break;
             if (isPointInsideTile(clickX, clickY, tile)) {
-                if (!isAction && !selectedTile.value && unitIsTeam(hoveredTile.value.row, hoveredTile.value.col)) {
-                    selectedTile.value = tile;
-                } else if (!isAction && selectedTile.value && tile.row === selectedTile.value.row && tile.col === selectedTile.value.col) {
-                    const unit = units.value.find(u => u.row === selectedTile.value!.row && u.col === selectedTile.value!.col);
-                    if (unit && validMoveTiles.value.find(t => t.row === tile.row && t.col === tile.col)) {
-                        socket?.emit('move', { unitId: unit.id, row: tile.row, col: tile.col });
-                        console.log('[SOCKET] Emitting move:', { unitId: unit.id, row: tile.row, col: tile.col });
+                const clickedUnit = units.value.find(u => u.row === hoveredTile.value!.row && u.col === hoveredTile.value!.col);
+                
+                if (!isAction && !selectedTile.value) {
+                    // Selecting a unit to move - must be my unit and must be able to move
+                    if (clickedUnit && unitIsTeam(hoveredTile.value.row, hoveredTile.value.col) && clickedUnit.canMove) {
+                        selectedTile.value = tile;
+                        console.log('[CLICK] Selected unit:', clickedUnit.name, 'at', tile.row, tile.col);
+                    } else if (clickedUnit && !unitIsTeam(hoveredTile.value.row, hoveredTile.value.col)) {
+                        console.log('[CLICK] Cannot select enemy unit');
+                    } else if (clickedUnit && !clickedUnit.canMove) {
+                        console.log('[CLICK] Cannot select unit - already moved');
                     }
-                    selectedTile.value = null;
-                } else if (!isAction && selectedTile.value && unitIsTeam(selectedTile.value.row, selectedTile.value.col)) {
-                    if (validMoveTiles.value.find(t => t.row === tile.row && t.col === tile.col)) {
-                        const unit = units.value.find(u => u.row === selectedTile.value!.row && u.col === selectedTile.value!.col);
-                        socket?.emit('move', { unitId: unit?.id, row: tile.row, col: tile.col });
-                        console.log('[SOCKET] Emitting move:', { unitId: unit?.id, row: tile.row, col: tile.col });
+                } else if (!isAction && selectedTile.value) {
+                    const selectedUnit = units.value.find(u => u.row === selectedTile.value!.row && u.col === selectedTile.value!.col);
+                    
+                    if (tile.row === selectedTile.value.row && tile.col === selectedTile.value.col) {
+                        // Clicked same tile - stay in place and enter action mode
+                        if (selectedUnit && selectedUnit.canAct) {
+                            isAction = true;
+                            moveTile.value = tile;
+                            console.log('[CLICK] Staying in place, entering action mode');
+                        } else {
+                            selectedTile.value = null;
+                            console.log('[CLICK] Cannot act, deselecting');
+                        }
+                    } else if (validMoveTiles.value.find(t => t.row === tile.row && t.col === tile.col)) {
+                        // Moving to a new tile
+                        socket?.emit('move', { unitId: selectedUnit?.id, row: tile.row, col: tile.col });
+                        console.log('[SOCKET] Emitting move:', { unitId: selectedUnit?.id, row: tile.row, col: tile.col });
+                        
+                        // Enter action mode after move if unit can act
+                        if (selectedUnit?.canAct) {
+                            isAction = true;
+                            moveTile.value = tile;
+                            console.log('[CLICK] Moved, entering action mode');
+                        } else {
+                            selectedTile.value = null;
+                        }
+                    } else {
+                        selectedTile.value = null;
+                        console.log('[CLICK] Invalid move tile, deselecting');
                     }
-                    selectedTile.value = null;
-                } else if (isAction && hasUnit(tile.row, tile.col)) {
+                } else if (isAction && moveTile.value) {
+                    // In action mode - can attack enemies or heal allies
+                    const actingUnit = units.value.find(u => u.row === moveTile.value!.row && u.col === moveTile.value!.col);
+                    
                     if (validActionTiles.value.find(t => t.row === tile.row && t.col === tile.col)) {
-                        const unit = units.value.find(u => u.row === moveTile.value!.row && u.col === moveTile.value!.col);
-                        socket?.emit('action', { unitId: unit?.id, row: tile.row, col: tile.col });
-                        console.log('[SOCKET] Emitting action:', { unitId: unit?.id, row: tile.row, col: tile.col });
+                        socket?.emit('action', { unitId: actingUnit?.id, row: tile.row, col: tile.col });
+                        console.log('[SOCKET] Emitting action:', { unitId: actingUnit?.id, row: tile.row, col: tile.col });
                     }
+                    
+                    // Reset state after action
                     isAction = false;
                     moveTile.value = null;
+                    selectedTile.value = null;
+                    console.log('[CLICK] Action complete, resetting state');
                 }
                 found = true;
                 break;
             }
         }
-        if (!found) selectedTile.value = null;
+        if (!found) {
+            console.log('[CLICK] Clicked outside tiles, deselecting');
+            selectedTile.value = null;
+            isAction = false;
+            moveTile.value = null;
+        }
     }
 
     function handleMouseDown(event: MouseEvent) {
@@ -831,9 +930,14 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
         isMyTurn,
         player1Time,
         player2Time,
+        isAction,
+        selectedTile,
+        moveTile,
         initSocket,
         start,
         stop,
-        updateState
+        updateState,
+        animateMove,
+        animateAction
     };
 }
