@@ -61,7 +61,7 @@
           <div class="divider">
             <div class="online-indicator-wrapper">
               <span class="online-dot"></span>
-              <span class="online-count">{{ totalPlayersInQueue }} {{ totalPlayersInQueue === 1 ? 'player' : 'players' }} online</span>
+              <span class="online-count">{{ totalPlayersOnline }} {{ totalPlayersOnline === 1 ? 'player' : 'players' }} online</span>
             </div>
           </div>
 
@@ -247,7 +247,7 @@ const nameInputRef = ref<HTMLInputElement | null>(null);
 const isInQueue = ref(false);
 const queueTime = ref(0);
 const playersInQueue = ref(0);
-const totalPlayersInQueue = ref(0);
+const totalPlayersOnline = ref(0);
 const k8sAvailable = ref(true);
 let matchmakingSocket: Socket | null = null;
 let queueTimer: any = null;
@@ -501,7 +501,7 @@ const fetchTotalPlayersInQueue = async () => {
       credentials: "include",
     });
     const data = await response.json();
-    totalPlayersInQueue.value = data.count || 0;
+    totalPlayersOnline.value = data.count || 0;
   } catch (err) {
     console.error("Failed to fetch queue count:", err);
   }

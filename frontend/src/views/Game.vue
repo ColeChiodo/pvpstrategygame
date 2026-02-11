@@ -27,9 +27,9 @@
               <span class="lobby-label">PLAYER 2</span>
             </div>
           </div>
-          <p class="lobby-subtitle">Game starting soon...</p>
-        </div>
-      </div>
+           <p class="lobby-subtitle">Game starting soon...</p>
+         </div>
+       </div>
 
       <!-- Game Canvas -->
       <canvas ref="gameCanvas" class="game-canvas" tabindex="0" :class="{ 'hidden': showLobby }"></canvas>
@@ -208,9 +208,24 @@ const connectToGameServer = () => {
      setPlayerIndex(data.playerIndex);
    });
 
-  socket.on("error", (err: any) => {
-    console.error("[GAME] Server error:", err);
-  });
+   socket.on("error", (err: any) => {
+     console.error("[GAME] Server error:", err);
+   });
+
+   socket.on("connectionWarning", (data: any) => {
+     console.log("[GAME] Connection warning:", data);
+     alerts.warning(data.message, 35000);
+   });
+
+   socket.on("serverClosing", (data: any) => {
+     console.log("[GAME] Server closing:", data);
+     alerts.error(data.reason, 0);
+     // Disconnect and return to lobby after a brief delay
+     setTimeout(() => {
+       socket?.disconnect();
+       router.push('/play');
+     }, 2000);
+   });
 
   socket.on("state", (compressedData: any) => {
     try {

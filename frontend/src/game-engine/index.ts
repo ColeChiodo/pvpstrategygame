@@ -192,21 +192,23 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
         }
 
         realUnit.sprite.currentFrame = 0;
-        let lastTile = { x: origin.col, y: origin.row };
+        realUnit.animatingRow = origin.row;
+        realUnit.animatingCol = origin.col;
+        let lastTile = { col: origin.col, row: origin.row };
 
         for (const tile of path) {
             if (!isAnimating) break;
             animatingUnit = realUnit;
             realUnit.currentStatus = 2;
-            realUnit.row = tile.row;
-            realUnit.col = tile.col;
+            realUnit.animatingRow = tile.row;
+            realUnit.animatingCol = tile.col;
 
-            if (realUnit.row === lastTile.y) {
-                if (realUnit.col > lastTile.x) realUnit.sprite.direction = 1;
-                else if (realUnit.col < lastTile.x) realUnit.sprite.direction = -1;
-            } else if (realUnit.col === lastTile.x) {
-                if (realUnit.row > lastTile.y) realUnit.sprite.direction = -1;
-                else if (realUnit.row < lastTile.y) realUnit.sprite.direction = 1;
+            if (tile.row === lastTile.row) {
+                if (tile.col > lastTile.col) realUnit.sprite.direction = 1;
+                else if (tile.col < lastTile.col) realUnit.sprite.direction = -1;
+            } else if (tile.col === lastTile.col) {
+                if (tile.row > lastTile.row) realUnit.sprite.direction = -1;
+                else if (tile.row < lastTile.row) realUnit.sprite.direction = 1;
             }
 
             lastTile = tile;
@@ -217,6 +219,8 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
         animatingUnit = null;
         realUnit.currentStatus = 0;
         realUnit.sprite.currentFrame = 0;
+        delete realUnit.animatingRow;
+        delete realUnit.animatingCol;
     }
 
     async function animateAction(unitId: number) {
@@ -281,12 +285,18 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
         ];
 
         entities.sort((a, b) => {
-            if (a.entity.row !== b.entity.row) return a.entity.row - b.entity.row;
-            return a.entity.col - b.entity.col;
+            const aRow = 'animatingRow' in a.entity && a.entity.animatingRow !== undefined ? a.entity.animatingRow : a.entity.row;
+            const aCol = 'animatingCol' in a.entity && a.entity.animatingCol !== undefined ? a.entity.animatingCol : a.entity.col;
+            const bRow = 'animatingRow' in b.entity && b.entity.animatingRow !== undefined ? b.entity.animatingRow : b.entity.row;
+            const bCol = 'animatingCol' in b.entity && b.entity.animatingCol !== undefined ? b.entity.animatingCol : b.entity.col;
+            if (aRow !== bRow) return aRow - bRow;
+            return aCol - bCol;
         });
 
         for (const { type, entity } of entities) {
-            const pos = coordToPosition(entity.row, entity.col);
+            const row = 'animatingRow' in entity && entity.animatingRow !== undefined ? entity.animatingRow : entity.row;
+            const col = 'animatingCol' in entity && entity.animatingCol !== undefined ? entity.animatingCol : entity.col;
+            const pos = coordToPosition(row, col);
             if (pos.x === -9999) continue;
 
             if (type === 'obstacle') {
@@ -768,19 +778,14 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
         isDragging = false;
     }
 
-    function handleMouseMove(event: MouseEvent) {
-        const clickX = event.offsetX;
-        const clickY = event.offsetY;
+    let lastMouseX = 0;
+    let lastMouseY = 0;
 
-        if (isDragging) {
-            cameraOffsetX = event.clientX - startX;
-            cameraOffsetY = event.clientY - startY;
-            return;
-        }
-
+    function updateHoveredTile() {
+        if (lastMouseX === 0 && lastMouseY === 0) return;
         let found = false;
         for (let i = tiles.length - 1; i >= 0; i--) {
-            if (isPointInsideTile(clickX, clickY, tiles[i])) {
+            if (isPointInsideTile(lastMouseX, lastMouseY, tiles[i])) {
                 hoveredTile.value = tiles[i];
                 found = true;
                 break;
@@ -791,31 +796,49 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
         }
     }
 
+    function handleMouseMove(event: MouseEvent) {
+        lastMouseX = event.offsetX;
+        lastMouseY = event.offsetY;
+
+        if (isDragging) {
+            cameraOffsetX = event.clientX - startX;
+            cameraOffsetY = event.clientY - startY;
+        }
+
+        updateHoveredTile();
+    }
+
     function handleKeyDown(e: KeyboardEvent) {
         switch (e.key) {
             case 'z':
                 if (SCALE > MIN_SCALE) SCALE -= 0.125;
                 if (SCALE < MIN_SCALE) SCALE = MIN_SCALE;
+                updateHoveredTile();
                 break;
             case 'x':
                 if (SCALE < MAX_SCALE) SCALE += 0.125;
                 if (SCALE > MAX_SCALE) SCALE = MAX_SCALE;
+                updateHoveredTile();
                 break;
             case 'ArrowUp':
             case 'w':
                 cameraOffsetY += 8 * SCALE;
+                updateHoveredTile();
                 break;
             case 'ArrowDown':
             case 's':
                 cameraOffsetY -= 8 * SCALE;
+                updateHoveredTile();
                 break;
             case 'ArrowLeft':
             case 'a':
                 cameraOffsetX += 8 * SCALE;
+                updateHoveredTile();
                 break;
             case 'ArrowRight':
             case 'd':
                 cameraOffsetX -= 8 * SCALE;
+                updateHoveredTile();
                 break;
             case 'Enter':
                 endTurn();
@@ -831,6 +854,7 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
             if (SCALE > MIN_SCALE) SCALE *= 0.9;
             if (SCALE < MIN_SCALE) SCALE = MIN_SCALE;
         }
+        updateHoveredTile();
     }
 
     let isStarted = false;

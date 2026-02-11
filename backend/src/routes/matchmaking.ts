@@ -23,7 +23,35 @@ const activeGames = new Map<string, { hostUserId: string; status: string }>();
 router.post("/join", isAuthenticated, async (req, res) => {
   try {
     const userId = (req.user as any).id;
-    
+
+    // First check if player is already in an active match
+    const existingGame = await prisma.gameSession.findFirst({
+      where: {
+        OR: [{ player1Id: userId }, { player2Id: userId }],
+        status: { in: ["match_found", "in_progress"] },
+      },
+    });
+
+    if (existingGame) {
+      console.log(`[MATCHMAKING] User ${userId} rejoining existing game: ${existingGame.id}`);
+      const opponentId = existingGame.player1Id === userId ? existingGame.player2Id : existingGame.player1Id;
+      const opponent = await prisma.user.findUnique({
+        where: { id: opponentId },
+        select: { displayName: true, avatar: true },
+      });
+
+      return res.json({
+        success: true,
+        matched: true,
+        gameId: existingGame.id,
+        serverUrl: existingGame.serverUrl,
+        isHost: existingGame.player1Id === userId,
+        opponent: opponent || { displayName: "Unknown", avatar: null },
+        rejoin: true,
+      });
+    }
+
+    // Check if already in queue
     const existingIndex = matchmakingQueue.findIndex(m => m.userId === userId);
     if (existingIndex !== -1) {
       return res.status(400).json({ error: "Already in queue" });
@@ -135,7 +163,34 @@ router.post("/leave", isAuthenticated, async (req, res) => {
 
 router.get("/queue-count", async (req, res) => {
   try {
-    res.json({ count: matchmakingQueue.length });
+    const queueCount = matchmakingQueue.length;
+    
+    // Count unique players in active games
+    const activeGames = await prisma.gameSession.findMany({
+      where: {
+        status: { in: ["match_found", "in_progress"] },
+      },
+      select: {
+        player1Id: true,
+        player2Id: true,
+      },
+    });
+    
+    const activePlayerIds = new Set<string>();
+    for (const game of activeGames) {
+      activePlayerIds.add(game.player1Id);
+      if (game.player2Id) {
+        activePlayerIds.add(game.player2Id);
+      }
+    }
+    
+    const totalOnline = queueCount + activePlayerIds.size;
+    
+    res.json({ 
+      count: totalOnline,
+      inQueue: queueCount,
+      inGame: activePlayerIds.size,
+    });
   } catch (error) {
     console.error("Queue count error:", error);
     res.status(500).json({ error: "Failed to get queue count" });

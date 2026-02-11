@@ -83,6 +83,67 @@ let gameInterval: NodeJS.Timeout | null = null;
 let gameId = process.env.GAME_ID || "unknown";
 const port = parseInt(process.env.PORT || "3000");
 
+// Connection timeout handling
+let connectionWarningTimeout: NodeJS.Timeout | null = null;
+let connectionCloseTimeout: NodeJS.Timeout | null = null;
+let serverStartTime: number | null = null;
+const CONNECTION_WARNING_DELAY = 10000; // 10 seconds
+const CONNECTION_CLOSE_DELAY = 30000; // 30 seconds after warning
+const REQUIRED_PLAYERS = 2;
+
+function startConnectionTimeout() {
+    if (serverStartTime) return; // Already started
+    serverStartTime = Date.now();
+    console.log(`[${gameId}] Starting connection timeout monitoring`);
+
+    // Warning after 10 seconds if not all players connected
+    connectionWarningTimeout = setTimeout(() => {
+        if (gameState && gameState.players.length < REQUIRED_PLAYERS) {
+            console.log(`[${gameId}] WARNING: Only ${gameState.players.length}/${REQUIRED_PLAYERS} players connected after 10s`);
+            // Send warning to all connected players
+            io?.emit("connectionWarning", {
+                message: "Server will close in 30 seconds if opponent doesn't connect",
+                connectedPlayers: gameState.players.length,
+                requiredPlayers: REQUIRED_PLAYERS,
+                secondsRemaining: 30
+            });
+
+            // Set final timeout to close server
+            connectionCloseTimeout = setTimeout(() => {
+                if (gameState && gameState.players.length < REQUIRED_PLAYERS) {
+                    console.log(`[${gameId}] Closing server - insufficient players after timeout`);
+                    io?.emit("serverClosing", {
+                        reason: "Opponent failed to connect within timeout period",
+                        connectedPlayers: gameState.players.length
+                    });
+                    // Give clients time to receive the message before closing
+                    setTimeout(() => {
+                        shutdownServer();
+                    }, 2000);
+                }
+            }, CONNECTION_CLOSE_DELAY);
+        }
+    }, CONNECTION_WARNING_DELAY);
+}
+
+function clearConnectionTimeouts() {
+    if (connectionWarningTimeout) {
+        clearTimeout(connectionWarningTimeout);
+        connectionWarningTimeout = null;
+    }
+    if (connectionCloseTimeout) {
+        clearTimeout(connectionCloseTimeout);
+        connectionCloseTimeout = null;
+    }
+}
+
+function shutdownServer() {
+    console.log(`[${gameId}] Shutting down due to insufficient connections`);
+    io?.close();
+    httpServer.close();
+    process.exit(0);
+}
+
 const httpServer = createServer((req, res) => {
     if (req.url === "/health" && req.method === "GET") {
         res.writeHead(200, { "Content-Type": "application/json" });
@@ -122,6 +183,14 @@ io.on("connection", (socket: Socket) => {
 
     socket.on("join", (data: { gameId: string; name: string; avatar: string }) => {
         console.log(`[${gameId}] JOIN event received from ${socket.id} (userId: ${userId}):`, JSON.stringify(data));
+        console.log(`[${gameId}] serverStartTime before check: ${serverStartTime}`);
+        // Start timeout monitoring on first player join
+        if (!serverStartTime) {
+            console.log(`[${gameId}] Starting connection timeout (serverStartTime is null)`);
+            startConnectionTimeout();
+        } else {
+            console.log(`[${gameId}] Connection timeout already started at ${serverStartTime}`);
+        }
         handleJoin(socket, data.gameId, userId, data.name, data.avatar);
     });
 
@@ -245,6 +314,10 @@ function handleJoin(socket: Socket, sessionId: string, userId: string, name: str
 
 function startGame() {
     if (!gameState || gameState.players.length !== 2) return;
+    // Clear timeout monitoring - all players connected
+    clearConnectionTimeouts();
+    console.log(`[${gameId}] All players connected, clearing connection timeout`);
+    
     gameState.round = 0;
     gameState.player1Time = 600;
     gameState.player2Time = 600;

@@ -43,6 +43,8 @@ export interface Unit {
     mobility: number;
     currentStatus: number;
     sprite: Sprite;
+    animatingRow?: number;
+    animatingCol?: number;
 }
 
 export interface Sprite {
