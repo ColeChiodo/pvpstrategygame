@@ -1,8 +1,6 @@
 import express from "express";
 import { isAuthenticated } from "../middleware/auth";
 import prisma from "../config/database";
-import path from "path";
-import fs from "fs";
 
 const router = express.Router();
 
@@ -13,68 +11,39 @@ interface AvatarInfo {
   owned: boolean;
 }
 
+const AVAILABLE_AVATARS: AvatarInfo[] = [
+  { id: "free/default", path: "/assets/avatars/free/default.png", price: null, owned: true },
+  { id: "300/kawaiiface", path: "/assets/avatars/300/kawaiiface.png", price: 300, owned: false },
+  { id: "300/lemon", path: "/assets/avatars/300/lemon.png", price: 300, owned: false },
+];
+
 router.get("/avatars", isAuthenticated, async (req, res) => {
   try {
-    const avatarsDir = path.join(process.cwd(), "..", "frontend", "public", "assets", "avatars");
-    
-    if (!fs.existsSync(avatarsDir)) {
-      return res.json({ avatars: [], ownedIds: [] });
-    }
-
-    const avatarFolders = fs.readdirSync(avatarsDir);
-    const avatars: AvatarInfo[] = [];
-    const ownedIds: string[] = [];
-
-    for (const folder of avatarFolders) {
-      const folderPath = path.join(avatarsDir, folder);
-      if (!fs.statSync(folderPath).isDirectory()) continue;
-
-      const price = folder === "free" ? null : parseInt(folder) || null;
-
-      const files = fs.readdirSync(folderPath);
-      for (const file of files) {
-        if (!file.match(/\.(png|jpg|jpeg|webp|svg)$/i)) continue;
-
-        const avatarPath = `/assets/avatars/${folder}/${file}`;
-        const avatarId = `${folder}/${file.replace(/\.[^/.]+$/, "")}`;
-
-        avatars.push({
-          id: avatarId,
-          path: avatarPath,
-          price,
-          owned: price === null,
-        });
-
-        if (price === null) {
-          ownedIds.push(avatarId);
-        }
-      }
-    }
+    const userId = (req.user as any).id;
 
     const userPurchased = await prisma.purchasedItem.findMany({
       where: {
-        userId: (req.user as any).id,
+        userId,
         type: "avatar",
       },
       select: { key: true },
     });
 
-    for (const purchased of userPurchased) {
-      ownedIds.push(purchased.key);
-      const avatar = avatars.find(a => a.id === purchased.key);
-      if (avatar) {
-        avatar.owned = true;
-      }
-    }
+    const ownedIds = new Set(userPurchased.map(p => p.key));
+
+    const avatars: AvatarInfo[] = AVAILABLE_AVATARS.map(avatar => ({
+      ...avatar,
+      owned: avatar.price === null || ownedIds.has(avatar.id),
+    }));
 
     const user = await prisma.user.findUnique({
-      where: { id: (req.user as any).id },
+      where: { id: userId },
       select: { avatar: true },
     });
 
     const currentAvatar = user?.avatar;
 
-    res.json({ avatars, ownedIds, currentAvatar });
+    res.json({ avatars, ownedIds: Array.from(ownedIds), currentAvatar });
   } catch (error) {
     console.error("Error fetching avatars:", error);
     res.status(500).json({ error: "Failed to fetch avatars" });
@@ -119,6 +88,15 @@ router.post("/avatars/purchase", isAuthenticated, async (req, res) => {
     const { avatarId } = req.body;
     const userId = (req.user as any).id;
 
+    const avatarInfo = AVAILABLE_AVATARS.find(a => a.id === avatarId);
+    if (!avatarInfo) {
+      return res.status(404).json({ error: "Avatar not found" });
+    }
+
+    if (avatarInfo.price === null) {
+      return res.status(400).json({ error: "This avatar is free" });
+    }
+
     const user = await prisma.user.findUnique({
       where: { id: userId },
     });
@@ -141,13 +119,7 @@ router.post("/avatars/purchase", isAuthenticated, async (req, res) => {
       return res.status(400).json({ error: "You already own this avatar" });
     }
 
-    const folder = avatarId.split("/")[0];
-    const price = folder === "free" ? null : parseInt(folder) || 0;
-
-    if (price === null) {
-      return res.status(400).json({ error: "This avatar is free" });
-    }
-
+    const price = avatarInfo.price;
     const userCurrency = user.currency;
     if (userCurrency < price) {
       return res.status(403).json({ error: `Not enough coins. Need ${price}, have ${userCurrency}` });

@@ -30,14 +30,13 @@
 
       <div class="play-content">
         <div class="play-card">
-          <div class="title-section">
+          <div class="logo-divider">
             <img
               src="/assets/landing/title.png"
               alt="Game Title"
               class="game-title"
             />
           </div>
-
           <div class="top-row">
             <div class="player-info" @click="showUserModal = true">
               <div class="player-avatar">
@@ -51,27 +50,32 @@
                 <div class="player-name">{{ authStore.displayName }}</div>
                 <div class="player-level">Level {{ userLevel }}</div>
               </div>
-            </div>
-
-            <div class="rank-info">
-              <div class="rank-badge" :class="rankTierClass">
-                {{ rankTier }}
+              <div class="rank-info">
+                <div class="rank-badge" :class="rankTierClass">
+                  {{ rankTier }}
+                </div>
               </div>
             </div>
           </div>
 
-          <div class="divider"></div>
+          <div class="divider">
+            <div class="online-indicator-wrapper">
+              <span class="online-dot"></span>
+              <span class="online-count">{{ totalPlayersInQueue }} {{ totalPlayersInQueue === 1 ? 'player' : 'players' }} online</span>
+            </div>
+          </div>
 
           <div class="match-section">
             <div class="match-card public-match">
               <div class="match-header">
                 <h2 class="match-title">Public Match</h2>
-                <PlayButton text="Find Game" color="cyan" @click="startMatchmaking" />
-              </div>
-              <div v-if="isInQueue" class="matchmaking-status">
-                <div class="queue-timer">{{ formatTime(queueTime) }}</div>
-                <div class="queue-players">{{ playersInQueue }} player{{ playersInQueue !== 1 ? 's' : '' }} in queue</div>
-                <button class="cancel-queue-btn-small" @click="leaveQueue">Cancel</button>
+                <QueueButton
+                  text="Find Game"
+                  :is-in-queue="isInQueue"
+                  :queue-time="queueTime"
+                  @click="startMatchmaking"
+                  @cancel="leaveQueue"
+                />
               </div>
               <div class="match-content">
                 <img
@@ -118,12 +122,12 @@
         </div>
       </div>
 
-      <div v-if="showUserModal" class="modal-overlay" @click.self="showUserModal = false">
-        <div class="user-modal">
-          <div class="user-modal-header">
-            <h2 class="modal-title">Profile</h2>
-            <button class="close-btn" @click="showUserModal = false">X</button>
-          </div>
+          <div v-if="showUserModal" class="modal-overlay" @click.self="showUserModal = false">
+          <div class="user-modal">
+            <div class="user-modal-header">
+              <h2 class="modal-title">Profile</h2>
+              <button class="close-btn" @click="showUserModal = false">X</button>
+            </div>
 
           <div class="user-info-row">
             <div class="user-avatar-section" @click="showAvatarSelector = true">
@@ -222,6 +226,7 @@ import { useAuthStore } from "../stores/auth";
 import { alerts } from "../composables/useAlerts";
 import { io, Socket } from "socket.io-client";
 import PlayButton from "../components/PlayButton.vue";
+import QueueButton from "../components/QueueButton.vue";
 import { RouterLink } from "vue-router";
 import ConfirmModal from "../components/ConfirmModal.vue";
 
@@ -242,10 +247,12 @@ const nameInputRef = ref<HTMLInputElement | null>(null);
 const isInQueue = ref(false);
 const queueTime = ref(0);
 const playersInQueue = ref(0);
+const totalPlayersInQueue = ref(0);
 const k8sAvailable = ref(true);
 let matchmakingSocket: Socket | null = null;
 let queueTimer: any = null;
 let pollTimer: any = null;
+let queueCountPollTimer: any = null;
 
 const mouseX = ref(0);
 const mouseY = ref(0);
@@ -285,11 +292,15 @@ onMounted(async () => {
     matchmakingSocket?.disconnect();
     await fetchGameDetails(data.gameId);
   });
+
+  fetchTotalPlayersInQueue();
+  startQueueCountPoll();
 });
 
 onUnmounted(() => {
   matchmakingSocket?.disconnect();
   stopQueueTimer();
+  stopQueueCountPoll();
   window.removeEventListener("mousemove", handleMouseMove);
 });
 
@@ -360,15 +371,22 @@ const getLayerStyle = (factor: number) => {
 const loadAvatars = async () => {
   loadingAvatars.value = true;
   try {
+    console.log("Fetching avatars...");
     const response = await fetch("/api/avatars", {
       credentials: "include",
     });
+    console.log("Response status:", response.status);
     const data = await response.json();
-    avatars.value = data.avatars;
+    console.log("Avatars API response:", data);
+    console.log("Avatars array:", data.avatars);
+    console.log("Avatars length:", data.avatars?.length);
+    avatars.value = data.avatars || [];
+    console.log("avatars.value after set:", avatars.value);
   } catch (err) {
     console.error("Failed to load avatars:", err);
   } finally {
     loadingAvatars.value = false;
+    console.log("loadingAvatars set to false");
   }
 };
 
@@ -431,6 +449,8 @@ watch(showPurchaseConfirm, (val) => {
 
 watch(showAvatarSelector, async (val) => {
   if (val) {
+    loadingAvatars.value = true;
+    avatars.value = [];
     await loadAvatars();
   }
 });
@@ -475,6 +495,32 @@ const formatTime = (seconds: number): string => {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 };
 
+const fetchTotalPlayersInQueue = async () => {
+  try {
+    const response = await fetch("/api/matchmaking/queue-count", {
+      credentials: "include",
+    });
+    const data = await response.json();
+    totalPlayersInQueue.value = data.count || 0;
+  } catch (err) {
+    console.error("Failed to fetch queue count:", err);
+  }
+};
+
+const startQueueCountPoll = () => {
+  fetchTotalPlayersInQueue();
+  queueCountPollTimer = setInterval(() => {
+    fetchTotalPlayersInQueue();
+  }, 15000);
+};
+
+const stopQueueCountPoll = () => {
+  if (queueCountPollTimer) {
+    clearInterval(queueCountPollTimer);
+    queueCountPollTimer = null;
+  }
+};
+
 const startMatchmaking = async () => {
   try {
     const response = await fetch("/api/matchmaking/join", {
@@ -492,6 +538,12 @@ const startMatchmaking = async () => {
       } else {
         pollMatchmaking();
       }
+    } else if (data.error === "Already in queue") {
+      isInQueue.value = true;
+      if (!queueTimer) {
+        startQueueTimer();
+      }
+      pollMatchmaking();
     } else {
       alerts.error(data.error || "Failed to join queue");
     }
@@ -649,17 +701,82 @@ const fetchGameDetails = async (gameId: string) => {
   border-bottom: 4px solid var(--color-primary);
   border-right: 4px solid var(--color-primary);
   margin: 1rem;
+  position: relative;
 }
 
-.title-section {
-  text-align: center;
+.play-card-online-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.online-dot {
+  width: 10px;
+  height: 10px;
+  background-color: #22c55e;
+  border-radius: 50%;
+  box-shadow: 0 0 6px #22c55e;
+  animation: pulse-green 2s ease-in-out infinite;
+}
+
+@keyframes pulse-green {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.3);
+  }
+}
+
+.online-count {
+  color: #22c55e;
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.logo-divider {
+  width: 100%;
+  height: 2px;
+  background-color: rgba(255, 255, 255, 0.2);
+  margin: 1rem 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.logo-divider .game-title {
+  width: 200px;
+  image-rendering: pixelated;
+  background-color: var(--color-secondary);
+  padding: 0 1rem;
+  border: 2px solid var(--color-cyan-500);
+  border-radius: 0.5rem;
+}
+
+.top-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 3rem;
   margin-bottom: 1.5rem;
 }
 
-.game-title {
+.logo-divider .game-title {
   width: 200px;
   image-rendering: pixelated;
-  margin-bottom: 1rem;
+  background-color: var(--color-secondary);
+  padding: 0 1rem;
+  border: 2px solid var(--color-cyan-500);
+  border-radius: 0.5rem;
+}
+
+.online-count {
+  font-weight: 500;
 }
 
 .top-row {
@@ -680,7 +797,7 @@ const fetchGameDetails = async (gameId: string) => {
   border: 4px solid var(--color-primary);
   cursor: pointer;
   transition: border-color 0.2s;
-  min-width: 200px;
+  width: 100%;
 }
 
 .player-info:hover {
@@ -717,6 +834,7 @@ const fetchGameDetails = async (gameId: string) => {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  margin-left: auto;
 }
 
 .rank-badge {
@@ -760,6 +878,46 @@ const fetchGameDetails = async (gameId: string) => {
   height: 2px;
   background-color: rgba(255, 255, 255, 0.2);
   margin: 1.5rem 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.online-indicator-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background-color: var(--color-secondary);
+  padding: 0 1rem;
+  border: 2px solid var(--color-emerald-500);
+  border-radius: 1rem;
+}
+
+.online-dot {
+  width: 10px;
+  height: 10px;
+  background-color: #22c55e;
+  border-radius: 50%;
+  box-shadow: 0 0 6px #22c55e;
+  animation: pulse-green 2s ease-in-out infinite;
+}
+
+@keyframes pulse-green {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.3);
+  }
+}
+
+.online-count {
+  color: #22c55e;
+  font-weight: 600;
+  font-size: 0.875rem;
 }
 
 .match-section {

@@ -133,6 +133,15 @@ router.post("/leave", isAuthenticated, async (req, res) => {
   }
 });
 
+router.get("/queue-count", async (req, res) => {
+  try {
+    res.json({ count: matchmakingQueue.length });
+  } catch (error) {
+    console.error("Queue count error:", error);
+    res.status(500).json({ error: "Failed to get queue count" });
+  }
+});
+
 router.get("/status", isAuthenticated, async (req, res) => {
   try {
     const userId = (req.user as any).id;
