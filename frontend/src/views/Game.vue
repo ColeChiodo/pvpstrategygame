@@ -109,7 +109,7 @@ const pendingState = ref<GameState | null>(null);
 
 let socket: Socket | null = null;
 
-const { initSocket, start, stop, updateState, animateMove, animateAction, triggerHealthBarAnimation, hasValidActionTargets, isAction, selectedTile, moveTile, setPlayerIndex } = useGameEngine(gameCanvas);
+const { initSocket, start, stop, updateState, animateMove, animateAction, triggerHealthBarAnimation, hasValidActionTargets, getPendingAction, clearPendingAction, isAction, selectedTile, moveTile, setPlayerIndex } = useGameEngine(gameCanvas);
 
 const isPlayer1Turn = computed(() => {
   return currentRound.value % 2 === 0;
@@ -304,12 +304,31 @@ const connectToGameServer = () => {
   });
 
   socket.on("unit-moving", (data: { unit: any; origin: { row: number; col: number }; target: { row: number; col: number } }) => {
-    animateMove(data.unit.id, data.origin, data.target).then(() => {
-      // After move animation, check if there are valid action targets
-      if (hasValidActionTargets(data.target.row, data.target.col, data.unit.action)) {
-        isAction.value = true;
-        moveTile.value = data.target;
-        selectedTile.value = null;
+    // Check if there's a pending action with precomputed path
+    const pending = getPendingAction();
+    const precomputedPath = (pending && pending.unitId === data.unit.id) ? pending.movePath : undefined;
+    
+    animateMove(data.unit.id, data.origin, data.target, precomputedPath).then(() => {
+      // Check if there's a pending action (move+attack)
+      if (pending && pending.unitId === data.unit.id) {
+        // Execute the pending action
+        console.log('[PENDING ACTION] Executing after move:', pending);
+        socket?.emit('action', { 
+          unitId: pending.unitId, 
+          row: pending.targetRow, 
+          col: pending.targetCol 
+        });
+        clearPendingAction();
+      } else {
+        // After normal movement, check if unit can still act and has targets
+        // If so, select the unit to show action tiles
+        setTimeout(() => {
+          const movedUnit = units.value.find(u => u.id === data.unit.id);
+          if (movedUnit && movedUnit.canAct && hasValidActionTargets(data.target.row, data.target.col, data.unit.action)) {
+            // Select the unit's new position to show action tiles
+            selectedTile.value = { row: data.target.row, col: data.target.col, x: 0, y: 0 };
+          }
+        }, 100);
       }
     });
   });

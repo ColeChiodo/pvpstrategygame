@@ -22,6 +22,10 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     const moveTile = ref<Tile | null>(null);
     const validMoveTiles = ref<Tile[]>([]);
     const validActionTiles = ref<Tile[]>([]);
+    
+    // Track which unit is assigned to each action tile and if movement is needed
+    // Key: "row,col", Value: { unitId, requiresMove, moveTarget, movePath }
+    let actionTileAssignments = new Map<string, { unitId: number; requiresMove: boolean; moveTarget?: { row: number; col: number }; movePath?: { row: number; col: number }[] }>();
 
     let arena: Arena | null = null;
     let arenaImage: HTMLImageElement | null = null;
@@ -47,6 +51,9 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     let tiles: Tile[] = [];
     let isAction = ref(false);
     let isMyTurn = ref(false);
+    
+    // Track pending action after move (for move+attack)
+    let pendingAction: { unitId: number; targetRow: number; targetCol: number; movePath?: { row: number; col: number }[] } | null = null;
 
     let gamepadIndex: number | null = null;
     let lastInputTime: Record<number, number> = {};
@@ -188,9 +195,9 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
         draw();
     }
 
-    async function animateMove(unitId: number, origin: { row: number; col: number }, target: { row: number; col: number }) {
+    async function animateMove(unitId: number, origin: { row: number; col: number }, target: { row: number; col: number }, precomputedPath?: { row: number; col: number }[]) {
         isAnimating = true;
-        const path = astarPath(origin.row, origin.col, target.row, target.col, arena!);
+        const path = precomputedPath || astarPath(origin.row, origin.col, target.row, target.col, arena!);
         const realUnit = units.value.find(u => u.id === unitId);
         if (!realUnit) {
             isAnimating = false;
@@ -481,49 +488,65 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     }
 
     function drawActionTiles() {
-        if (!isAction.value || !moveTile.value || !arena) return;
-        const unit = units.value.find(u => u.row === moveTile.value!.row && u.col === moveTile.value!.col);
-        if (!unit) {
-            // No unit found at moveTile, exit action mode
-            isAction.value = false;
-            moveTile.value = null;
-            return;
-        }
-
-        // If unit can't act, exit action mode
-        if (!unit.canAct) {
-            isAction.value = false;
-            moveTile.value = null;
-            return;
-        }
-
-        const range = unit.range;
-        const row = moveTile.value.row;
-        const col = moveTile.value.col;
+        if (!arena || !selectedTile.value) return;
+        
+        // Only show action tiles for the selected unit
+        const unit = units.value.find(u => u.row === selectedTile.value!.row && u.col === selectedTile.value!.col);
+        if (!unit || !unit.canAct) return;
+        
+        // Clear previous assignments
+        actionTileAssignments.clear();
+        validActionTiles.value = [];
+        
+        const isMyUnit = players.value[myPlayerIndex]?.units.some(mu => mu.id === unit.id);
+        if (!isMyUnit) return;
+        
+        const mobility = unit.mobilityRemaining ?? unit.mobility;
+        const totalReach = mobility + unit.range;
         const unitAction = unit.action;
         
-        validActionTiles.value = [];
-
-        // Always show all tiles in range when unit can act
-        // Server will validate if there's a valid target
-        for (let i = -range; i <= range; i++) {
-            for (let j = -range; j <= range; j++) {
-                if (Math.abs(i) + Math.abs(j) <= range) {
-                    if (i === 0 && j === 0) continue;
-
-                    const targetRow = row + i;
-                    const targetCol = col + j;
+        for (let i = -totalReach; i <= totalReach; i++) {
+            for (let j = -totalReach; j <= totalReach; j++) {
+                if (Math.abs(i) + Math.abs(j) > totalReach) continue;
+                if (i === 0 && j === 0) continue;
+                
+                const targetRow = unit.row + i;
+                const targetCol = unit.col + j;
+                const tileKey = `${targetRow},${targetCol}`;
+                
+                // Check if there's a unit at this tile
+                const targetUnit = units.value.find(u => u.row === targetRow && u.col === targetCol);
+                
+                // Check if it's a valid target
+                if (targetUnit) {
+                    const isEnemy = !unitIsTeam(targetRow, targetCol);
+                    if (unitAction === 'heal' && isEnemy) continue;
+                    if (unitAction === 'attack' && !isEnemy) continue;
                     
-                    // Check if there's a unit at this tile
-                    const targetUnit = units.value.find(u => u.row === targetRow && u.col === targetCol);
+                    // For healers, only show if target needs healing
+                    if (unitAction === 'heal' && targetUnit.health >= targetUnit.maxHealth) continue;
                     
-                    // If there's a unit, check if it's a valid target type
-                    if (targetUnit) {
-                        const isEnemy = !unitIsTeam(targetRow, targetCol);
-                        if (unitAction === 'heal' && isEnemy) continue;
-                        if (unitAction === 'attack' && !isEnemy) continue;
+                    // Check if unit is already in attack range
+                    const distance = Math.abs(i) + Math.abs(j);
+                    const inAttackRange = distance <= unit.range;
+                    
+                    // If not in attack range, check if we can move to attack range
+                    let moveTarget: { row: number; col: number } | undefined;
+                    let movePath: { row: number; col: number }[] | undefined;
+                    if (!inAttackRange) {
+                        const attackPos = findAttackPosition(unit, targetRow, targetCol);
+                        if (!attackPos) continue; // Can't reach
+                        moveTarget = attackPos.moveTarget;
+                        movePath = attackPos.path;
                     }
-                    // If no unit visible, still show the tile - server will validate
+                    
+                    // Add action tile assignment
+                    actionTileAssignments.set(tileKey, {
+                        unitId: unit.id,
+                        requiresMove: !inAttackRange,
+                        moveTarget,
+                        movePath
+                    });
                     
                     const pos = coordToPosition(targetRow, targetCol);
                     if (pos.x !== -9999) {
@@ -534,6 +557,61 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
                 }
             }
         }
+    }
+    
+    function findAttackPosition(unit: Unit, targetRow: number, targetCol: number): { moveTarget: { row: number; col: number }; path: { row: number; col: number }[] } | null {
+        const mobility = unit.mobilityRemaining ?? unit.mobility;
+        const range = unit.range;
+        
+        // Find all tiles within mobility range that can attack the target
+        let bestPosition: { row: number; col: number; distance: number; path: { row: number; col: number }[] } | null = null;
+        
+        for (let i = -mobility; i <= mobility; i++) {
+            for (let j = -mobility; j <= mobility; j++) {
+                if (Math.abs(i) + Math.abs(j) > mobility) continue;
+                
+                const moveRow = unit.row + i;
+                const moveCol = unit.col + j;
+                
+                // Check if tile is valid (no unit, not obstacle)
+                if (hasUnit(moveRow, moveCol) && (moveRow !== unit.row || moveCol !== unit.col)) continue;
+                if (!arena || arena.tiles[moveRow]?.[moveCol] === 0) continue;
+                if (!arena.tiles[moveRow]?.[moveCol] === 4) continue;
+                
+                // Check if from this position, target is in attack range
+                const attackDistance = Math.abs(moveRow - targetRow) + Math.abs(moveCol - targetCol);
+                if (attackDistance <= range) {
+                    // Calculate path to this position
+                    const path = astarPath(unit.row, unit.col, moveRow, moveCol, arena!);
+                    if (path.length <= 1) continue;
+                    
+                    // Check path length is within mobility
+                    const pathCost = calculatePathCost(path, arena!);
+                    if (pathCost > mobility) continue;
+                    
+                    // This is a valid position - pick the one closest to max range (furthest from target)
+                    if (!bestPosition || attackDistance > bestPosition.distance) {
+                        bestPosition = { row: moveRow, col: moveCol, distance: attackDistance, path };
+                    }
+                }
+            }
+        }
+        
+        return bestPosition ? { moveTarget: { row: bestPosition.row, col: bestPosition.col }, path: bestPosition.path } : null;
+    }
+    
+    function calculatePathCost(path: { row: number; col: number }[], arena: Arena): number {
+        let cost = 0;
+        for (let i = 1; i < path.length; i++) {
+            const tile = path[i];
+            const terrain = arena.tiles[tile.row]?.[tile.col];
+            if (terrain === 2) {
+                cost += 2; // Forest terrain costs more
+            } else {
+                cost += 1;
+            }
+        }
+        return cost;
     }
 
     function drawPath() {
@@ -776,46 +854,84 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
                         socket?.emit('move', { unitId: unit.id, row: tile.row, col: tile.col });
                     }
                     selectedTile.value = null;
-                } else if (!isAction.value && selectedTile.value) {
-                    const unit = units.value.find(u => u.row === selectedTile.value!.row && u.col === selectedTile.value!.col);
-                    if (unit) {
-                        if (validMoveTiles.value.find(t => t.row === tile.row && t.col === tile.col)) {
-                            // Clicked on a valid move tile
-                            console.log('[MOVE]', unit.name, '->', tile.row, tile.col);
-                            socket?.emit('move', { unitId: unit.id, row: tile.row, col: tile.col });
-                        } else {
-                            // Clicked outside mobility range - move as far as possible
-                            const path = astarPath(selectedTile.value.row, selectedTile.value.col, tile.row, tile.col, arena!);
-                            if (path.length > 1) {
-                                // Find furthest valid tile along the path
-                                let furthestTile: { row: number; col: number } | null = null;
-                                const unitMobility = unit.mobilityRemaining ?? unit.mobility;
+                } else if (selectedTile.value) {
+                    // First check if clicking on an action tile (even if not in action mode)
+                    const actionAssignment = actionTileAssignments.get(`${tile.row},${tile.col}`);
+                    
+                    if (actionAssignment) {
+                        // Clicked on an action tile
+                        const actingUnit = units.value.find(u => u.id === actionAssignment.unitId);
+                        if (actingUnit) {
+                            if (actionAssignment.requiresMove && actionAssignment.moveTarget) {
+                                // Need to move first, then attack
+                                console.log('[MOVE+ATTACK]', actingUnit.name, 'moving to', actionAssignment.moveTarget.row, actionAssignment.moveTarget.col, 'then attacking', tile.row, tile.col);
                                 
-                                for (let i = path.length - 1; i >= 0; i--) {
-                                    const pathTile = path[i];
-                                    const distance = Math.abs(pathTile.row - selectedTile.value.row) + Math.abs(pathTile.col - selectedTile.value.col);
-                                    const isValidTile = validMoveTiles.value.find(t => t.row === pathTile.row && t.col === pathTile.col);
+                                // Set up pending action after move with precomputed path
+                                pendingAction = {
+                                    unitId: actingUnit.id,
+                                    targetRow: tile.row,
+                                    targetCol: tile.col,
+                                    movePath: actionAssignment.movePath
+                                };
+                                
+                                socket?.emit('move', { 
+                                    unitId: actingUnit.id, 
+                                    row: actionAssignment.moveTarget.row, 
+                                    col: actionAssignment.moveTarget.col 
+                                });
+                            } else {
+                                // Already in range, attack immediately
+                                console.log('[ACTION]', actingUnit.name, '->', tile.row, tile.col);
+                                socket?.emit('action', { unitId: actingUnit.id, row: tile.row, col: tile.col });
+                            }
+                        }
+                        selectedTile.value = null;
+                    } else {
+                        // Normal move logic
+                        const unit = units.value.find(u => u.row === selectedTile.value!.row && u.col === selectedTile.value!.col);
+                        if (unit) {
+                            if (validMoveTiles.value.find(t => t.row === tile.row && t.col === tile.col)) {
+                                // Clicked on a valid move tile
+                                console.log('[MOVE]', unit.name, '->', tile.row, tile.col);
+                                socket?.emit('move', { unitId: unit.id, row: tile.row, col: tile.col });
+                            } else {
+                                // Clicked outside mobility range - move as far as possible
+                                const path = astarPath(selectedTile.value.row, selectedTile.value.col, tile.row, tile.col, arena!);
+                                if (path.length > 1) {
+                                    // Find furthest valid tile along the path
+                                    let furthestTile: { row: number; col: number } | null = null;
+                                    const unitMobility = unit.mobilityRemaining ?? unit.mobility;
                                     
-                                    if (isValidTile && distance <= unitMobility) {
-                                        furthestTile = pathTile;
-                                        break;
+                                    for (let i = path.length - 1; i >= 0; i--) {
+                                        const pathTile = path[i];
+                                        const distance = Math.abs(pathTile.row - selectedTile.value.row) + Math.abs(pathTile.col - selectedTile.value.col);
+                                        const isValidTile = validMoveTiles.value.find(t => t.row === pathTile.row && t.col === pathTile.col);
+                                        
+                                        if (isValidTile && distance <= unitMobility) {
+                                            furthestTile = pathTile;
+                                            break;
+                                        }
                                     }
-                                }
-                                
-                                if (furthestTile && (furthestTile.row !== selectedTile.value.row || furthestTile.col !== selectedTile.value.col)) {
-                                    console.log('[MOVE] Partial move', unit.name, '->', furthestTile.row, furthestTile.col);
-                                    socket?.emit('move', { unitId: unit.id, row: furthestTile.row, col: furthestTile.col });
+                                    
+                                    if (furthestTile && (furthestTile.row !== selectedTile.value.row || furthestTile.col !== selectedTile.value.col)) {
+                                        console.log('[MOVE] Partial move', unit.name, '->', furthestTile.row, furthestTile.col);
+                                        socket?.emit('move', { unitId: unit.id, row: furthestTile.row, col: furthestTile.col });
+                                    }
                                 }
                             }
                         }
+                        selectedTile.value = null;
                     }
-                    selectedTile.value = null;
                 } else if (isAction.value && moveTile.value) {
-                    const actingUnit = units.value.find(u => u.row === moveTile.value!.row && u.col === moveTile.value!.col);
-
-                    if (validActionTiles.value.find(t => t.row === tile.row && t.col === tile.col)) {
-                        console.log('[ACTION]', actingUnit?.name, '->', tile.row, tile.col);
-                        socket?.emit('action', { unitId: actingUnit?.id, row: tile.row, col: tile.col });
+                    // Legacy action mode (when unit was moved first)
+                    const actionAssignment = actionTileAssignments.get(`${tile.row},${tile.col}`);
+                    
+                    if (actionAssignment) {
+                        const actingUnit = units.value.find(u => u.id === actionAssignment.unitId);
+                        if (actingUnit) {
+                            console.log('[ACTION]', actingUnit.name, '->', tile.row, tile.col);
+                            socket?.emit('action', { unitId: actingUnit.id, row: tile.row, col: tile.col });
+                        }
                     }
 
                     isAction.value = false;
@@ -1028,6 +1144,14 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
         return false;
     }
 
+    function getPendingAction(): { unitId: number; targetRow: number; targetCol: number } | null {
+        return pendingAction;
+    }
+    
+    function clearPendingAction() {
+        pendingAction = null;
+    }
+
     return {
         gameSession,
         players,
@@ -1046,6 +1170,8 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
         animateAction,
         triggerHealthBarAnimation,
         hasValidActionTargets,
+        getPendingAction,
+        clearPendingAction,
         setPlayerIndex
     };
 }
