@@ -34,6 +34,13 @@
       <!-- Game Canvas -->
       <canvas ref="gameCanvas" class="game-canvas" tabindex="0" :class="{ 'hidden': showLobby }"></canvas>
 
+      <UnitTooltip
+        :hovered-unit="hoveredUnit"
+        :selected-unit="selectedUnit"
+        :players="players"
+        :my-player-index="playerIndex"
+      />
+
       <div class="game-hud">
         <div class="game-info-bar">
           <div class="player-timer" :class="{ 'active-turn': isPlayer1Turn }">
@@ -55,15 +62,9 @@
 
         <div class="game-controls">
           <PlayButton
-            v-if="isPlayer1Turn && playerIndex === 0"
-            text="END TURN"
-            color="cyan"
-            @click="endTurn"
-          />
-          <PlayButton
-            v-else-if="!isPlayer1Turn && playerIndex === 1"
-            text="END TURN"
-            color="cyan"
+            :text="isMyTurnButton ? 'END TURN' : 'WAITING...'"
+            :color="isMyTurnButton ? 'cyan' : 'gray'"
+            :disabled="!isMyTurnButton"
             @click="endTurn"
           />
         </div>
@@ -86,6 +87,7 @@ import { inflate } from 'pako';
 import { useGameEngine } from "../game-engine";
 import { GameState } from "../game-engine/types";
 import PlayButton from "../components/PlayButton.vue";
+import UnitTooltip from "../components/UnitTooltip.vue";
 
 const props = defineProps<{
   gameId: string;
@@ -109,10 +111,17 @@ const pendingState = ref<GameState | null>(null);
 
 let socket: Socket | null = null;
 
-const { initSocket, start, stop, updateState, animateMove, animateAction, triggerHealthBarAnimation, hasValidActionTargets, getPendingAction, clearPendingAction, isAction, selectedTile, moveTile, setPlayerIndex } = useGameEngine(gameCanvas);
+const { initSocket, start, stop, updateState, animateMove, animateAction, triggerHealthBarAnimation, hasValidActionTargets, getPendingAction, clearPendingAction, getHoveredUnit, getSelectedUnitFromEngine, players, hoveredTile, selectedTile, moveTile, isAction, setPlayerIndex } = useGameEngine(gameCanvas);
+
+const hoveredUnit = computed(() => getHoveredUnit());
+const selectedUnit = computed(() => getSelectedUnitFromEngine());
 
 const isPlayer1Turn = computed(() => {
   return currentRound.value % 2 === 0;
+});
+
+const isMyTurnButton = computed(() => {
+  return (isPlayer1Turn.value && playerIndex.value === 0) || (!isPlayer1Turn.value && playerIndex.value === 1);
 });
 
 const formatTime = (seconds: number): string => {
@@ -325,8 +334,9 @@ const connectToGameServer = () => {
         setTimeout(() => {
           const movedUnit = units.value.find(u => u.id === data.unit.id);
           if (movedUnit && movedUnit.canAct && hasValidActionTargets(data.target.row, data.target.col, data.unit.action)) {
-            // Select the unit's new position to show action tiles
-            selectedTile.value = { row: data.target.row, col: data.target.col, x: 0, y: 0 };
+            const pos = coordToPosition(data.target.row, data.target.col);
+            // Select the unit's new position with proper tile coordinates
+            selectedTile.value = { row: data.target.row, col: data.target.col, x: pos.x, y: pos.y };
           }
         }, 100);
       }
@@ -618,6 +628,9 @@ onUnmounted(() => {
 }
 
 .game-controls {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
   pointer-events: auto;
 }
 </style>

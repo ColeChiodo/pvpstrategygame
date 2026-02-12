@@ -1,13 +1,13 @@
 <template>
-  <a v-if="href" :href="href" class="play-button" :class="colorClass">
+  <a v-if="href" :href="href" class="play-button" :class="[colorClass, { 'is-disabled': disabled }]" :aria-disabled="disabled">
     <img v-if="icon" :src="icon" alt="" class="button-icon" />
     {{ text }}
   </a>
-  <RouterLink v-else-if="to" :to="to" class="play-button" :class="colorClass">
+  <RouterLink v-else-if="to" :to="to" class="play-button" :class="[colorClass, { 'is-disabled': disabled }]" :aria-disabled="disabled">
     <img v-if="icon" :src="icon" alt="" class="button-icon" />
     {{ text }}
   </RouterLink>
-  <button v-else type="button" :class="colorClass" class="play-button" @click="$emit('click')">
+  <button v-else type="button" :class="[colorClass, { 'is-disabled': disabled }]" class="play-button" :disabled="disabled" @click="handleClick">
     <img v-if="icon" :src="icon" alt="" class="button-icon" />
     {{ text }}
   </button>
@@ -23,6 +23,7 @@ const props = defineProps<{
   to?: string;
   icon?: string;
   color?: "emerald" | "cyan" | "amber" | "rose" | "gray" | "google" | "discord";
+  disabled?: boolean;
 }>();
 
 defineEmits<{
@@ -30,6 +31,14 @@ defineEmits<{
 }>();
 
 const colorClass = computed(() => `play-button-${props.color || "emerald"}`);
+
+function handleClick(e: MouseEvent) {
+  if (props.disabled) {
+    e.preventDefault();
+    e.stopPropagation();
+    return;
+  }
+}
 </script>
 
 <style scoped>
@@ -112,5 +121,22 @@ const colorClass = computed(() => `play-button-${props.color || "emerald"}`);
   background-color: #5865f2;
   border-bottom-color: #4049ab;
   border-right-color: #4049ab;
+}
+
+.play-button.is-disabled,
+.play-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  filter: grayscale(0.5);
+}
+
+.play-button.is-disabled:hover {
+  filter: grayscale(0.5);
+}
+
+.play-button.is-disabled:active {
+  transform: none;
+  border-bottom-width: 4px;
+  border-right-width: 4px;
 }
 </style>

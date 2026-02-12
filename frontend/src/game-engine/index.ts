@@ -92,24 +92,12 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
 
     function loadPlayers(newPlayers: Player[]) {
         players.value = newPlayers;
-        console.log('[GAME-ENGINE] loadPlayers:', {
-            myPlayerIndex,
-            myUserId,
-            players: newPlayers.map((p, i) => `${p.name}[${i}](${p.id})`)
-        });
         if (players.value.length === 2) {
             isMyTurn.value = isTurn();
         }
     }
 
     function loadUnits(newPlayers: Player[]) {
-        console.log('[GAME-ENGINE] loadUnits START:', {
-            myPlayerIndex,
-            myUserId,
-            newPlayersCount: newPlayers.length,
-            newPlayers: newPlayers.map(p => `${p.name}: ${p.units.length} units`)
-        });
-
         const receivedUnitIds = new Set<string>();
         const receivedMyUnitIds = new Set<string>();
 
@@ -167,14 +155,6 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
             }
         }
 
-        console.log('[GAME-ENGINE] loadUnits END:', {
-            myPlayerIndex,
-            myUserId,
-            receivedMyUnitIds: Array.from(receivedMyUnitIds),
-            totalUnitsAfter: units.value.length,
-            totalUnitsAfterIds: units.value.map(u => `${u.name}(${u.row},${u.col})`)
-        });
-
         for (let i = units.value.length - 1; i >= 0; i--) {
             const existingUnit = units.value[i];
             const unitId = String(existingUnit.id);
@@ -182,7 +162,6 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
             if (receivedMyUnitIds.has(unitId)) continue;
 
             if (!receivedUnitIds.has(unitId)) {
-                console.log('[GAME-ENGINE] Removing invisible unit:', existingUnit.name, existingUnit.row, existingUnit.col);
                 units.value.splice(i, 1);
             }
         }
@@ -727,10 +706,9 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     }
 
     function isTurn(): boolean {
-        if (players.value.length < 2 || !myUserId) return false;
+        if (players.value.length < 2 || myPlayerIndex < 0) return false;
         const currentPlayerIndex = currentRound % 2;
-        const currentPlayer = players.value[currentPlayerIndex];
-        return currentPlayer?.id === myUserId;
+        return currentPlayerIndex === myPlayerIndex;
     }
 
     function loadImage(name: string, src: string): HTMLImageElement {
@@ -829,23 +807,35 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
 
     function handleClick(event: MouseEvent) {
         if (event.button !== 0) return;
-        if (!isMyTurn.value) return;
-        if (players.value.length !== 2) return;
+        if (!isMyTurn.value) {
+            console.log('[CLICK] Not my turn');
+            return;
+        }
+        if (players.value.length !== 2) {
+            console.log('[CLICK] Not 2 players:', players.value.length);
+            return;
+        }
 
         canvasRef.value?.focus();
 
         const clickX = event.offsetX;
         const clickY = event.offsetY;
+        
+        console.log('[CLICK] at', clickX, clickY, 'hoveredTile:', hoveredTile.value);
 
         let found = false;
         for (const tile of tiles) {
-            if (!hoveredTile.value) break;
             if (isPointInsideTile(clickX, clickY, tile)) {
+                console.log('[CLICK] Found tile:', tile.row, tile.col);
                 const clickedUnit = units.value.find(u => u.row === tile.row && u.col === tile.col);
-                const isMyUnit = clickedUnit && players.value[myPlayerIndex]?.units.some(u => u.id === clickedUnit.id);
+                console.log('[CLICK] Unit at tile:', clickedUnit?.name || 'none');
+                const isMyUnit = clickedUnit && players.value[myPlayerIndex]?.units?.some(u => u.id === clickedUnit.id);
+                console.log('[CLICK] isMyUnit:', isMyUnit, 'myPlayerIndex:', myPlayerIndex, 'players.length:', players.value.length);
                 const canUnitMove = clickedUnit && clickedUnit.canMove && (clickedUnit.mobilityRemaining ?? 0) > 0;
 
-                if (!isAction.value && !selectedTile.value && isMyUnit && canUnitMove) {
+                if (!isAction.value && !selectedTile.value && isMyUnit) {
+                    // Select the unit regardless of mobility - can still act even if can't move
+                    console.log('[CLICK] Selecting unit:', clickedUnit?.name, 'at', tile.row, tile.col);
                     selectedTile.value = tile;
                 } else if (!isAction.value && selectedTile.value && tile.row === selectedTile.value.row && tile.col === selectedTile.value.col) {
                     const unit = units.value.find(u => u.row === selectedTile.value!.row && u.col === selectedTile.value!.col);
@@ -1151,6 +1141,16 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
     function clearPendingAction() {
         pendingAction = null;
     }
+    
+    function getHoveredUnit(): Unit | null {
+        if (!hoveredTile.value) return null;
+        return units.value.find(u => u.row === hoveredTile.value!.row && u.col === hoveredTile.value!.col) || null;
+    }
+    
+    function getSelectedUnitFromEngine(): Unit | null {
+        if (!selectedTile.value) return null;
+        return units.value.find(u => u.row === selectedTile.value!.row && u.col === selectedTile.value!.col) || null;
+    }
 
     return {
         gameSession,
@@ -1160,6 +1160,7 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
         player1Time,
         player2Time,
         isAction,
+        hoveredTile,
         selectedTile,
         moveTile,
         initSocket,
@@ -1172,6 +1173,8 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
         hasValidActionTargets,
         getPendingAction,
         clearPendingAction,
+        getHoveredUnit,
+        getSelectedUnitFromEngine,
         setPlayerIndex
     };
 }
