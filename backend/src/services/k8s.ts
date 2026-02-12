@@ -40,7 +40,7 @@ const GAME_SERVER_REPLICAS = 1;
 const GAME_SERVER_PORT = 3000;
 const GAME_SERVER_HOSTNAME = process.env.GAME_SERVER_HOSTNAME || "gamefortezza.colechiodo.cc";
 
-async function createStripPrefixMiddleware(gameId: string): Promise<boolean> {
+async function createStripPrefixMiddleware(gameId: string, deploymentUid: string): Promise<boolean> {
   const middlewareName = `strip-game-prefix-${gameId}`;
 
   const middleware = {
@@ -49,6 +49,14 @@ async function createStripPrefixMiddleware(gameId: string): Promise<boolean> {
     metadata: {
       name: middlewareName,
       namespace: GAME_SERVER_NAMESPACE,
+      ownerReferences: [
+        {
+          apiVersion: "apps/v1",
+          kind: "Deployment",
+          name: `game-server-${gameId}`,
+          uid: deploymentUid,
+        },
+      ],
     },
     spec: {
       stripPrefix: {
@@ -77,11 +85,10 @@ async function createStripPrefixMiddleware(gameId: string): Promise<boolean> {
   }
 }
 
-async function createIngressRoute(gameId: string, serviceName: string): Promise<boolean> {
+async function createIngressRoute(gameId: string, serviceName: string, deploymentUid: string): Promise<boolean> {
   const ingressRouteName = `game-server-${gameId}`;
 
-  // Create StripPrefix middleware first
-  const middlewareCreated = await createStripPrefixMiddleware(gameId);
+  const middlewareCreated = await createStripPrefixMiddleware(gameId, deploymentUid);
   if (!middlewareCreated) {
     console.error(`[K8S] Failed to create middleware, aborting IngressRoute creation`);
     return false;
@@ -93,6 +100,14 @@ async function createIngressRoute(gameId: string, serviceName: string): Promise<
     metadata: {
       name: ingressRouteName,
       namespace: GAME_SERVER_NAMESPACE,
+      ownerReferences: [
+        {
+          apiVersion: "apps/v1",
+          kind: "Deployment",
+          name: `game-server-${gameId}`,
+          uid: deploymentUid,
+        },
+      ],
     },
     spec: {
       entryPoints: ["web", "websecure"],
@@ -187,11 +202,9 @@ export async function createGameServer(gameId: string): Promise<{ url: string; p
   console.log(`[K8S] K8sApi ready:`, !!k8sAppsApi);
   
   try {
-    // Test K8s API connectivity
     const cluster = kc.getCurrentCluster();
     console.log(`[K8S] Attempting to reach ${cluster?.server}`);
     
-    // Try to list deployments to verify connectivity
     await k8sAppsApi.listNamespacedDeployment({ namespace: GAME_SERVER_NAMESPACE });
     console.log(`[K8S] K8s API is reachable`);
   } catch (apiError: any) {
@@ -240,6 +253,8 @@ export async function createGameServer(gameId: string): Promise<{ url: string; p
                   { name: "GAME_ID", value: gameId },
                   { name: "PORT", value: GAME_SERVER_PORT.toString() },
                   { name: "ALLOWED_ORIGINS", value: `${process.env.FRONTEND_URL || ""},${process.env.GAME_URL || ""}` },
+                  { name: "BACKEND_URL", value: process.env.BACKEND_URL || "https://apifortezza.colechiodo.cc" },
+                  { name: "GAME_SERVER_SECRET", value: process.env.GAME_SERVER_SECRET || "" },
                 ],
                 resources: {
                   limits: {
@@ -275,6 +290,23 @@ export async function createGameServer(gameId: string): Promise<{ url: string; p
       },
     };
 
+    await k8sAppsApi.createNamespacedDeployment({
+      namespace: GAME_SERVER_NAMESPACE,
+      body: deployment,
+    });
+    console.log(`Kubernetes pod created: ${deploymentName}`);
+
+    const deploymentResponse = await k8sAppsApi.readNamespacedDeployment({
+      name: deploymentName,
+      namespace: GAME_SERVER_NAMESPACE,
+    });
+    const deploymentUid = (deploymentResponse as any).metadata?.uid;
+    if (!deploymentUid) {
+      console.error(`[K8S] Failed to get UID for deployment ${deploymentName}`);
+      return null;
+    }
+    console.log(`[K8S] Deployment UID: ${deploymentUid}`);
+
     const service = {
       apiVersion: "v1",
       kind: "Service",
@@ -284,6 +316,14 @@ export async function createGameServer(gameId: string): Promise<{ url: string; p
         labels: {
           app: deploymentName,
         },
+        ownerReferences: [
+          {
+            apiVersion: "apps/v1",
+            kind: "Deployment",
+            name: deploymentName,
+            uid: deploymentUid,
+          },
+        ],
       },
       spec: {
         selector: {
@@ -296,19 +336,13 @@ export async function createGameServer(gameId: string): Promise<{ url: string; p
       },
     };
 
-    await k8sAppsApi.createNamespacedDeployment({
-      namespace: GAME_SERVER_NAMESPACE,
-      body: deployment,
-    });
-    console.log(`Kubernetes pod created: ${deploymentName}`);
-
     await k8sApi.createNamespacedService({
       namespace: GAME_SERVER_NAMESPACE,
       body: service,
     });
     console.log(`[K8S] Kubernetes service created: ${serviceName}`);
 
-    const ingressRouteCreated = await createIngressRoute(gameId, serviceName);
+    const ingressRouteCreated = await createIngressRoute(gameId, serviceName, deploymentUid);
     if (!ingressRouteCreated) {
       console.warn(`[K8S] Failed to create IngressRoute for ${gameId}, continuing anyway`);
     }
@@ -334,32 +368,61 @@ export async function createGameServer(gameId: string): Promise<{ url: string; p
 }
 
 export async function destroyGameServer(gameId: string): Promise<boolean> {
+  const deploymentName = `game-server-${gameId}`;
+  const serviceName = `game-server-${gameId}`;
+
   try {
-    const deploymentName = `game-server-${gameId}`;
-    const serviceName = `game-server-${gameId}`;
+    console.log(`[K8S] Destroying game server ${gameId}`);
 
-    await k8sAppsApi.deleteNamespacedDeployment({
-      name: deploymentName,
-      namespace: GAME_SERVER_NAMESPACE,
-    });
+    console.log(`[K8S] Checking if deployment ${deploymentName} exists...`);
+    try {
+      await k8sAppsApi.readNamespacedDeployment({
+        name: deploymentName,
+        namespace: GAME_SERVER_NAMESPACE,
+      });
+      console.log(`[K8S] Deployment exists, proceeding with deletion`);
+    } catch (readError: any) {
+      console.log(`[K8S] Deployment not found or already deleted: ${readError.message}`);
+      console.log(`[K8S] Proceeding to delete service/ingress anyway`);
+    }
 
-    await k8sApi.deleteNamespacedService({
-      name: serviceName,
-      namespace: GAME_SERVER_NAMESPACE,
-    });
+    console.log(`[K8S] Deleting deployment ${deploymentName}`);
+    try {
+      await k8sAppsApi.deleteNamespacedDeployment({
+        name: deploymentName,
+        namespace: GAME_SERVER_NAMESPACE,
+      });
+      console.log(`[K8S] Deployment deleted`);
+    } catch (delError: any) {
+      if (delError.statusCode === 404) {
+        console.log(`[K8S] Deployment already deleted (404)`);
+      } else {
+        throw delError;
+      }
+    }
+
+    console.log(`[K8S] Deleting service ${serviceName}`);
+    try {
+      await k8sApi.deleteNamespacedService({
+        name: serviceName,
+        namespace: GAME_SERVER_NAMESPACE,
+      });
+      console.log(`[K8S] Service deleted`);
+    } catch (svcError: any) {
+      if (svcError.statusCode === 404) {
+        console.log(`[K8S] Service already deleted (404)`);
+      } else {
+        throw svcError;
+      }
+    }
 
     await deleteIngressRoute(gameId);
-
-    await prisma.gameSession.update({
-      where: { id: gameId },
-      data: { status: "completed" },
-    });
 
     console.log(`Game server destroyed: ${deploymentName}`);
     return true;
 
-  } catch (error) {
-    console.error("Failed to destroy game server:", error);
+  } catch (error: any) {
+    console.error(`[K8S] Failed to destroy game server ${gameId}:`, error.message);
     return false;
   }
 }

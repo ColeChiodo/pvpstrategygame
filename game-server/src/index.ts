@@ -86,6 +86,8 @@ let gameState: GameState | null = null;
 let gameInterval: NodeJS.Timeout | null = null;
 let gameId = process.env.GAME_ID || "unknown";
 const port = parseInt(process.env.PORT || "3000");
+const BACKEND_URL = process.env.BACKEND_URL || "https://apifortezza.colechiodo.cc";
+const GAME_SERVER_SECRET = process.env.GAME_SERVER_SECRET || "";
 
 // Connection timeout handling
 let connectionWarningTimeout: NodeJS.Timeout | null = null;
@@ -137,10 +139,11 @@ function clearConnectionTimeouts() {
     }
 }
 
-function shutdownServer() {
+async function shutdownServer() {
     console.log(`[${gameId}] Shutting down due to insufficient connections`);
     io?.close();
     httpServer.close();
+    await notifyBackendGameComplete();
     process.exit(0);
 }
 
@@ -1111,6 +1114,27 @@ function winnerChosen(winner: Player) {
     endGame();
 }
 
+async function notifyBackendGameComplete() {
+    if (!GAME_SERVER_SECRET) {
+        console.log(`[${gameId}] No GAME_SERVER_SECRET configured, skipping backend notification`);
+        return;
+    }
+    try {
+        const response = await fetch(`${BACKEND_URL}/api/matchmaking/game/${gameId}/complete`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ secret: GAME_SERVER_SECRET }),
+        });
+        if (response.ok) {
+            console.log(`[${gameId}] Notified backend of game completion`);
+        } else {
+            console.error(`[${gameId}] Failed to notify backend: ${response.status}`);
+        }
+    } catch (error) {
+        console.error(`[${gameId}] Error notifying backend:`, error);
+    }
+}
+
 function endGame() {
     if (gameInterval) {
         clearInterval(gameInterval);
@@ -1118,6 +1142,7 @@ function endGame() {
     }
     emitGameState();
     console.log(`[${gameId}] Closing Game...`);
+    notifyBackendGameComplete();
 }
 
 httpServer.listen(port, () => {

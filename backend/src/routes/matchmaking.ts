@@ -290,6 +290,49 @@ router.get("/game/:gameId", isAuthenticated, async (req, res) => {
   }
 });
 
+router.post("/game/:gameId/complete", async (req, res) => {
+  const { gameId } = req.params;
+  const { secret } = req.body;
+
+  const EXPECTED_SECRET = process.env.GAME_SERVER_SECRET;
+  if (!secret || secret !== EXPECTED_SECRET) {
+    console.log(`[COMPLETE-GAME] Invalid secret for game ${gameId}`);
+    return res.status(403).json({ error: "Forbidden" });
+  }
+
+  console.log(`[COMPLETE-GAME] Game server signaling completion for ${gameId}`);
+  try {
+    const game = await prisma.gameSession.findUnique({
+      where: { id: gameId },
+    });
+
+    if (!game) {
+      console.log(`[COMPLETE-GAME] Game ${gameId} not found`);
+      return res.status(404).json({ error: "Game not found" });
+    }
+
+    if (game.status === "completed") {
+      console.log(`[COMPLETE-GAME] Game ${gameId} already completed`);
+      return res.json({ success: true });
+    }
+
+    await destroyGameServer(gameId);
+
+    await prisma.gameSession.update({
+      where: { id: gameId },
+      data: { status: "completed" },
+    });
+
+    activeGames.delete(gameId);
+
+    console.log(`[COMPLETE-GAME] Game ${gameId} completed successfully`);
+    res.json({ success: true });
+  } catch (error) {
+    console.error(`[COMPLETE-GAME] Error completing game ${gameId}:`, error);
+    res.status(500).json({ error: "Failed to complete game" });
+  }
+});
+
 router.post("/game/:gameId/end", isAuthenticated, async (req, res) => {
   const userId = (req.user as any).id;
   console.log(`[END-GAME] Request received from user ${userId} for game ${req.params.gameId}`);
