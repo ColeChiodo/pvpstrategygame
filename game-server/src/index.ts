@@ -5,6 +5,13 @@ import { deflate, inflate } from 'pako';
 const MAX_TIME = 60 * 10;
 const TICKRATE = 1;
 
+interface PlayerStats {
+    unitsKilled: number;
+    damageDealt: number;
+    damageHealed: number;
+    unitsLost: number;
+}
+
 interface Player {
     id: string;
     userId: string;
@@ -12,6 +19,7 @@ interface Player {
     name: string;
     profileimage: string;
     units: Unit[];
+    stats: PlayerStats;
 }
 
 interface Arena {
@@ -317,6 +325,12 @@ function addPlayerToGame(gameState: GameState, socket: Socket, userId: string, n
         name: name,
         profileimage: avatar || "default",
         units: [],
+        stats: {
+            unitsKilled: 0,
+            damageDealt: 0,
+            damageHealed: 0,
+            unitsLost: 0,
+        },
     };
 
     const isPlayer2 = gameState.players.length === 1;
@@ -515,7 +529,7 @@ function startGameLoop() {
                 gameState.player1Time -= 1;
                 if (gameState.player1Time <= 0) {
                     console.log(`[${gameId}] ${gameState.players[0].name} ran out of time`);
-                    winnerChosen(gameState.players[1]);
+                    winnerChosen(gameState.players[1], "timeout");
                     endGame();
                     return;
                 }
@@ -523,7 +537,7 @@ function startGameLoop() {
                 gameState.player2Time -= 1;
                 if (gameState.player2Time <= 0) {
                     console.log(`[${gameId}] ${gameState.players[1].name} ran out of time`);
-                    winnerChosen(gameState.players[0]);
+                    winnerChosen(gameState.players[0], "timeout");
                     endGame();
                     return;
                 }
@@ -531,14 +545,14 @@ function startGameLoop() {
 
             if (gameState.players[0].units.length === 0) {
                 console.log(`[${gameId}] ${gameState.players[0].name} has no units left`);
-                winnerChosen(gameState.players[1]);
+                winnerChosen(gameState.players[1], "noUnits");
                 endGame();
                 return;
             }
 
             if (gameState.players[1].units.length === 0) {
                 console.log(`[${gameId}] ${gameState.players[1].name} has no units left`);
-                winnerChosen(gameState.players[0]);
+                winnerChosen(gameState.players[0], "noUnits");
                 endGame();
                 return;
             }
@@ -548,14 +562,14 @@ function startGameLoop() {
 
             if (!player1King) {
                 console.log(`[${gameId}] ${gameState.players[0].name}'s King is Dead.`);
-                winnerChosen(gameState.players[1]);
+                winnerChosen(gameState.players[1], "kingDefeated");
                 endGame();
                 return;
             }
 
             if (!player2King) {
                 console.log(`[${gameId}] ${gameState.players[1].name}'s King is Dead.`);
-                winnerChosen(gameState.players[0]);
+                winnerChosen(gameState.players[0], "kingDefeated");
                 endGame();
                 return;
             }
@@ -633,19 +647,25 @@ function handleAction(socket: Socket, userId: string, unitId: number, targetRow:
 
         if (userId !== otherUnitsOwner.id) {
             healthBefore = otherUnit.health;
-            otherUnit.health -= unit.attack * (1 - otherUnit.defense / (otherUnit.defense + 20));
+            const damageDealt = Math.max(0, unit.attack * (1 - otherUnit.defense / (otherUnit.defense + 20)));
+            otherUnit.health -= damageDealt;
+            player.stats.damageDealt += damageDealt;
             console.log(`[${gameId}] ${player.name}: unit ${unitId} attacking at tile (${targetRow}, ${targetCol}). ${otherUnit.id} has ${otherUnit.health} health remaining.`);
 
             if (otherUnit.health <= 0) {
                 otherUnitsOwner.units = otherUnitsOwner.units.filter((u) => u.id !== otherUnit!.id);
+                player.stats.unitsKilled += 1;
+                otherUnitsOwner.stats.unitsLost += 1;
             }
             healthAfter = otherUnit.health;
         } else {
             healthBefore = otherUnit.health;
+            const healAmount = Math.min(unit.attack, otherUnit.maxHealth - otherUnit.health);
             otherUnit.health += unit.attack;
             if (otherUnit.health > otherUnit.maxHealth) {
                 otherUnit.health = otherUnit.maxHealth;
             }
+            player.stats.damageHealed += healAmount;
             console.log(`[${gameId}] ${player.name}: unit ${unitId} healing at tile (${targetRow}, ${targetCol}). ${otherUnit.id} has ${otherUnit.health} health remaining.`);
             healthAfter = otherUnit.health;
         }
@@ -1101,13 +1121,26 @@ function hasUnit(row: number, col: number, gameState: GameState): boolean {
     return false;
 }
 
-function winnerChosen(winner: Player) {
+function winnerChosen(winner: Player, reason: string) {
     if (!gameState) return;
+
+    const gameOverData = {
+        winner: {
+            id: winner.id,
+            userId: winner.userId,
+            name: winner.name,
+            profileimage: winner.profileimage,
+            stats: winner.stats,
+        },
+        loser: gameState.players.find(p => p.id !== winner.id),
+        reason: reason,
+        round: gameState.round,
+    };
 
     for (let player of gameState.players) {
         const playerSocket = io.sockets.sockets.get(player.socketId);
         if (playerSocket) {
-            playerSocket.emit('gameOver', winner);
+            playerSocket.emit('gameOver', gameOverData);
         }
     }
 

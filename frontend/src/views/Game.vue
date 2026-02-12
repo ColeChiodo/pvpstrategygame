@@ -74,6 +74,19 @@
     <div v-else class="error-state">
       <p>Game not found</p>
     </div>
+
+    <GameSummaryModal
+      :is-open="showGameSummary"
+      :is-winner="gameSummaryData.isWinner"
+      :reason="gameSummaryData.reason"
+      :stats="gameSummaryData.stats"
+      :xp-gained="gameSummaryData.xpGained"
+      :leveled-up="gameSummaryData.leveledUp"
+      :currency-gained="gameSummaryData.currencyGained"
+      :current-xp="gameSummaryData.currentXP"
+      :xp-for-next-level="gameSummaryData.xpForNextLevel"
+      @close="handleGameSummaryClose"
+    />
   </div>
 </template>
 
@@ -88,6 +101,7 @@ import { useGameEngine } from "../game-engine";
 import { GameState } from "../game-engine/types";
 import PlayButton from "../components/PlayButton.vue";
 import UnitTooltip from "../components/UnitTooltip.vue";
+import GameSummaryModal from "../components/GameSummaryModal.vue";
 
 const props = defineProps<{
   gameId: string;
@@ -109,7 +123,29 @@ const player2Time = ref(600);
 const currentRound = ref(0);
 const pendingState = ref<GameState | null>(null);
 
+const showGameSummary = ref(false);
+const gameSummaryData = ref<{
+  isWinner: boolean;
+  reason?: string;
+  stats: { unitsKilled: number; damageDealt: number; damageHealed: number; unitsLost: number };
+  xpGained: number;
+  leveledUp: boolean;
+  currencyGained: number;
+  currentXP: number;
+  xpForNextLevel: number;
+}>({
+  isWinner: false,
+  reason: undefined,
+  stats: { unitsKilled: 0, damageDealt: 0, damageHealed: 0, unitsLost: 0 },
+  xpGained: 0,
+  leveledUp: false,
+  currencyGained: 0,
+  currentXP: 0,
+  xpForNextLevel: 1000,
+});
+
 let socket: Socket | null = null;
+let currentUserId: string | null = null;
 
 const { initSocket, start, stop, updateState, animateMove, animateAction, triggerHealthBarAnimation, hasValidActionTargets, getPendingAction, clearPendingAction, getHoveredUnit, getSelectedUnitFromEngine, players, hoveredTile, selectedTile, moveTile, isAction, setPlayerIndex } = useGameEngine(gameCanvas);
 
@@ -155,18 +191,18 @@ const connectToGameServer = () => {
 
   const serverUrl = gameSession.value.serverUrl;
   const gameSessionId = gameSession.value.gameId;
-  const userId = authStore.user?.id;
+  currentUserId = authStore.user?.id;
   const userName = authStore.displayName;
   const userAvatar = authStore.user?.avatar || "";
 
-  if (!gameSessionId || !userId) {
+  if (!gameSessionId || !currentUserId) {
     console.error("[GAME] Missing gameSessionId or userId");
     return;
   }
 
   socket = io(import.meta.env.VITE_GAME_URL, {
     path: `/game/${gameSessionId}/socket.io`,
-    query: { userId },
+    query: { userId: currentUserId },
     transports: ['websocket', 'polling'],
     reconnectionAttempts: 10,
     reconnectionDelay: 500,
@@ -179,12 +215,12 @@ const connectToGameServer = () => {
     initSocket(socket, {
       gameId: gameSessionId,
       opponent: gameSession.value.opponent,
-      userId: userId
+      userId: currentUserId
     });
 
     setTimeout(() => {
-      console.log("[GAME] Sending join event:", { gameId: gameSessionId, name: userName, avatar: userAvatar });
-      socket?.emit('join', { gameId: gameSessionId, name: userName, avatar: userAvatar });
+      console.log("[GAME] Sending join event:", { gameId: gameSessionId, name: authStore.displayName, avatar: authStore.user?.avatar });
+      socket?.emit('join', { gameId: gameSessionId, name: authStore.displayName, avatar: authStore.user?.avatar });
     }, 100);
   });
 
@@ -361,6 +397,44 @@ const connectToGameServer = () => {
       router.push("/play");
     }
   });
+
+  socket.on("gameOver", (data: any) => {
+    console.log("[GAME] Game over:", data);
+    console.log("[GAME] Current userId from stored:", currentUserId);
+    isEnding.value = true;
+    stop();
+
+    const isWinner = data.winner?.userId === currentUserId;
+    console.log("[GAME] Is winner:", isWinner, "Winner userId:", data.winner?.userId, "My userId:", currentUserId);
+    
+    const playerStats = isWinner ? data.winner?.stats : data.loser?.stats;
+    console.log("[GAME] Player stats:", playerStats);
+
+    const BASE_XP_WIN = 50;
+    const BASE_XP_LOSS = 15;
+    const xpGained = isWinner 
+      ? BASE_XP_WIN + Math.floor((data.winner?.stats?.unitsKilled || 0) * 5) 
+      : BASE_XP_LOSS + Math.floor((data.loser?.stats?.unitsKilled || 0) * 3);
+    
+    const currentXP = authStore.user?.xp || 0;
+    const xpForNextLevel = 1000;
+    const xpInCurrentLevel = currentXP % xpForNextLevel;
+    const willLevelUp = isWinner && (xpInCurrentLevel + xpGained) >= xpForNextLevel;
+    const leveledUp = willLevelUp || (isWinner && Math.random() < 0.25);
+    const currencyGained = leveledUp ? 100 : 0;
+
+    gameSummaryData.value = {
+      isWinner,
+      reason: data.reason,
+      stats: playerStats || { unitsKilled: 0, damageDealt: 0, damageHealed: 0, unitsLost: 0 },
+      xpGained,
+      leveledUp,
+      currencyGained,
+      currentXP,
+      xpForNextLevel,
+    };
+    showGameSummary.value = true;
+  });
 };
 
 function updateGameState(state: GameState) {
@@ -369,6 +443,12 @@ function updateGameState(state: GameState) {
 
 const endTurn = () => {
   socket?.emit('endTurn');
+};
+
+const handleGameSummaryClose = () => {
+  showGameSummary.value = false;
+  socket?.disconnect();
+  router.push('/play');
 };
 
 watch([() => player1Time.value, () => player2Time.value], () => {});
