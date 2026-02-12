@@ -571,17 +571,18 @@ function handleMove(socket: Socket, userId: string, unitId: number, targetRow: n
     if (isValidMove(unit, target, gameState)) {
         const origin = { row: unit.row, col: unit.col };
 
+        // Update unit position BEFORE emitting so clients get the correct position
+        unit.row = targetRow;
+        unit.col = targetCol;
+        unit.canMove = false;
+        console.log(`[${gameId}] ${player.name}: unit ${unitId} moving to tile (${targetRow}, ${targetCol})`);
+
         for (let p of gameState.players) {
             const playerSocket = io.sockets.sockets.get(p.socketId);
             if (playerSocket) {
                 playerSocket.emit('unit-moving', { unit: unit, origin: origin, target: target });
             }
         }
-
-        unit.row = targetRow;
-        unit.col = targetCol;
-        unit.canMove = false;
-        console.log(`[${gameId}] ${player.name}: unit ${unitId} moving to tile (${targetRow}, ${targetCol})`);
     }
 
     emitGameState();
@@ -633,6 +634,13 @@ function handleAction(socket: Socket, userId: string, unitId: number, targetRow:
             const playerSocket = io.sockets.sockets.get(p.socketId);
             if (playerSocket) {
                 playerSocket.emit('unit-acting', { unit: unit, target: { row: otherUnit.row, col: otherUnit.col } });
+                playerSocket.emit('animate-healthbar', { 
+                    unitId: otherUnit.id, 
+                    row: otherUnit.row, 
+                    col: otherUnit.col, 
+                    healthBefore, 
+                    healthAfter 
+                });
             }
         }
     }

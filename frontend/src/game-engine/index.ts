@@ -247,6 +247,29 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
         realUnit.sprite.currentFrame = 0;
     }
 
+    async function triggerHealthBarAnimation(unitId: number, healthBefore: number, healthAfter: number) {
+        const targetUnit = units.value.find(u => u.id === unitId);
+        if (!targetUnit) return;
+
+        animatingHealthBarUnit = targetUnit;
+        animateHealthBar = true;
+        healthBarCurrent = healthBefore;
+
+        const healthDiff = healthAfter - healthBefore;
+        const steps = 20; // Animation steps
+        const healthStep = healthDiff / steps;
+        const delay = 50; // ms between steps
+
+        for (let i = 0; i < steps; i++) {
+            healthBarCurrent += healthStep;
+            await sleep(delay);
+        }
+
+        healthBarCurrent = healthAfter;
+        animateHealthBar = false;
+        animatingHealthBarUnit = null;
+    }
+
     function draw() {
         if (!ctx || !canvasRef.value) return;
 
@@ -945,6 +968,7 @@ export function useGameEngine(canvasRef: { value: HTMLCanvasElement | null }) {
         updateState,
         animateMove,
         animateAction,
+        triggerHealthBarAnimation,
         setPlayerIndex
     };
 }

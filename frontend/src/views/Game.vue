@@ -109,7 +109,7 @@ const pendingState = ref<GameState | null>(null);
 
 let socket: Socket | null = null;
 
-const { initSocket, start, stop, updateState, animateMove, animateAction, isAction, selectedTile, moveTile, setPlayerIndex } = useGameEngine(gameCanvas);
+const { initSocket, start, stop, updateState, animateMove, animateAction, triggerHealthBarAnimation, isAction, selectedTile, moveTile, setPlayerIndex } = useGameEngine(gameCanvas);
 
 const isPlayer1Turn = computed(() => {
   return currentRound.value % 2 === 0;
@@ -315,6 +315,10 @@ const connectToGameServer = () => {
     moveTile.value = null;
     selectedTile.value = null;
     animateAction(data.unit.id);
+  });
+
+  socket.on("animate-healthbar", (data: { unitId: number; row: number; col: number; healthBefore: number; healthAfter: number }) => {
+    triggerHealthBarAnimation(data.unitId, data.healthBefore, data.healthAfter);
   });
 
   socket.on("disconnect", (reason) => {
