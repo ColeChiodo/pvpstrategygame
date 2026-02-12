@@ -41,6 +41,7 @@ export interface Unit {
     defense: number;
     range: number;
     mobility: number;
+    mobilityRemaining: number;
     currentStatus: number;
     sprite: Sprite;
     animatingRow?: number;

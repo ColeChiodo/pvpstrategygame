@@ -109,7 +109,7 @@ const pendingState = ref<GameState | null>(null);
 
 let socket: Socket | null = null;
 
-const { initSocket, start, stop, updateState, animateMove, animateAction, triggerHealthBarAnimation, isAction, selectedTile, moveTile, setPlayerIndex } = useGameEngine(gameCanvas);
+const { initSocket, start, stop, updateState, animateMove, animateAction, triggerHealthBarAnimation, hasValidActionTargets, isAction, selectedTile, moveTile, setPlayerIndex } = useGameEngine(gameCanvas);
 
 const isPlayer1Turn = computed(() => {
   return currentRound.value % 2 === 0;
@@ -304,10 +304,14 @@ const connectToGameServer = () => {
   });
 
   socket.on("unit-moving", (data: { unit: any; origin: { row: number; col: number }; target: { row: number; col: number } }) => {
-    isAction.value = true;
-    moveTile.value = data.target;
-    selectedTile.value = null;
-    animateMove(data.unit.id, data.origin, data.target);
+    animateMove(data.unit.id, data.origin, data.target).then(() => {
+      // After move animation, check if there are valid action targets
+      if (hasValidActionTargets(data.target.row, data.target.col, data.unit.action)) {
+        isAction.value = true;
+        moveTile.value = data.target;
+        selectedTile.value = null;
+      }
+    });
   });
 
   socket.on("unit-acting", (data: { unit: any; target: any }) => {

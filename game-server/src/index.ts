@@ -57,6 +57,7 @@ interface Unit {
     defense: number;
     range: number;
     mobility: number;
+    mobilityRemaining: number;
 }
 
 interface GameState {
@@ -334,6 +335,7 @@ function addPlayerToGame(gameState: GameState, socket: Socket, userId: string, n
         defense: 10,
         range: 2,
         mobility: 3,
+        mobilityRemaining: 3,
     });
 
     newPlayer.units.push({
@@ -350,6 +352,7 @@ function addPlayerToGame(gameState: GameState, socket: Socket, userId: string, n
         defense: 10,
         range: 1,
         mobility: 2,
+        mobilityRemaining: 2,
     });
 
     newPlayer.units.push({
@@ -366,6 +369,7 @@ function addPlayerToGame(gameState: GameState, socket: Socket, userId: string, n
         defense: 0,
         range: 3,
         mobility: 3,
+        mobilityRemaining: 3,
     });
 
     newPlayer.units.push({
@@ -382,6 +386,7 @@ function addPlayerToGame(gameState: GameState, socket: Socket, userId: string, n
         defense: 0,
         range: 2,
         mobility: 2,
+        mobilityRemaining: 2,
     });
 
     newPlayer.units.push({
@@ -398,6 +403,7 @@ function addPlayerToGame(gameState: GameState, socket: Socket, userId: string, n
         defense: 0,
         range: 2,
         mobility: 4,
+        mobilityRemaining: 4,
     });
 
     newPlayer.units.push({
@@ -414,6 +420,7 @@ function addPlayerToGame(gameState: GameState, socket: Socket, userId: string, n
         defense: 10,
         range: 1,
         mobility: 4,
+        mobilityRemaining: 4,
     });
 
     newPlayer.units.push({
@@ -430,6 +437,7 @@ function addPlayerToGame(gameState: GameState, socket: Socket, userId: string, n
         defense: 10,
         range: 1,
         mobility: 5,
+        mobilityRemaining: 5,
     });
 
     newPlayer.units.push({
@@ -446,6 +454,7 @@ function addPlayerToGame(gameState: GameState, socket: Socket, userId: string, n
         defense: 20,
         range: 1,
         mobility: 2,
+        mobilityRemaining: 2,
     });
 
     gameState.players.push(newPlayer);
@@ -571,11 +580,21 @@ function handleMove(socket: Socket, userId: string, unitId: number, targetRow: n
     if (isValidMove(unit, target, gameState)) {
         const origin = { row: unit.row, col: unit.col };
 
+        // Calculate path length for mobility tracking
+        const path = astarPath(unit.row, unit.col, targetRow, targetCol, gameState.arena);
+        const distanceMoved = Math.max(0, path.length - 1);
+
         // Update unit position BEFORE emitting so clients get the correct position
         unit.row = targetRow;
         unit.col = targetCol;
-        unit.canMove = false;
-        console.log(`[${gameId}] ${player.name}: unit ${unitId} moving to tile (${targetRow}, ${targetCol})`);
+        
+        // Subtract moved distance from remaining mobility
+        unit.mobilityRemaining = Math.max(0, unit.mobilityRemaining - distanceMoved);
+        
+        // Check if unit should be exhausted
+        checkAndExhaustUnit(unit, player, gameState);
+        
+        console.log(`[${gameId}] ${player.name}: unit ${unitId} moved ${distanceMoved} tiles to (${targetRow}, ${targetCol}), remaining mobility: ${unit.mobilityRemaining}`);
 
         for (let p of gameState.players) {
             const playerSocket = io.sockets.sockets.get(p.socketId);
@@ -630,6 +649,9 @@ function handleAction(socket: Socket, userId: string, unitId: number, targetRow:
 
         unit.canAct = false;
 
+        // Check if unit should be exhausted after action
+        checkAndExhaustUnit(unit, player, gameState);
+
         for (let p of gameState.players) {
             const playerSocket = io.sockets.sockets.get(p.socketId);
             if (playerSocket) {
@@ -676,6 +698,46 @@ function handleForceUnitEndTurn(socket: Socket, userId: string, unitId: number) 
     emitGameState();
 }
 
+function hasValidActionTarget(unit: Unit, player: Player, gameState: GameState): boolean {
+    const range = unit.range;
+    const row = unit.row;
+    const col = unit.col;
+
+    // Find all enemy and friendly units
+    for (const otherPlayer of gameState.players) {
+        const isEnemy = otherPlayer.id !== player.id;
+        
+        for (const otherUnit of otherPlayer.units) {
+            const distance = Math.abs(otherUnit.row - row) + Math.abs(otherUnit.col - col);
+            if (distance > range || distance === 0) continue;
+            
+            // Check if target is valid based on unit action type
+            if (unit.action === 'heal' && !isEnemy) {
+                return true;
+            } else if (unit.action === 'attack' && isEnemy) {
+                return true;
+            }
+        }
+    }
+    
+    return false;
+}
+
+function checkAndExhaustUnit(unit: Unit, player: Player, gameState: GameState) {
+    // Check if unit should be exhausted:
+    // 1. No mobility remaining
+    // 2. No action available or no valid targets
+    
+    const noMobility = unit.mobilityRemaining <= 0;
+    const actionExhausted = !unit.canAct || !hasValidActionTarget(unit, player, gameState);
+    
+    if (noMobility && actionExhausted) {
+        unit.canMove = false;
+        unit.canAct = false;
+        console.log(`[${gameId}] Unit ${unit.id} (${unit.name}) exhausted`);
+    }
+}
+
 function handleDisplayEmote(socket: Socket, userId: string, src: string, sid: string) {
     if (!gameState) return;
 
@@ -716,6 +778,8 @@ function nextRound() {
         player.units.forEach((unit) => {
             unit.canAct = isActivePlayer;
             unit.canMove = isActivePlayer;
+            // Reset mobility for new turn
+            unit.mobilityRemaining = unit.mobility;
         });
     });
 
