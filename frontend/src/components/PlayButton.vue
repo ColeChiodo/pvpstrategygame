@@ -26,7 +26,7 @@ const props = defineProps<{
   disabled?: boolean;
 }>();
 
-defineEmits<{
+const emit = defineEmits<{
   click: [];
 }>();
 
@@ -38,6 +38,7 @@ function handleClick(e: MouseEvent) {
     e.stopPropagation();
     return;
   }
+  emit('click', e);
 }
 </script>
 
