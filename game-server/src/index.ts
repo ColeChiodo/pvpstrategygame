@@ -2,6 +2,9 @@ import { Server, Socket } from "socket.io";
 import { createServer } from "http";
 import { deflate, inflate } from 'pako';
 
+const MAX_TIME = 60 * 10;
+const TICKRATE = 1;
+
 interface Player {
     id: string;
     userId: string;
@@ -64,6 +67,8 @@ interface GameState {
     round: number;
     player1Time: number;
     player2Time: number;
+    player1UltCharge: number;
+    player2UltCharge: number;
     visibleTiles: { row: number; col: number }[];
 }
 
@@ -74,8 +79,6 @@ interface Tile {
     h?: number;
     f?: number;
     parent?: Tile | null;
-    row?: number;
-    col?: number;
 }
 
 let gameState: GameState | null = null;
@@ -87,20 +90,18 @@ const port = parseInt(process.env.PORT || "3000");
 let connectionWarningTimeout: NodeJS.Timeout | null = null;
 let connectionCloseTimeout: NodeJS.Timeout | null = null;
 let serverStartTime: number | null = null;
-const CONNECTION_WARNING_DELAY = 10000; // 10 seconds
-const CONNECTION_CLOSE_DELAY = 30000; // 30 seconds after warning
+const CONNECTION_WARNING_DELAY = 10000;
+const CONNECTION_CLOSE_DELAY = 30000;
 const REQUIRED_PLAYERS = 2;
 
 function startConnectionTimeout() {
-    if (serverStartTime) return; // Already started
+    if (serverStartTime) return;
     serverStartTime = Date.now();
     console.log(`[${gameId}] Starting connection timeout monitoring`);
 
-    // Warning after 10 seconds if not all players connected
     connectionWarningTimeout = setTimeout(() => {
         if (gameState && gameState.players.length < REQUIRED_PLAYERS) {
             console.log(`[${gameId}] WARNING: Only ${gameState.players.length}/${REQUIRED_PLAYERS} players connected after 10s`);
-            // Send warning to all connected players
             io?.emit("connectionWarning", {
                 message: "Server will close in 30 seconds if opponent doesn't connect",
                 connectedPlayers: gameState.players.length,
@@ -108,7 +109,6 @@ function startConnectionTimeout() {
                 secondsRemaining: 30
             });
 
-            // Set final timeout to close server
             connectionCloseTimeout = setTimeout(() => {
                 if (gameState && gameState.players.length < REQUIRED_PLAYERS) {
                     console.log(`[${gameId}] Closing server - insufficient players after timeout`);
@@ -116,7 +116,6 @@ function startConnectionTimeout() {
                         reason: "Opponent failed to connect within timeout period",
                         connectedPlayers: gameState.players.length
                     });
-                    // Give clients time to receive the message before closing
                     setTimeout(() => {
                         shutdownServer();
                     }, 2000);
@@ -176,20 +175,15 @@ io.on("connection", (socket: Socket) => {
         return;
     }
 
-    // Log all incoming events for debugging
     socket.onAny((eventName, ...args) => {
         console.log(`[${gameId}] Received event '${eventName}' from ${socket.id}:`, args);
     });
 
     socket.on("join", (data: { gameId: string; name: string; avatar: string }) => {
         console.log(`[${gameId}] JOIN event received from ${socket.id} (userId: ${userId}):`, JSON.stringify(data));
-        console.log(`[${gameId}] serverStartTime before check: ${serverStartTime}`);
-        // Start timeout monitoring on first player join
         if (!serverStartTime) {
-            console.log(`[${gameId}] Starting connection timeout (serverStartTime is null)`);
+            console.log(`[${gameId}] Starting connection timeout`);
             startConnectionTimeout();
-        } else {
-            console.log(`[${gameId}] Connection timeout already started at ${serverStartTime}`);
         }
         handleJoin(socket, data.gameId, userId, data.name, data.avatar);
     });
@@ -206,363 +200,29 @@ io.on("connection", (socket: Socket) => {
         handleEndTurn(socket, userId);
     });
 
+    socket.on("forceUnitEndTurn", (data: { unitId: number }) => {
+        handleForceUnitEndTurn(socket, userId, data.unitId);
+    });
+
+    socket.on("displayEmote", (data: { src: string; sid: string }) => {
+        handleDisplayEmote(socket, userId, data.src, data.sid);
+    });
+
     socket.on("disconnect", () => {
         console.log(`[${gameId}] Disconnected: ${socket.id}`);
+        handleDisconnect(socket, userId);
     });
 });
 
-function handleJoin(socket: Socket, sessionId: string, userId: string, name: string, avatar: string) {
-    console.log(`[${gameId}] handleJoin: ${name} (${userId}) joining session ${sessionId}`);
-
-    if (!gameState) {
-        gameState = initializeGame(sessionId);
-    }
-
-    const existingPlayer = gameState.players.find(p => p.id === userId);
-    if (existingPlayer) {
-        existingPlayer.socketId = socket.id;
-        const playerIndex = gameState.players.indexOf(existingPlayer);
-        
-        // Re-assign units if missing (for reconnects)
-        if (existingPlayer.units.length === 0) {
-            console.log(`[${gameId}] Re-assigning units to rejoined player ${name}`);
-            const isPlayer1 = playerIndex === 0;
-            const startRow = isPlayer1 ? gameState.arena.p1Start.row : gameState.arena.p2Start.row;
-            const startCol = isPlayer1 ? gameState.arena.p1Start.col : gameState.arena.p2Start.col;
-            
-            // Use offset direction based on player (positive for P1, negative for P2 to stay in bounds)
-            const rowOffset = isPlayer1 ? 1 : -1;
-            const colOffset = isPlayer1 ? 1 : -1;
-            
-            existingPlayer.units.push(
-                { id: Date.now() + 1, row: startRow, col: startCol, name: "king", action: "attack", canMove: true, canAct: true, health: 40, maxHealth: 40, attack: 30, defense: 10, range: 2, mobility: 3 },
-                { id: Date.now() + 2, row: startRow + (2 * rowOffset), col: startCol, name: "melee", action: "attack", canMove: true, canAct: true, health: 30, maxHealth: 30, attack: 30, defense: 10, range: 1, mobility: 2 },
-                { id: Date.now() + 3, row: startRow, col: startCol + (2 * colOffset), name: "ranged", action: "attack", canMove: true, canAct: true, health: 20, maxHealth: 20, attack: 20, defense: 0, range: 3, mobility: 3 },
-                { id: Date.now() + 4, row: startRow + (1 * rowOffset), col: startCol, name: "mage", action: "attack", canMove: true, canAct: true, health: 20, maxHealth: 20, attack: 40, defense: 0, range: 2, mobility: 2 },
-                { id: Date.now() + 5, row: startRow, col: startCol + (1 * colOffset), name: "healer", action: "heal", canMove: true, canAct: true, health: 10, maxHealth: 10, attack: 30, defense: 0, range: 2, mobility: 4 },
-                { id: Date.now() + 6, row: startRow + (2 * rowOffset), col: startCol + (1 * colOffset), name: "cavalry", action: "attack", canMove: true, canAct: true, health: 20, maxHealth: 20, attack: 20, defense: 10, range: 1, mobility: 4 },
-                { id: Date.now() + 7, row: startRow + (2 * rowOffset), col: startCol + (2 * colOffset), name: "scout", action: "attack", canMove: true, canAct: true, health: 20, maxHealth: 20, attack: 10, defense: 10, range: 1, mobility: 5 },
-                { id: Date.now() + 8, row: startRow + (1 * rowOffset), col: startCol + (2 * colOffset), name: "tank", action: "attack", canMove: true, canAct: true, health: 40, maxHealth: 40, attack: 10, defense: 20, range: 1, mobility: 2 }
-            );
-        }
-        
-        socket.emit("joined", { playerIndex });
-        console.log(`[${gameId}] Re-joined existing player ${name} as player ${playerIndex + 1} with ${existingPlayer.units.length} units`);
-        
-        // If game already started (has 2 players), send start event
-        if (gameState.players.length === 2) {
-            console.log(`[${gameId}] Sending start event to rejoined player`);
-            socket.emit("start", { round: gameState.round });
-        }
-        
-        // Send current state immediately
-        broadcastState();
-        return;
-    }
-
-    if (gameState.players.length >= 2) {
-        console.log(`[${gameId}] Game full`);
-        socket.emit("error", { message: "Game is full" });
-        return;
-    }
-
-    const isPlayer1 = gameState.players.length === 0;
-    const player: Player = {
-        id: userId,
-        userId,
-        socketId: socket.id,
-        name,
-        profileimage: avatar || "default",
-        units: [],
-    };
-
-    const startRow = isPlayer1 ? gameState.arena.p1Start.row : gameState.arena.p2Start.row;
-    const startCol = isPlayer1 ? gameState.arena.p1Start.col : gameState.arena.p2Start.col;
-    
-    console.log(`[${gameId}] Spawning units for ${name} (Player ${isPlayer1 ? 1 : 2}) at row:${startRow} col:${startCol}`);
-
-    // Use offset direction based on player (positive for P1, negative for P2 to stay in bounds)
-    const rowOffset = isPlayer1 ? 1 : -1;
-    const colOffset = isPlayer1 ? 1 : -1;
-
-    player.units.push(
-        { id: 1, row: startRow, col: startCol, name: "king", action: "attack", canMove: true, canAct: true, health: 40, maxHealth: 40, attack: 30, defense: 10, range: 2, mobility: 3 },
-        { id: 2, row: startRow + (2 * rowOffset), col: startCol, name: "melee", action: "attack", canMove: true, canAct: true, health: 30, maxHealth: 30, attack: 30, defense: 10, range: 1, mobility: 2 },
-        { id: 3, row: startRow, col: startCol + (2 * colOffset), name: "ranged", action: "attack", canMove: true, canAct: true, health: 20, maxHealth: 20, attack: 20, defense: 0, range: 3, mobility: 3 },
-        { id: 4, row: startRow + (1 * rowOffset), col: startCol, name: "mage", action: "attack", canMove: true, canAct: true, health: 20, maxHealth: 20, attack: 40, defense: 0, range: 2, mobility: 2 },
-        { id: 5, row: startRow, col: startCol + (1 * colOffset), name: "healer", action: "heal", canMove: true, canAct: true, health: 10, maxHealth: 10, attack: 30, defense: 0, range: 2, mobility: 4 },
-        { id: 6, row: startRow + (2 * rowOffset), col: startCol + (1 * colOffset), name: "cavalry", action: "attack", canMove: true, canAct: true, health: 20, maxHealth: 20, attack: 20, defense: 10, range: 1, mobility: 4 },
-        { id: 7, row: startRow + (2 * rowOffset), col: startCol + (2 * colOffset), name: "scout", action: "attack", canMove: true, canAct: true, health: 20, maxHealth: 20, attack: 10, defense: 10, range: 1, mobility: 5 },
-        { id: 8, row: startRow + (1 * rowOffset), col: startCol + (2 * colOffset), name: "tank", action: "attack", canMove: true, canAct: true, health: 40, maxHealth: 40, attack: 10, defense: 20, range: 1, mobility: 2 }
-    );
-    
-    console.log(`[${gameId}] Player ${name} has ${player.units.length} units`);
-
-    gameState.players.push(player);
-    const playerIndex = gameState.players.length - 1;
-    const playerLabel = playerIndex === 0 ? 'Player 1' : 'Player 2';
-
-    socket.emit("joined", { playerIndex });
-    console.log(`[${gameId}] ${playerLabel} (${player.name}) joined at index ${playerIndex}`);
-
-    if (gameState.players.length === 2) {
-        startGame();
-    }
-
-    broadcastState();
-}
-
-function startGame() {
-    if (!gameState || gameState.players.length !== 2) return;
-    // Clear timeout monitoring - all players connected
-    clearConnectionTimeouts();
-    console.log(`[${gameId}] All players connected, clearing connection timeout`);
-    
-    gameState.round = 0;
-    gameState.player1Time = 600;
-    gameState.player2Time = 600;
-    console.log(`[${gameId}] Game started! Round 0, Player 1's turn (${gameState.players[0].name})`);
-    io?.emit("start", { round: 0 });
-
-    if (gameInterval) clearInterval(gameInterval);
-    gameInterval = setInterval(() => {
-        if (!gameState || gameState.players.length !== 2) return;
-
-        if (gameState.round % 2 === 0) {
-            gameState.player1Time--;
-            if (gameState.player1Time <= 0) {
-                console.log(`[${gameId}] Player 1 ran out of time`);
-                endGame(1);
-            }
-        } else {
-            gameState.player2Time--;
-            if (gameState.player2Time <= 0) {
-                console.log(`[${gameId}] Player 2 ran out of time`);
-                endGame(0);
-            }
-        }
-        broadcastState();
-    }, 1000);
-}
-
-function endGame(winnerIndex: number) {
-    if (gameInterval) {
-        clearInterval(gameInterval);
-        gameInterval = null;
-    }
-    if (gameState) {
-        io?.emit("gameOver", { winner: gameState.players[winnerIndex]?.name });
-    }
-    console.log(`[${gameId}] Game ended, winner: ${winnerIndex}`);
-    gameState = null;
-}
-
-function handleMove(socket: Socket, userId: string, unitId: number, row: number, col: number) {
-    if (!gameState) return;
-    const player = gameState.players.find(p => p.id === userId);
-    if (!player) {
-        console.log(`[${gameId}] Move REJECTED: Player not found for userId ${userId}`);
-        return;
-    }
-    const playerIndex = gameState.players.indexOf(player);
-    const currentPlayerIndex = gameState.round % 2;
-    const currentPlayer = gameState.players[currentPlayerIndex];
-    const isPlayerTurn = currentPlayer === player;
-
-    console.log(`[${gameId}] Move ATTEMPT: ${player.name} (userId=${userId}, playerIndex=${playerIndex})`);
-    console.log(`[${gameId}] Current round: ${gameState.round}, currentPlayerIndex: ${currentPlayerIndex}, currentPlayer: ${currentPlayer?.name} (id=${currentPlayer?.id})`);
-    console.log(`[${gameId}] isPlayerTurn=${isPlayerTurn}, comparing currentPlayer.id=${currentPlayer?.id} === player.id=${player.id}`);
-
-    if (!isPlayerTurn) {
-        console.log(`[${gameId}] Move REJECTED: Not ${player.name}'s turn (expected player ${currentPlayerIndex}, got player ${playerIndex})`);
-        return;
-    }
-
-    console.log(`[${gameId}] Move ACCEPTED for ${player.name}`);
-
-    const unit = player.units.find(u => u.id === unitId);
-    if (!unit || !unit.canMove) return;
-
-    if (isValidMove(unit, { row, col }, gameState)) {
-        const origin = { row: unit.row, col: unit.col };
-        unit.row = row;
-        unit.col = col;
-        unit.canMove = false;
-        console.log(`[${gameId}] Move: ${unit.name} to (${row}, ${col})`);
-
-        // Broadcast move event only to players who can see the movement
-        const moveEvent = { unit, origin, target: { row, col } };
-        for (const p of gameState.players) {
-            if (p.id === userId || isTileVisibleToPlayer(gameState, p, row, col)) {
-                io?.to(p.socketId).emit("unit-moving", moveEvent);
-            }
-        }
-    }
-
-    broadcastState();
-}
-
-function handleAction(socket: Socket, userId: string, unitId: number, row: number, col: number) {
-    if (!gameState) return;
-    const player = gameState.players.find(p => p.id === userId);
-    if (!player) return;
-    if (gameState.players[gameState.round % 2] !== player) return;
-
-    const unit = player.units.find(u => u.id === unitId);
-    if (!unit || !unit.canAct) return;
-
-    const targetUnit = gameState.players
-        .flatMap(p => p.units)
-        .find(u => u.row === row && u.col === col);
-
-    if (!targetUnit) return;
-
-    const targetOwner = gameState.players.find(p => p.units.some(u => u.id === targetUnit.id));
-
-    if (isValidAction(unit, { row, col }, gameState)) {
-        if (targetOwner && targetOwner.id !== player.id) {
-            const damage = Math.floor(unit.attack * (1 - targetUnit.defense / (targetUnit.defense + 20)));
-            targetUnit.health -= damage;
-            console.log(`[${gameId}] Attack: ${unit.name} hit ${targetUnit.name} for ${damage} dmg`);
-            if (targetUnit.health <= 0) {
-                for (const p of gameState.players) {
-                    p.units = p.units.filter(u => u.id !== targetUnit.id);
-                }
-            }
-        } else {
-            targetUnit.health = Math.min(targetUnit.health + unit.attack, targetUnit.maxHealth);
-            console.log(`[${gameId}] Heal: ${unit.name} healed for ${unit.attack}`);
-        }
-        unit.canAct = false;
-
-        // Broadcast action event only to players who can see the action
-        const actionEvent = { unit, target: targetUnit };
-        for (const p of gameState.players) {
-            const canSee = p.id === userId || 
-                           isTileVisibleToPlayer(gameState, p, unit.row, unit.col) ||
-                           isTileVisibleToPlayer(gameState, p, targetUnit.row, targetUnit.col);
-            if (canSee) {
-                io?.to(p.socketId).emit("unit-acting", actionEvent);
-            }
-        }
-    }
-
-    broadcastState();
-}
-
-function handleEndTurn(socket: Socket, userId: string) {
-    if (!gameState) return;
-    const player = gameState.players.find(p => p.id === userId);
-    if (!player) return;
-    if (gameState.players[gameState.round % 2] !== player) return;
-
-    const oldPlayer = gameState.players[gameState.round % 2];
-    gameState.round++;
-
-    const newPlayer = gameState.players[gameState.round % 2];
-
-    if (gameState.round % 2 === 0) {
-        gameState.player1Time = Math.min(gameState.player1Time + 5, 600);
-    } else {
-        gameState.player2Time = Math.min(gameState.player2Time + 5, 600);
-    }
-
-    oldPlayer.units.forEach(u => { u.canAct = false; u.canMove = false; });
-    newPlayer.units.forEach(u => { u.canAct = true; u.canMove = true; });
-
-    console.log(`[${gameId}] Turn ended. Round ${gameState.round}, ${gameState.round % 2 === 0 ? 'Player 1' : 'Player 2'}'s turn (${newPlayer.name})`);
-    io?.emit("turn", { round: gameState.round });
-
-    broadcastState();
-}
-
-function broadcastState() {
-    if (!gameState || !io) return;
-    console.log(`[${gameId}] broadcastState: Broadcasting to ${gameState.players.length} players`);
-    gameState.players.forEach(p => {
-        const playerState = getPlayerGameState(gameState!, p);
-        console.log(`[${gameId}]   Sending to ${p.name} (socketId=${p.socketId}): visibleTiles=${playerState.visibleTiles.length}, enemyUnits=${playerState.players.find(op => op.id !== p.id)?.units.length || 0}`);
-        const compressedPlayer = deflate(JSON.stringify(playerState));
-        io!.to(p.socketId).emit("state", compressedPlayer);
-    });
-}
-
-function getPlayerGameState(gs: GameState, player: Player): GameState {
-    const temp = { ...gs, arena: { ...gs.arena }, players: gs.players.map(p => ({ ...p, units: p.units.map(u => ({ ...u })) })), visibleTiles: [] as { row: number; col: number }[] };
-
-    const visible: { row: number; col: number }[] = [];
-    for (const unit of player.units) {
-        const viewRadius = unit.mobility + unit.range;
-        for (let i = -viewRadius; i <= viewRadius; i++) {
-            for (let j = -viewRadius; j <= viewRadius; j++) {
-                if (Math.abs(i) + Math.abs(j) <= viewRadius) {
-                    const r = unit.row + i, c = unit.col + j;
-                    if (r >= 0 && r < gs.arena.tiles.length && c >= 0 && c < gs.arena.tiles[0].length) {
-                        if (!visible.some(v => v.row === r && v.col === c)) visible.push({ row: r, col: c });
-                    }
-                }
-            }
-        }
-    }
-    temp.visibleTiles = visible;
-
-    const other = temp.players.find(p => p.id !== player.id);
-    if (other) {
-        const visibleEnemyUnits = other.units.filter(u => {
-            const isVisible = visible.some(v => v.row === u.row && v.col === u.col);
-            if (!isVisible) {
-                console.log(`[${gameId}] HIDDEN: ${player.name} cannot see enemy ${u.name} at (${u.row},${u.col})`);
-            } else {
-                console.log(`[${gameId}] VISIBLE: ${player.name} CAN see enemy ${u.name} at (${u.row},${u.col})`);
-            }
-            return isVisible;
-        });
-        console.log(`[${gameId}] getPlayerGameState for ${player.name} (id=${player.id}):`);
-        console.log(`[${gameId}]   My units: ${player.units.map(u => `${u.name}(${u.row},${u.col})`).join(', ')}`);
-        console.log(`[${gameId}]   Enemy units: ${other.units.map(u => `${u.name}(${u.row},${u.col})`).join(', ')}`);
-        console.log(`[${gameId}]   Visible tiles count: ${visible.length}`);
-        console.log(`[${gameId}]   Visible enemy units: ${visibleEnemyUnits.length} - ${visibleEnemyUnits.map(u => `${u.name}(${u.row},${u.col})`).join(', ')}`);
-        other.units = visibleEnemyUnits;
-    }
-
-    return temp;
-}
-
-function isValidMove(unit: Unit, tile: { row: number; col: number }, gs: GameState): boolean {
-    const dist = Math.abs(unit.row - tile.row) + Math.abs(unit.col - tile.col);
-    if (dist > unit.mobility) return false;
-    if (gs.arena.tiles[tile.row]?.[tile.col] === 0) return false;
-    for (const p of gs.players) {
-        if (p.units.some(u => u.row === tile.row && u.col === tile.col)) return false;
-    }
-    return true;
-}
-
-function isValidAction(unit: Unit, tile: { row: number; col: number }, gs: GameState): boolean {
-    const dist = Math.abs(unit.row - tile.row) + Math.abs(unit.col - tile.col);
-    return dist <= unit.range && dist > 0;
-}
-
-function isTileVisibleToPlayer(gs: GameState, player: Player, row: number, col: number): boolean {
-    for (const unit of player.units) {
-        const viewRadius = unit.mobility + unit.range;
-        for (let i = -viewRadius; i <= viewRadius; i++) {
-            for (let j = -viewRadius; j <= viewRadius; j++) {
-                if (Math.abs(i) + Math.abs(j) <= viewRadius) {
-                    const r = unit.row + i, c = unit.col + j;
-                    if (r === row && c === col) return true;
-                }
-            }
-        }
-    }
-    return false;
-}
-
-function initializeGame(id: string): GameState {
+function initializeGameState(gameID: string, privacy: string): GameState {
     return {
-        id, privacy: "public", players: [],
+        id: gameID,
+        privacy: privacy,
+        players: [] as Player[],
         arena: {
-            width: 1024, height: 512, name: "field",
+            width: 1024,
+            height: 512,
+            name: 'field',
             tiles: [
                 [1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
                 [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
@@ -605,46 +265,789 @@ function initializeGame(id: string): GameState {
                 [2.5, 2, 2, 1.5, 1.5, 1.5, 1.5, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
                 [2.5, 2, 2, 1.5, 1.5, 1.5, 1.5, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.5, 0.5, 0.5],
                 [2.5, 2, 2, 1.5, 1.5, 1.5, 1.5, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.5, 0.5, 0.5],
-                [2.5, 2, 2, 1.5, 1.5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0.5, 0.5, 0.5]
+                [2.5, 2, 2, 1.5, 1.5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0.5, 0.5, 0.5],
             ],
             obstacles: [
                 {
                     name: "well1",
-                    row: 0,
-                    col: 19,
+                    row: 1,
+                    col: 18,
                     sprite: {
                         width: 32,
                         height: 64,
                         name: "well",
-                        image: "well"
+                        image: "well",
                     }
                 },
                 {
                     name: "well2",
                     row: 16,
-                    col: 5,
+                    col: 3,
                     sprite: {
                         width: 32,
                         height: 64,
                         name: "well",
-                        image: "well"
+                        image: "well",
                     }
                 }
             ],
             p1Start: { row: 0, col: 0 },
-            p2Start: { row: 19, col: 19 }
-        },
-        round: 0, player1Time: 600, player2Time: 600, visibleTiles: [{ row: -1, col: -1 }]
+            p2Start: { row: 19, col: 19 },
+        } as Arena,
+        round: 0,
+        player1Time: MAX_TIME,
+        player2Time: MAX_TIME,
+        player1UltCharge: 0,
+        player2UltCharge: 0,
+        visibleTiles: [{ row: -1, col: -1 }],
     };
 }
 
-httpServer.listen(port, () => {
-    console.log(`[${gameId}] Listening on port ${port}`);
-});
+function addPlayerToGame(gameState: GameState, socket: Socket, userId: string, name: string, avatar: string) {
+    console.log(`[${gameId}] Adding ${name} to game`);
 
-process.on("SIGTERM", () => {
-    console.log(`[${gameId}] Shutting down`);
-    io.close();
-    httpServer.close();
-    process.exit(0);
+    let newPlayer: Player = {
+        id: userId,
+        userId: userId,
+        socketId: socket.id,
+        name: name,
+        profileimage: avatar || "default",
+        units: [],
+    };
+
+    const isPlayer2 = gameState.players.length === 1;
+    const unitIdOffset = isPlayer2 ? 50 : 0;
+    const startRow = isPlayer2 ? gameState.arena.p2Start.row : gameState.arena.p1Start.col;
+    const startCol = isPlayer2 ? gameState.arena.p2Start.row : gameState.arena.p1Start.col;
+
+    newPlayer.units.push({
+        id: 1 + unitIdOffset,
+        row: isPlayer2 ? gameState.arena.p2Start.row : gameState.arena.p1Start.row,
+        col: isPlayer2 ? gameState.arena.p2Start.col : gameState.arena.p1Start.col,
+        name: "king",
+        action: "attack",
+        canMove: true,
+        canAct: true,
+        health: 40,
+        maxHealth: 40,
+        attack: 30,
+        defense: 10,
+        range: 2,
+        mobility: 3,
+    });
+
+    newPlayer.units.push({
+        id: 2 + unitIdOffset,
+        row: isPlayer2 ? gameState.arena.p2Start.row - 2 : gameState.arena.p1Start.row + 2,
+        col: isPlayer2 ? gameState.arena.p2Start.col : gameState.arena.p1Start.col,
+        name: "melee",
+        action: "attack",
+        canMove: true,
+        canAct: true,
+        health: 30,
+        maxHealth: 30,
+        attack: 30,
+        defense: 10,
+        range: 1,
+        mobility: 2,
+    });
+
+    newPlayer.units.push({
+        id: 3 + unitIdOffset,
+        row: isPlayer2 ? gameState.arena.p2Start.row : gameState.arena.p1Start.row,
+        col: isPlayer2 ? gameState.arena.p2Start.col - 2 : gameState.arena.p1Start.col + 2,
+        name: "ranged",
+        action: "attack",
+        canMove: true,
+        canAct: true,
+        health: 20,
+        maxHealth: 20,
+        attack: 20,
+        defense: 0,
+        range: 3,
+        mobility: 3,
+    });
+
+    newPlayer.units.push({
+        id: 4 + unitIdOffset,
+        row: isPlayer2 ? gameState.arena.p2Start.row - 1 : gameState.arena.p1Start.row + 1,
+        col: isPlayer2 ? gameState.arena.p2Start.col : gameState.arena.p1Start.col,
+        name: "mage",
+        action: "attack",
+        canMove: true,
+        canAct: true,
+        health: 20,
+        maxHealth: 20,
+        attack: 40,
+        defense: 0,
+        range: 2,
+        mobility: 2,
+    });
+
+    newPlayer.units.push({
+        id: 5 + unitIdOffset,
+        row: isPlayer2 ? gameState.arena.p2Start.row : gameState.arena.p1Start.row,
+        col: isPlayer2 ? gameState.arena.p2Start.col - 1 : gameState.arena.p1Start.col + 1,
+        name: "healer",
+        action: "heal",
+        canMove: true,
+        canAct: true,
+        health: 10,
+        maxHealth: 10,
+        attack: 30,
+        defense: 0,
+        range: 2,
+        mobility: 4,
+    });
+
+    newPlayer.units.push({
+        id: 6 + unitIdOffset,
+        row: isPlayer2 ? gameState.arena.p2Start.row - 2 : gameState.arena.p1Start.row + 2,
+        col: isPlayer2 ? gameState.arena.p2Start.col - 1 : gameState.arena.p1Start.col + 1,
+        name: "cavalry",
+        action: "attack",
+        canMove: true,
+        canAct: true,
+        health: 20,
+        maxHealth: 20,
+        attack: 20,
+        defense: 10,
+        range: 1,
+        mobility: 4,
+    });
+
+    newPlayer.units.push({
+        id: 7 + unitIdOffset,
+        row: isPlayer2 ? gameState.arena.p2Start.row - 2 : gameState.arena.p1Start.row + 2,
+        col: isPlayer2 ? gameState.arena.p2Start.col - 2 : gameState.arena.p1Start.col + 2,
+        name: "scout",
+        action: "attack",
+        canMove: true,
+        canAct: true,
+        health: 20,
+        maxHealth: 20,
+        attack: 10,
+        defense: 10,
+        range: 1,
+        mobility: 5,
+    });
+
+    newPlayer.units.push({
+        id: 8 + unitIdOffset,
+        row: isPlayer2 ? gameState.arena.p2Start.row - 1 : gameState.arena.p1Start.row + 1,
+        col: isPlayer2 ? gameState.arena.p2Start.col - 2 : gameState.arena.p1Start.col + 2,
+        name: "tank",
+        action: "attack",
+        canMove: true,
+        canAct: true,
+        health: 40,
+        maxHealth: 40,
+        attack: 10,
+        defense: 20,
+        range: 1,
+        mobility: 2,
+    });
+
+    gameState.players.push(newPlayer);
+}
+
+function handleJoin(socket: Socket, joinGameId: string, userId: string, name: string, avatar: string) {
+    if (!gameState) {
+        gameState = initializeGameState(gameId, "private");
+    }
+
+    let playerIndex = -1;
+
+    if (gameState.players.length < 2 && !gameState.players.find(p => p.id === userId)) {
+        addPlayerToGame(gameState, socket, userId, name, avatar);
+        playerIndex = gameState.players.length - 1;
+
+        // Notify player they joined
+        socket.emit('joined', { playerIndex });
+
+        if (gameState.players.length === 2) {
+            clearConnectionTimeouts();
+            startGameLoop();
+            // Emit start to both players
+            for (let player of gameState.players) {
+                const playerSocket = io.sockets.sockets.get(player.socketId);
+                if (playerSocket) {
+                    playerSocket.emit('start', { round: gameState.round });
+                }
+            }
+            nextRound();
+        }
+    } else if (gameState.players.find(p => p.id === userId)) {
+        const player = gameState.players.find(p => p.id === userId);
+        if (player) {
+            player.socketId = socket.id;
+            playerIndex = gameState.players.indexOf(player);
+            console.log(`[${gameId}] Reconnected player ${name}`);
+            // Notify reconnected player
+            socket.emit('joined', { playerIndex });
+            // Send current state immediately
+            emitGameState();
+        }
+    }
+}
+
+function startGameLoop() {
+    if (gameInterval) return;
+
+    let tick = 0;
+    gameInterval = setInterval(() => {
+        if (!gameState) return;
+
+        if (tick % TICKRATE === 0 && gameState.players.length === 2) {
+            if (gameState.round % 2 === 0) {
+                gameState.player1Time -= 1;
+                if (gameState.player1Time <= 0) {
+                    console.log(`[${gameId}] ${gameState.players[0].name} ran out of time`);
+                    winnerChosen(gameState.players[1]);
+                    endGame();
+                    return;
+                }
+            } else {
+                gameState.player2Time -= 1;
+                if (gameState.player2Time <= 0) {
+                    console.log(`[${gameId}] ${gameState.players[1].name} ran out of time`);
+                    winnerChosen(gameState.players[0]);
+                    endGame();
+                    return;
+                }
+            }
+
+            if (gameState.players[0].units.length === 0) {
+                console.log(`[${gameId}] ${gameState.players[0].name} has no units left`);
+                winnerChosen(gameState.players[1]);
+                endGame();
+                return;
+            }
+
+            if (gameState.players[1].units.length === 0) {
+                console.log(`[${gameId}] ${gameState.players[1].name} has no units left`);
+                winnerChosen(gameState.players[0]);
+                endGame();
+                return;
+            }
+
+            const player1King = gameState.players[0].units.find(u => u.name === "king");
+            const player2King = gameState.players[1].units.find(u => u.name === "king");
+
+            if (!player1King) {
+                console.log(`[${gameId}] ${gameState.players[0].name}'s King is Dead.`);
+                winnerChosen(gameState.players[1]);
+                endGame();
+                return;
+            }
+
+            if (!player2King) {
+                console.log(`[${gameId}] ${gameState.players[1].name}'s King is Dead.`);
+                winnerChosen(gameState.players[0]);
+                endGame();
+                return;
+            }
+        }
+
+        emitGameState();
+        tick++;
+    }, 1000 / TICKRATE);
+}
+
+function handleMove(socket: Socket, userId: string, unitId: number, targetRow: number, targetCol: number) {
+    if (!gameState) return;
+
+    const player = gameState.players.find(p => p.id === userId);
+    if (!player) return;
+
+    const unit = player.units.find(u => u.id === unitId);
+    if (!unit || !unit.canMove) return;
+
+    let otherUnit = gameState.players.find((p) => p.units.find((u) => u.row === targetRow && u.col === targetCol));
+    if (otherUnit && otherUnit.id !== userId) return;
+
+    const target = { x: 0, y: 0, row: targetRow, col: targetCol };
+
+    if (isValidMove(unit, target, gameState)) {
+        const origin = { row: unit.row, col: unit.col };
+
+        for (let p of gameState.players) {
+            const playerSocket = io.sockets.sockets.get(p.socketId);
+            if (playerSocket) {
+                playerSocket.emit('unit-moving', { unit: unit, origin: origin, target: target });
+            }
+        }
+
+        unit.row = targetRow;
+        unit.col = targetCol;
+        unit.canMove = false;
+        console.log(`[${gameId}] ${player.name}: unit ${unitId} moving to tile (${targetRow}, ${targetCol})`);
+    }
+
+    emitGameState();
+}
+
+function handleAction(socket: Socket, userId: string, unitId: number, targetRow: number, targetCol: number) {
+    if (!gameState) return;
+
+    const player = gameState.players.find(p => p.id === userId);
+    if (!player) return;
+
+    const unit = player.units.find(u => u.id === unitId);
+    if (!unit || !unit.canAct) return;
+
+    let otherUnitsOwner = gameState.players.find((p) => p.units.find((u) => u.row === targetRow && u.col === targetCol));
+    if (!otherUnitsOwner) return;
+
+    let otherUnit = otherUnitsOwner.units.find((u) => u.row === targetRow && u.col === targetCol);
+    if (!otherUnit) return;
+
+    const tile = { x: 0, y: 0, row: targetRow, col: targetCol };
+
+    if (isValidAction(unit, tile, gameState)) {
+        let healthBefore: number;
+        let healthAfter: number;
+
+        if (userId !== otherUnitsOwner.id) {
+            healthBefore = otherUnit.health;
+            otherUnit.health -= unit.attack * (1 - otherUnit.defense / (otherUnit.defense + 20));
+            console.log(`[${gameId}] ${player.name}: unit ${unitId} attacking at tile (${targetRow}, ${targetCol}). ${otherUnit.id} has ${otherUnit.health} health remaining.`);
+
+            if (otherUnit.health <= 0) {
+                otherUnitsOwner.units = otherUnitsOwner.units.filter((u) => u.id !== otherUnit!.id);
+            }
+            healthAfter = otherUnit.health;
+        } else {
+            healthBefore = otherUnit.health;
+            otherUnit.health += unit.attack;
+            if (otherUnit.health > otherUnit.maxHealth) {
+                otherUnit.health = otherUnit.maxHealth;
+            }
+            console.log(`[${gameId}] ${player.name}: unit ${unitId} healing at tile (${targetRow}, ${targetCol}). ${otherUnit.id} has ${otherUnit.health} health remaining.`);
+            healthAfter = otherUnit.health;
+        }
+
+        unit.canAct = false;
+
+        for (let p of gameState.players) {
+            const playerSocket = io.sockets.sockets.get(p.socketId);
+            if (playerSocket) {
+                playerSocket.emit('unit-acting', { unit: unit, target: { row: otherUnit.row, col: otherUnit.col } });
+            }
+        }
+    }
+
+    emitGameState();
+}
+
+function handleEndTurn(socket: Socket, userId: string) {
+    if (!gameState) return;
+
+    const player = gameState.players.find(p => p.id === userId);
+    if (!player) return;
+
+    if (gameState.players[gameState.round % 2] !== player) {
+        return;
+    }
+
+    nextRound();
+}
+
+function handleForceUnitEndTurn(socket: Socket, userId: string, unitId: number) {
+    if (!gameState) return;
+
+    const player = gameState.players.find(p => p.id === userId);
+    if (!player) return;
+
+    const unit = player.units.find(u => u.id === unitId);
+    if (!unit) return;
+
+    unit.canMove = false;
+    unit.canAct = false;
+
+    emitGameState();
+}
+
+function handleDisplayEmote(socket: Socket, userId: string, src: string, sid: string) {
+    if (!gameState) return;
+
+    for (let player of gameState.players) {
+        const playerSocket = io.sockets.sockets.get(player.socketId);
+        if (playerSocket) {
+            playerSocket.emit('displayEmote', src, sid);
+        }
+    }
+}
+
+function handleDisconnect(socket: Socket, userId: string) {
+    if (!gameState || gameState.players.length !== 2) {
+        endGame();
+    }
+}
+
+function nextRound() {
+    if (!gameState) return;
+
+    gameState.round += 1;
+    let newPlayer = gameState.players[gameState.round % 2];
+
+    if (gameState.round % 2 === 0) {
+        gameState.player1Time += 5;
+        if (gameState.player1Time > MAX_TIME) {
+            gameState.player1Time = MAX_TIME;
+        }
+    } else {
+        gameState.player2Time += 5;
+        if (gameState.player2Time > MAX_TIME) {
+            gameState.player2Time = MAX_TIME;
+        }
+    }
+
+    gameState.players.forEach((player, index) => {
+        const isActivePlayer = index === gameState!.round % 2;
+        player.units.forEach((unit) => {
+            unit.canAct = isActivePlayer;
+            unit.canMove = isActivePlayer;
+        });
+    });
+
+    emitGameState();
+
+    for (let player of gameState.players) {
+        const playerSocket = io.sockets.sockets.get(player.socketId);
+        if (playerSocket) {
+            playerSocket.emit('turn', { round: gameState.round });
+        }
+    }
+}
+
+function emitGameState() {
+    if (!gameState) return;
+
+    for (let player of gameState.players) {
+        let playerGameState = getPlayerGameState(gameState, player);
+        const serializedData = JSON.stringify(playerGameState);
+        const compressedData = deflate(serializedData);
+
+        const playerSocket = io.sockets.sockets.get(player.socketId);
+        if (playerSocket) {
+            playerSocket.emit('state', compressedData);
+        }
+    }
+}
+
+function getPlayerGameState(gameState: GameState, player: Player): GameState {
+    let temp = { ...gameState };
+
+    temp.arena = { ...gameState.arena };
+    temp.players = gameState.players.map(p => ({
+        ...p,
+        units: p.units.map(u => ({ ...u })),
+    }));
+
+    let visibleTiles: { row: number, col: number }[] = [];
+    for (const unit of player.units) {
+        const row = unit.row;
+        const col = unit.col;
+        const modifier = temp.arena.tiles[row][col] === 2 ? 1 : 0;
+        const viewDistance = unit.range + unit.mobility + modifier;
+
+        for (let i = -viewDistance; i <= viewDistance; i++) {
+            for (let j = -viewDistance; j <= viewDistance; j++) {
+                if (Math.abs(i) + Math.abs(j) <= viewDistance) {
+                    const targetRow = row + i;
+                    const targetCol = col + j;
+                    if (targetRow >= 0 && targetRow < temp.arena.tiles.length && targetCol >= 0 && targetCol < temp.arena.tiles[0].length) {
+                        const path = bresenhamPath(row, col, targetRow, targetCol);
+                        let canSee = true;
+
+                        for (const tile of path) {
+                            if (temp.arena.tiles) {
+                                const terrain: number = temp.arena.tiles[tile.y][tile.x];
+
+                                if (terrain === 3) {
+                                    if (!adjacentTile(row, col, tile.y, tile.x)) {
+                                        canSee = false;
+                                        break;
+                                    }
+                                }
+                                if (terrain === 4) {
+                                    canSee = false;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (canSee) {
+                            const newTile = { row: row + i, col: col + j };
+                            const isDuplicate = visibleTiles.some(tile => tile.row === newTile.row && tile.col === newTile.col);
+                            if (!isDuplicate) {
+                                visibleTiles.push(newTile);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    temp.visibleTiles = visibleTiles;
+
+    const otherPlayer = temp.players.find(otherPlayer => otherPlayer.id !== player.id);
+    if (otherPlayer) {
+        otherPlayer.units = otherPlayer.units.filter(enemyUnit => {
+            return visibleTiles.some(visibleTile =>
+                visibleTile.row === enemyUnit.row && visibleTile.col === enemyUnit.col
+            );
+        });
+    }
+
+    return temp;
+}
+
+function adjacentTile(row1: number, col1: number, row2: number, col2: number): boolean {
+    return (row1 === row2 && col1 === col2) ||
+        (Math.abs(row1 - row2) === 1 && col1 === col2) ||
+        (Math.abs(col1 - col2) === 1 && row1 === row2);
+}
+
+function bresenhamPath(startRow: number, startCol: number, endRow: number, endCol: number) {
+    const path = [];
+    let x = startCol;
+    let y = startRow;
+    const dx = Math.abs(endCol - startCol);
+    const dy = Math.abs(endRow - startRow);
+    const sx = startCol < endCol ? 1 : -1;
+    const sy = startRow < endRow ? 1 : -1;
+    let err = dx - dy;
+
+    while (x !== endCol || y !== endRow) {
+        path.push({ x, y });
+
+        const e2 = err * 2;
+        if (e2 > -dy) {
+            err -= dy;
+            x += sx;
+        }
+        if (e2 < dx) {
+            err += dx;
+            y += sy;
+        }
+    }
+
+    path.push({ y: endRow, x: endCol });
+    return path;
+}
+
+function isValidMove(unit: Unit, tile: { x: number, y: number, row: number, col: number }, gameState: GameState): boolean {
+    const arena = gameState.arena;
+    let mobility = unit.mobility;
+    let row = unit.row;
+    let col = unit.col;
+
+    let validTiles = [];
+
+    for (let i = -mobility; i <= mobility; i++) {
+        for (let j = -mobility; j <= mobility; j++) {
+            if (Math.abs(i) + Math.abs(j) <= mobility) {
+                const targetRow = row + i;
+                const targetCol = col + j;
+
+                if (targetRow < 0 || targetCol < 0 || targetRow >= arena.tiles.length || targetCol >= arena.tiles[0].length) continue;
+                if (hasUnit(targetRow, targetCol, gameState) && (i !== 0 || j !== 0)) continue;
+                const targetTerrain: number = arena.tiles[targetRow][targetCol];
+                if (targetTerrain === 0) continue;
+
+                const path = astarPath(row, col, targetRow, targetCol, arena);
+                if (path.length - 1 > mobility) continue;
+                let canMove = true;
+                let mobilityPenalty = 0;
+                for (const tile of path) {
+                    const terrain: number = arena.tiles[tile.y][tile.x];
+
+                    if ((row !== tile.y && col !== tile.x) && hasUnit(tile.y, tile.x, gameState)) {
+                        canMove = false;
+                        break;
+                    }
+
+                    if (terrain === 0) {
+                        canMove = false;
+                        break;
+                    } else if (terrain === 2) {
+                        mobilityPenalty += 2;
+                    } else if (terrain === 3) {
+                    } else if (terrain === 4) {
+                        canMove = false;
+                        break;
+                    }
+                }
+
+                if (canMove && (mobility - mobilityPenalty >= 0)) {
+                    validTiles.push({ row: row + i, col: col + j });
+                }
+            }
+        }
+    }
+
+    if (!validTiles.find((validTile) => validTile.row === tile.row && validTile.col === tile.col)) {
+        console.log("Invalid move");
+        return false;
+    }
+
+    return true;
+}
+
+function isValidAction(unit: Unit, tile: { x: number, y: number, row: number, col: number }, gameState: GameState): boolean {
+    const arena = gameState.arena;
+    let range = unit.range;
+    let row = unit.row;
+    let col = unit.col;
+
+    let validTiles = [];
+
+    for (let i = -range; i <= range; i++) {
+        for (let j = -range; j <= range; j++) {
+            if (Math.abs(i) + Math.abs(j) <= range) {
+                const targetRow = row + i;
+                const targetCol = col + j;
+
+                if (targetRow === row && targetCol === col) continue;
+
+                if (targetRow >= 0 && targetRow < arena.tiles.length && targetCol >= 0 && targetCol < arena.tiles[0].length) {
+                    const path = bresenhamPath(row, col, targetRow, targetCol);
+                    let canSee = true;
+                    let rangePenalty = 0;
+
+                    for (const tile of path) {
+                        if (arena.tiles) {
+                            const terrain: number = arena.tiles[tile.y][tile.x];
+
+                            if (terrain === 4) {
+                                canSee = false;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (canSee && (range - rangePenalty >= 0)) {
+                        validTiles.push({ row: row + i, col: col + j });
+                    }
+                }
+            }
+        }
+    }
+
+    if (!validTiles.find((validTile) => validTile.row === tile.row && validTile.col === tile.col)) {
+        console.log("Invalid attack");
+        return false;
+    }
+
+    return true;
+}
+
+function astarPath(startRow: number, startCol: number, endRow: number, endCol: number, arena: Arena): { x: number, y: number }[] {
+    const grid = arena.tiles;
+    const openList: Tile[] = [];
+    const closedList: Set<string> = new Set();
+
+    const startTile: Tile = {
+        x: startCol,
+        y: startRow,
+        g: 0,
+        h: heuristic({ x: startCol, y: startRow, g: 0, h: 0, f: 0, parent: null }, { x: endCol, y: endRow, g: 0, h: 0, f: 0, parent: null }),
+        f: 0,
+        parent: null
+    };
+    const endTile: Tile = { x: endCol, y: endRow, g: 0, h: 0, f: 0, parent: null };
+
+    openList.push(startTile);
+
+    const neighbors = [
+        { x: 0, y: -1 }, { x: 0, y: 1 }, { x: -1, y: 0 }, { x: 1, y: 0 },
+    ];
+
+    while (openList.length > 0) {
+        openList.sort((a, b) => a.f! - b.f!);
+        const current = openList.shift()!;
+
+        if (current.x === endTile.x && current.y === endTile.y) {
+            const path: { x: number, y: number }[] = [];
+            let currentTile: Tile | null = current;
+            while (currentTile) {
+                path.unshift({ x: currentTile.x, y: currentTile.y });
+                currentTile = currentTile.parent || null;
+            }
+            return path;
+        }
+
+        closedList.add(`${current.x},${current.y}`);
+
+        for (const { x: dx, y: dy } of neighbors) {
+            const neighborX = current.x + dx;
+            const neighborY = current.y + dy;
+
+            if (neighborX >= 0 && neighborX < grid[0].length && neighborY >= 0 && neighborY < grid.length && (grid[neighborY][neighborX] !== 0 && grid[neighborY][neighborX] !== 4) && arena.heightMap[neighborY][neighborX] - arena.heightMap[current.y][current.x] <= 1.5) {
+                const neighbor: Tile = {
+                    x: neighborX,
+                    y: neighborY,
+                    g: (current.g || 0) + 1,
+                    h: heuristic({ x: neighborX, y: neighborY, g: 0, h: 0, f: 0, parent: null }, { x: endCol, y: endRow, g: 0, h: 0, f: 0, parent: null }),
+                    f: 0,
+                    parent: current
+                };
+
+                if (closedList.has(`${neighbor.x},${neighbor.y}`)) {
+                    continue;
+                }
+
+                if (!openList.some(tile => tile.x === neighbor.x && tile.y === neighbor.y)) {
+                    neighbor.f = (neighbor.g || 0) + (neighbor.h || 0);
+                    openList.push(neighbor);
+                }
+            }
+        }
+    }
+
+    return [];
+}
+
+function heuristic(a: Tile, b: Tile): number {
+    return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+}
+
+function hasUnit(row: number, col: number, gameState: GameState): boolean {
+    if (gameState.players.length < 2) return false;
+    const units = [...gameState.players[0].units, ...gameState.players[1].units];
+    for (const unit of units) {
+        if (unit.row === row && unit.col === col) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function winnerChosen(winner: Player) {
+    if (!gameState) return;
+
+    for (let player of gameState.players) {
+        const playerSocket = io.sockets.sockets.get(player.socketId);
+        if (playerSocket) {
+            playerSocket.emit('gameOver', winner);
+        }
+    }
+
+    endGame();
+}
+
+function endGame() {
+    if (gameInterval) {
+        clearInterval(gameInterval);
+        gameInterval = null;
+    }
+    emitGameState();
+    console.log(`[${gameId}] Closing Game...`);
+}
+
+httpServer.listen(port, () => {
+    console.log(`[${gameId}] Game server running on port ${port}`);
 });

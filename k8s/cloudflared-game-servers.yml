@@ -23,7 +23,7 @@ ingress:
   # Points to Traefik HTTPS endpoint for WebSocket support
   - hostname: fortezza.colechiodo.cc
     path: /game/*
-    service: https://172.19.0.2:30082
+    service: https://172.19.0.2:8443
     originRequest:
       noTLSVerify: true
       http2Origin: false
