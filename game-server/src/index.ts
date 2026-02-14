@@ -10,6 +10,45 @@ interface PlayerStats {
     damageDealt: number;
     damageHealed: number;
     unitsLost: number;
+    rounds: number;
+    duration: number;
+    timeUsed: number;
+    attacksMade: number;
+    killsLanded: number;
+    avgDamagePerAttack: number;
+    remainingKingHealth: number;
+    meleeDamage: number;
+    rangedDamage: number;
+    mageDamage: number;
+    healerDamage: number;
+    cavalryDamage: number;
+    scoutDamage: number;
+    tankDamage: number;
+    kingDamage: number;
+    meleeHealing: number;
+    rangedHealing: number;
+    mageHealing: number;
+    healerHealing: number;
+    cavalryHealing: number;
+    scoutHealing: number;
+    tankHealing: number;
+    kingHealing: number;
+    meleeKilled: number;
+    rangedKilled: number;
+    mageKilled: number;
+    healerKilled: number;
+    cavalryKilled: number;
+    scoutKilled: number;
+    tankKilled: number;
+    kingKilled: number;
+    meleeLost: number;
+    rangedLost: number;
+    mageLost: number;
+    healerLost: number;
+    cavalryLost: number;
+    scoutLost: number;
+    tankLost: number;
+    kingLost: number;
 }
 
 interface Player {
@@ -96,6 +135,8 @@ let gameId = process.env.GAME_ID || "unknown";
 const port = parseInt(process.env.PORT || "3000");
 const BACKEND_URL = process.env.BACKEND_URL || "https://apifortezza.colechiodo.cc";
 const GAME_SERVER_SECRET = process.env.GAME_SERVER_SECRET || "";
+let gameStartTime: number | null = null;
+let replayEvents: any[] = [];
 
 // Connection timeout handling
 let connectionWarningTimeout: NodeJS.Timeout | null = null;
@@ -151,7 +192,6 @@ async function shutdownServer() {
     console.log(`[${gameId}] Shutting down due to insufficient connections`);
     io?.close();
     httpServer.close();
-    await notifyBackendGameComplete();
     process.exit(0);
 }
 
@@ -330,6 +370,45 @@ function addPlayerToGame(gameState: GameState, socket: Socket, userId: string, n
             damageDealt: 0,
             damageHealed: 0,
             unitsLost: 0,
+            rounds: 0,
+            duration: 0,
+            timeUsed: 0,
+            attacksMade: 0,
+            killsLanded: 0,
+            avgDamagePerAttack: 0,
+            remainingKingHealth: 0,
+            meleeDamage: 0,
+            rangedDamage: 0,
+            mageDamage: 0,
+            healerDamage: 0,
+            cavalryDamage: 0,
+            scoutDamage: 0,
+            tankDamage: 0,
+            kingDamage: 0,
+            meleeHealing: 0,
+            rangedHealing: 0,
+            mageHealing: 0,
+            healerHealing: 0,
+            cavalryHealing: 0,
+            scoutHealing: 0,
+            tankHealing: 0,
+            kingHealing: 0,
+            meleeKilled: 0,
+            rangedKilled: 0,
+            mageKilled: 0,
+            healerKilled: 0,
+            cavalryKilled: 0,
+            scoutKilled: 0,
+            tankKilled: 0,
+            kingKilled: 0,
+            meleeLost: 0,
+            rangedLost: 0,
+            mageLost: 0,
+            healerLost: 0,
+            cavalryLost: 0,
+            scoutLost: 0,
+            tankLost: 0,
+            kingLost: 0,
         },
     };
 
@@ -493,6 +572,7 @@ function handleJoin(socket: Socket, joinGameId: string, userId: string, name: st
 
         if (gameState.players.length === 2) {
             clearConnectionTimeouts();
+            gameStartTime = Date.now();
             startGameLoop();
             // Emit start to both players
             for (let player of gameState.players) {
@@ -530,7 +610,6 @@ function startGameLoop() {
                 if (gameState.player1Time <= 0) {
                     console.log(`[${gameId}] ${gameState.players[0].name} ran out of time`);
                     winnerChosen(gameState.players[1], "timeout");
-                    endGame();
                     return;
                 }
             } else {
@@ -538,7 +617,6 @@ function startGameLoop() {
                 if (gameState.player2Time <= 0) {
                     console.log(`[${gameId}] ${gameState.players[1].name} ran out of time`);
                     winnerChosen(gameState.players[0], "timeout");
-                    endGame();
                     return;
                 }
             }
@@ -546,14 +624,12 @@ function startGameLoop() {
             if (gameState.players[0].units.length === 0) {
                 console.log(`[${gameId}] ${gameState.players[0].name} has no units left`);
                 winnerChosen(gameState.players[1], "noUnits");
-                endGame();
                 return;
             }
 
             if (gameState.players[1].units.length === 0) {
                 console.log(`[${gameId}] ${gameState.players[1].name} has no units left`);
                 winnerChosen(gameState.players[0], "noUnits");
-                endGame();
                 return;
             }
 
@@ -563,14 +639,12 @@ function startGameLoop() {
             if (!player1King) {
                 console.log(`[${gameId}] ${gameState.players[0].name}'s King is Dead.`);
                 winnerChosen(gameState.players[1], "kingDefeated");
-                endGame();
                 return;
             }
 
             if (!player2King) {
                 console.log(`[${gameId}] ${gameState.players[1].name}'s King is Dead.`);
                 winnerChosen(gameState.players[0], "kingDefeated");
-                endGame();
                 return;
             }
         }
@@ -619,6 +693,16 @@ function handleMove(socket: Socket, userId: string, unitId: number, targetRow: n
                 playerSocket.emit('unit-moving', { unit: unit, origin: origin, target: target });
             }
         }
+
+        replayEvents.push({
+            type: 'move',
+            round: gameState.round,
+            playerId: player.id,
+            unitId: unitId,
+            from: origin,
+            to: { row: targetRow, col: targetCol },
+            timestamp: Date.now(),
+        });
     }
 
     emitGameState();
@@ -650,12 +734,29 @@ function handleAction(socket: Socket, userId: string, unitId: number, targetRow:
             const damageDealt = Math.max(0, unit.attack * (1 - otherUnit.defense / (otherUnit.defense + 20)));
             otherUnit.health -= damageDealt;
             player.stats.damageDealt += damageDealt;
+            player.stats.attacksMade += 1;
+            
+            const unitType = unit.name as keyof typeof player.stats & `${string}Damage`;
+            if (unitType in player.stats) {
+                (player.stats as any)[unitType] += damageDealt;
+            }
+            
             console.log(`[${gameId}] ${player.name}: unit ${unitId} attacking at tile (${targetRow}, ${targetCol}). ${otherUnit.id} has ${otherUnit.health} health remaining.`);
 
             if (otherUnit.health <= 0) {
                 otherUnitsOwner.units = otherUnitsOwner.units.filter((u) => u.id !== otherUnit!.id);
                 player.stats.unitsKilled += 1;
+                player.stats.killsLanded += 1;
                 otherUnitsOwner.stats.unitsLost += 1;
+                
+                const killedUnitType = otherUnit.name as keyof typeof player.stats & `${string}Killed`;
+                const lostUnitType = otherUnit.name as keyof typeof otherUnitsOwner.stats & `${string}Lost`;
+                if (killedUnitType in player.stats) {
+                    (player.stats as any)[killedUnitType] += 1;
+                }
+                if (lostUnitType in otherUnitsOwner.stats) {
+                    (otherUnitsOwner.stats as any)[lostUnitType] += 1;
+                }
             }
             healthAfter = otherUnit.health;
         } else {
@@ -666,6 +767,12 @@ function handleAction(socket: Socket, userId: string, unitId: number, targetRow:
                 otherUnit.health = otherUnit.maxHealth;
             }
             player.stats.damageHealed += healAmount;
+            
+            const healerUnitType = unit.name as keyof typeof player.stats & `${string}Healing`;
+            if (healerUnitType in player.stats) {
+                (player.stats as any)[healerUnitType] += healAmount;
+            }
+            
             console.log(`[${gameId}] ${player.name}: unit ${unitId} healing at tile (${targetRow}, ${targetCol}). ${otherUnit.id} has ${otherUnit.health} health remaining.`);
             healthAfter = otherUnit.health;
         }
@@ -688,6 +795,19 @@ function handleAction(socket: Socket, userId: string, unitId: number, targetRow:
                 });
             }
         }
+
+        replayEvents.push({
+            type: 'action',
+            round: gameState.round,
+            playerId: player.id,
+            unitId: unitId,
+            targetUnitId: otherUnit.id,
+            action: userId !== otherUnitsOwner.id ? 'attack' : 'heal',
+            damage: userId !== otherUnitsOwner.id ? (() => { const d = Math.max(0, unit.attack * (1 - otherUnit.defense / (otherUnit.defense + 20))); return d; })() : undefined,
+            healing: userId === otherUnitsOwner.id ? (() => { const h = Math.min(unit.attack, otherUnit.maxHealth - otherUnit.health); return h; })() : undefined,
+            unitKilled: userId !== otherUnitsOwner.id && otherUnit.health <= 0,
+            timestamp: Date.now(),
+        });
     }
 
     emitGameState();
@@ -1121,51 +1241,105 @@ function hasUnit(row: number, col: number, gameState: GameState): boolean {
     return false;
 }
 
-function winnerChosen(winner: Player, reason: string) {
-    if (!gameState) return;
+async function winnerChosen(winner: Player, reason: string) {
+    if (!gameState || !gameStartTime) return;
 
-    const gameOverData = {
-        winner: {
-            id: winner.id,
-            userId: winner.userId,
-            name: winner.name,
-            profileimage: winner.profileimage,
-            stats: winner.stats,
-        },
-        loser: gameState.players.find(p => p.id !== winner.id),
-        reason: reason,
-        round: gameState.round,
-    };
+    const duration = Math.floor((Date.now() - gameStartTime) / 1000);
+    const rounds = gameState.round;
+
+    for (const player of gameState.players) {
+        const isPlayer1 = gameState.players.indexOf(player) === 0;
+        player.stats.duration = duration;
+        player.stats.rounds = rounds;
+        player.stats.timeUsed = isPlayer1 ? (MAX_TIME - gameState.player1Time) : (MAX_TIME - gameState.player2Time);
+        player.stats.avgDamagePerAttack = player.stats.attacksMade > 0 
+            ? player.stats.damageDealt / player.stats.attacksMade 
+            : 0;
+        
+        const king = player.units.find(u => u.name === "king");
+        player.stats.remainingKingHealth = king ? king.health : 0;
+    }
+
+    const winnerIndex = gameState.players.findIndex(p => p.id === winner.id);
+    const loser = gameState.players.find(p => p.id !== winner.id);
+
+    const xpData = await notifyBackendGameComplete(winner.id, loser?.id || null, reason, duration);
 
     for (let player of gameState.players) {
+        const isWinner = player.userId === winner.userId;
+        
+        const playerGameOverData = {
+            winner: {
+                id: winner.id,
+                userId: winner.userId,
+                name: winner.name,
+                profileimage: winner.profileimage,
+                stats: winner.stats,
+                xpData: isWinner ? xpData?.winner : xpData?.loser,
+            },
+            loser: loser ? {
+                id: loser.id,
+                userId: loser.userId,
+                name: loser.name,
+                profileimage: loser.profileimage,
+                stats: loser.stats,
+                xpData: !isWinner ? xpData?.winner : xpData?.loser,
+            } : null,
+            reason: reason,
+            round: rounds,
+            duration: duration,
+        };
+
         const playerSocket = io.sockets.sockets.get(player.socketId);
         if (playerSocket) {
-            playerSocket.emit('gameOver', gameOverData);
+            playerSocket.emit('gameOver', playerGameOverData);
         }
     }
 
     endGame();
 }
 
-async function notifyBackendGameComplete() {
-    if (!GAME_SERVER_SECRET) {
+async function notifyBackendGameComplete(winnerId: string, loserId: string | null, endReason: string, duration: number) {
+    if (!GAME_SERVER_SECRET || !gameState) {
         console.log(`[${gameId}] No GAME_SERVER_SECRET configured, skipping backend notification`);
         return;
     }
+
+    const player1 = gameState.players[0];
+    const player2 = gameState.players[1];
+
+    const statsData = {
+        secret: GAME_SERVER_SECRET,
+        winnerId,
+        loserId,
+        endReason,
+        duration,
+        player1Stats: player1.stats,
+        player2Stats: player2.stats,
+        replayEvents: replayEvents,
+    };
+
+    let xpData = null;
     try {
+        console.log(`[${gameId}] Sending game complete to backend with stats...`);
         const response = await fetch(`${BACKEND_URL}/api/matchmaking/game/${gameId}/complete`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ secret: GAME_SERVER_SECRET }),
+            body: JSON.stringify(statsData),
         });
         if (response.ok) {
-            console.log(`[${gameId}] Notified backend of game completion`);
+            xpData = await response.json();
+            console.log(`[${gameId}] Backend response:`, xpData);
+            console.log(`[${gameId}] Notified backend of game completion with stats`);
         } else {
             console.error(`[${gameId}] Failed to notify backend: ${response.status}`);
         }
     } catch (error) {
         console.error(`[${gameId}] Error notifying backend:`, error);
     }
+
+    console.log(`[${gameId}] XP data to send to client:`, xpData);
+    return xpData;
 }
 
 function endGame() {
@@ -1175,7 +1349,6 @@ function endGame() {
     }
     emitGameState();
     console.log(`[${gameId}] Closing Game...`);
-    notifyBackendGameComplete();
 }
 
 httpServer.listen(port, () => {

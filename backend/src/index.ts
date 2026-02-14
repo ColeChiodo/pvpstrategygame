@@ -10,6 +10,7 @@ import authRoutes from "./routes/auth";
 import patchNotesRoutes from "./routes/patchNotes";
 import avatarsRoutes from "./routes/avatars";
 import matchmakingRoutes from "./routes/matchmaking";
+import statsRoutes from "./routes/stats";
 import { createProxyMiddleware } from "http-proxy-middleware";
 import { Server as SocketIOServer } from "socket.io";
 import { setMatchmakingIO } from "./routes/matchmaking";
@@ -17,11 +18,20 @@ import { setMatchmakingIO } from "./routes/matchmaking";
 const PORT = process.env.PORT || 3000;
 
 async function main() {
-  // Cleanup old game sessions on startup
+  // Cleanup old game sessions on startup - only waiting sessions can be safely removed
+  // Mark in_progress/match_found as abandoned instead of deleting
   try {
     await prisma.gameSession.deleteMany({
       where: {
+        status: "waiting",
+      },
+    });
+    await prisma.gameSession.updateMany({
+      where: {
         status: { in: ["match_found", "in_progress"] },
+      },
+      data: {
+        status: "abandoned",
       },
     });
     console.log("Cleaned up old game sessions");
@@ -88,6 +98,7 @@ async function main() {
   app.use("/api/patch-notes", patchNotesRoutes);
   app.use("/api", avatarsRoutes);
   app.use("/api/matchmaking", matchmakingRoutes);
+  app.use("/api/stats", statsRoutes);
 
   // Game server WebSocket proxy
   app.use("/game-ws", createProxyMiddleware({

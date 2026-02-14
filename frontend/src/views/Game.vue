@@ -141,7 +141,7 @@ const gameSummaryData = ref<{
   leveledUp: false,
   currencyGained: 0,
   currentXP: 0,
-  xpForNextLevel: 1000,
+  xpForNextLevel: 250,
 });
 
 let socket: Socket | null = null;
@@ -368,7 +368,8 @@ const connectToGameServer = () => {
         // After normal movement, check if unit can still act and has targets
         // If so, select the unit to show action tiles
         setTimeout(() => {
-          const movedUnit = units.value.find(u => u.id === data.unit.id);
+          const playerUnits = state.value?.players?.[0]?.units || [];
+          const movedUnit = playerUnits.find((u: any) => u.id === data.unit.id);
           if (movedUnit && movedUnit.canAct && hasValidActionTargets(data.target.row, data.target.col, data.unit.action)) {
             const pos = coordToPosition(data.target.row, data.target.col);
             // Select the unit's new position with proper tile coordinates
@@ -410,18 +411,21 @@ const connectToGameServer = () => {
     const playerStats = isWinner ? data.winner?.stats : data.loser?.stats;
     console.log("[GAME] Player stats:", playerStats);
 
-    const BASE_XP_WIN = 50;
-    const BASE_XP_LOSS = 15;
-    const xpGained = isWinner 
-      ? BASE_XP_WIN + Math.floor((data.winner?.stats?.unitsKilled || 0) * 5) 
-      : BASE_XP_LOSS + Math.floor((data.loser?.stats?.unitsKilled || 0) * 3);
-    
-    const currentXP = authStore.user?.xp || 0;
-    const xpForNextLevel = 1000;
-    const xpInCurrentLevel = currentXP % xpForNextLevel;
-    const willLevelUp = isWinner && (xpInCurrentLevel + xpGained) >= xpForNextLevel;
-    const leveledUp = willLevelUp || (isWinner && Math.random() < 0.25);
-    const currencyGained = leveledUp ? 100 : 0;
+    const myXpData = isWinner ? data.winner?.xpData : data.loser?.xpData;
+    console.log("[GAME] Full game over data:", data);
+    console.log("[GAME] Winner xpData:", data.winner?.xpData);
+    console.log("[GAME] Loser xpData:", data.loser?.xpData);
+    console.log("[GAME] XP Data:", myXpData);
+    const xpGained = myXpData?.xpGained || 0;
+    const currentXP = myXpData?.xp || 0;
+    const xpForNextLevel = 250;
+    const leveledUp = myXpData?.leveledUp || false;
+    const currencyGained = myXpData?.currencyGained || 0;
+
+    console.log("[GAME] XP gained:", xpGained, "Current XP:", currentXP);
+
+    // Refresh user data in auth store
+    authStore.checkAuth();
 
     gameSummaryData.value = {
       isWinner,
@@ -445,9 +449,12 @@ const endTurn = () => {
   socket?.emit('endTurn');
 };
 
-const handleGameSummaryClose = () => {
+const handleGameSummaryClose = async () => {
   showGameSummary.value = false;
   socket?.disconnect();
+  // Refresh auth to get updated XP/level/rank before navigating
+  // Force refresh by resetting the auth check promise
+  authStore.forceCheckAuth();
   router.push('/play');
 };
 

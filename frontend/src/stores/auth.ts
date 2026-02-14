@@ -15,6 +15,8 @@ export interface User {
     tier: string;
     wins: number;
     losses: number;
+    streak: number;
+    longestStreak: number;
   };
   hasAcceptedTerms: boolean;
   isAdmin: boolean;
@@ -57,6 +59,11 @@ export const useAuthStore = defineStore("auth", () => {
     })();
 
     return authCheckPromise.value;
+  }
+
+  async function forceCheckAuth() {
+    authCheckPromise.value = null;
+    return checkAuth();
   }
 
   async function updateDisplayName(newName: string) {
@@ -122,6 +129,7 @@ export const useAuthStore = defineStore("auth", () => {
     currency,
     isAdmin,
     checkAuth,
+    forceCheckAuth,
     updateDisplayName,
     acceptTerms,
     loginWithGoogle,

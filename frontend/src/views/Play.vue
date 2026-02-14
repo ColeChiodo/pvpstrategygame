@@ -163,16 +163,88 @@
               <div class="stat-label">Losses</div>
             </div>
             <div class="stat-item">
+              <div class="stat-value streak">{{ authStore.user?.rank?.streak || 0 }}</div>
+              <div class="stat-label">Streak</div>
+            </div>
+            <div class="stat-item">
               <div class="stat-value">{{ authStore.user?.level }}</div>
               <div class="stat-label">Level</div>
             </div>
+          </div>
+
+          <div class="stats-row">
             <div class="stat-item">
               <div class="stat-value currency">{{ authStore.currency }}</div>
               <div class="stat-label">Coins</div>
             </div>
+            <div class="stat-item">
+              <div class="stat-value">{{ authStore.user?.rank?.longestStreak || 0 }}</div>
+              <div class="stat-label">Best Streak</div>
+            </div>
           </div>
 
+          <div class="all-time-stats" v-if="userAllTimeStats">
+            <h3 class="all-time-title">All-Time Stats</h3>
+            <div class="stats-row">
+              <div class="stat-item">
+                <div class="stat-value">{{ userAllTimeStats.totalGames }}</div>
+                <div class="stat-label">Games</div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-value">{{ userAllTimeStats.unitsKilled }}</div>
+                <div class="stat-label">Units Killed</div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-value">{{ Math.round(userAllTimeStats.damageDealt) }}</div>
+                <div class="stat-label">Damage Dealt</div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-value">{{ Math.round(userAllTimeStats.damageHealed) }}</div>
+                <div class="stat-label">Healing Done</div>
+              </div>
+            </div>
+            <div class="mvp-unit" v-if="userAllTimeStats.mvpUnit">
+              <span class="mvp-label">MVP Unit:</span>
+              <span class="mvp-value">{{ userAllTimeStats.mvpUnit.type }}</span>
+              <span class="mvp-stats">({{ userAllTimeStats.mvpUnit.kills }} kills, {{ Math.round(userAllTimeStats.mvpUnit.damage) }} dmg)</span>
+            </div>
+          </div>
+
+          <button @click="showMatchHistory = true" class="match-history-btn">Match History</button>
+
           <button @click="handleLogout" class="logout-btn">Logout</button>
+        </div>
+      </div>
+
+      <div v-if="showMatchHistory" class="modal-overlay" @click.self="showMatchHistory = false">
+        <div class="match-history-modal">
+          <div class="match-history-header">
+            <h2>Match History</h2>
+            <button class="close-modal-btn" @click="showMatchHistory = false">X</button>
+          </div>
+          <div class="match-history-list">
+            <div v-for="match in matchHistory" :key="match.gameId" class="match-item" :class="match.won ? 'win' : 'loss'">
+              <div class="match-result">{{ match.won ? 'Victory' : 'Defeat' }}</div>
+              <div class="match-opponent">vs {{ match.opponent?.displayName || 'Unknown' }}</div>
+              <div class="match-stats">
+                <span>{{ match.unitsKilled }} kills</span>
+                <span>{{ match.damageDealt }} dmg</span>
+                <span>{{ formatDuration(match.duration) }}</span>
+              </div>
+              <button v-if="match.hasReplay" class="watch-replay-btn" disabled>Watch Replay</button>
+            </div>
+            <div v-if="matchHistory.length === 0 && !loadingMatchHistory" class="no-matches">
+              No matches played yet
+            </div>
+            <button 
+              v-if="matchHistoryHasMore" 
+              @click="loadMatchHistory(false)" 
+              class="load-more-btn"
+              :disabled="loadingMatchHistory"
+            >
+              {{ loadingMatchHistory ? 'Loading...' : 'Load More' }}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -234,6 +306,33 @@ const router = useRouter();
 const authStore = useAuthStore();
 const showUserModal = ref(false);
 const showAvatarSelector = ref(false);
+const userAllTimeStats = ref<{
+  totalGames: number;
+  wins: number;
+  losses: number;
+  unitsKilled: number;
+  unitsLost: number;
+  damageDealt: number;
+  damageHealed: number;
+  totalDuration: number;
+  mvpUnit: { type: string; kills: number; damage: number } | null;
+} | null>(null);
+const showMatchHistory = ref(false);
+const matchHistory = ref<Array<{
+  gameId: string;
+  won: boolean;
+  opponent: { displayName: string; avatar: string } | null;
+  endReason: string;
+  duration: number;
+  unitsKilled: number;
+  unitsLost: number;
+  damageDealt: number;
+  hasReplay: boolean;
+  createdAt: string;
+}>>([]);
+const loadingMatchHistory = ref(false);
+const matchHistoryHasMore = ref(true);
+const matchHistoryOffset = ref(0);
 const editingName = ref(false);
 const newDisplayName = ref("");
 const isSavingName = ref(false);
@@ -304,12 +403,59 @@ onUnmounted(() => {
   window.removeEventListener("mousemove", handleMouseMove);
 });
 
-watch(showUserModal, (val) => {
+watch(showUserModal, async (val) => {
   if (!val) {
     editingName.value = false;
     newDisplayName.value = "";
+    userAllTimeStats.value = null;
   } else {
     newDisplayName.value = authStore.displayName;
+    // Fetch all-time stats
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/stats/user/${authStore.user?.id}`, {
+        credentials: "include",
+      });
+      if (response.ok) {
+        userAllTimeStats.value = await response.json();
+      }
+    } catch (error) {
+      console.error("Failed to fetch user stats:", error);
+    }
+  }
+});
+
+const loadMatchHistory = async (reset = false) => {
+  if (reset) {
+    matchHistory.value = [];
+    matchHistoryOffset.value = 0;
+    matchHistoryHasMore.value = true;
+  }
+
+  if (!matchHistoryHasMore.value || loadingMatchHistory.value) return;
+  if (!authStore.user?.id) return;
+
+  loadingMatchHistory.value = true;
+  try {
+    const response = await fetch(
+      `${import.meta.env.VITE_API_URL}/api/stats/match-history/${authStore.user.id}?limit=5&offset=${matchHistoryOffset.value}`,
+      { credentials: "include" }
+    );
+    if (response.ok) {
+      const data = await response.json();
+      matchHistory.value = [...matchHistory.value, ...data.matches];
+      matchHistoryOffset.value += data.matches.length;
+      matchHistoryHasMore.value = data.matches.length === 5;
+    }
+  } catch (error) {
+    console.error("Failed to load match history:", error);
+  } finally {
+    loadingMatchHistory.value = false;
+  }
+};
+
+watch(showMatchHistory, (val) => {
+  if (val) {
+    loadMatchHistory(true);
   }
 });
 
@@ -466,6 +612,12 @@ const userLevel = computed(() => {
 const rankTier = computed(() => {
   return authStore.user?.rank?.tier || "BRONZE";
 });
+
+const formatDuration = (seconds: number): string => {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+};
 
 const rankTierClass = computed(() => {
   return `rank-${rankTier.value.toLowerCase()}`;
@@ -1256,9 +1408,50 @@ const fetchGameDetails = async (gameId: string) => {
   color: var(--color-gold);
 }
 
+.stat-value.streak {
+  color: var(--color-orange-400);
+}
+
 .stat-label {
   color: var(--color-gray-500);
   font-size: 0.625rem;
+}
+
+.all-time-stats {
+  background-color: var(--color-primary);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.all-time-title {
+  color: var(--color-cyan-400);
+  font-size: 0.875rem;
+  margin-bottom: 0.75rem;
+  text-align: center;
+}
+
+.mvp-unit {
+  margin-top: 0.75rem;
+  text-align: center;
+  font-size: 0.875rem;
+}
+
+.mvp-label {
+  color: var(--color-gray-400);
+}
+
+.mvp-value {
+  color: var(--color-gold);
+  font-weight: bold;
+  margin-left: 0.5rem;
+  text-transform: capitalize;
+}
+
+.mvp-stats {
+  color: var(--color-gray-500);
+  margin-left: 0.5rem;
+  font-size: 0.75rem;
 }
 
 .logout-btn {
@@ -1277,6 +1470,131 @@ const fetchGameDetails = async (gameId: string) => {
 
 .logout-btn:hover {
   filter: brightness(1.1);
+}
+
+.match-history-btn {
+  width: 100%;
+  padding: 0.75rem;
+  background-color: var(--color-cyan-600);
+  color: white;
+  font-weight: bold;
+  border: none;
+  border-bottom: 3px solid var(--color-cyan-800);
+  border-right: 3px solid var(--color-cyan-800);
+  border-radius: 0.5rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+  margin-bottom: 1rem;
+}
+
+.match-history-btn:hover {
+  filter: brightness(1.1);
+}
+
+.match-history-modal {
+  background-color: var(--color-secondary);
+  border-radius: 1rem;
+  border: 4px solid var(--color-primary);
+  max-width: 500px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.match-history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  border-bottom: 1px solid var(--color-primary);
+}
+
+.match-history-header h2 {
+  color: white;
+  font-size: 1.25rem;
+  margin: 0;
+}
+
+.match-history-list {
+  padding: 1rem;
+}
+
+.match-item {
+  background-color: var(--color-primary);
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.match-item.win {
+  border-left: 4px solid var(--color-green-500);
+}
+
+.match-item.loss {
+  border-left: 4px solid var(--color-red-500);
+}
+
+.match-result {
+  font-weight: bold;
+  font-size: 1rem;
+}
+
+.match-item.win .match-result {
+  color: var(--color-green-400);
+}
+
+.match-item.loss .match-result {
+  color: var(--color-red-400);
+}
+
+.match-opponent {
+  color: var(--color-gray-400);
+  font-size: 0.875rem;
+}
+
+.match-stats {
+  display: flex;
+  gap: 1rem;
+  color: var(--color-gray-500);
+  font-size: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.watch-replay-btn {
+  margin-top: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  background-color: var(--color-cyan-600);
+  color: white;
+  border: none;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.load-more-btn {
+  width: 100%;
+  padding: 0.5rem;
+  background-color: var(--color-primary);
+  color: var(--color-gray-400);
+  border: 1px solid var(--color-gray-600);
+  border-radius: 0.5rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+
+.load-more-btn:hover:not(:disabled) {
+  background-color: var(--color-gray-700);
+}
+
+.load-more-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.no-matches {
+  text-align: center;
+  color: var(--color-gray-500);
+  padding: 2rem;
 }
 
 .logout-btn:active {

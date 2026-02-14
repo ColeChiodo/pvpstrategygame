@@ -29,9 +29,6 @@ model User {
   purchasedItems PurchasedItem[]
   loadout   Loadout?
 
-  matches         MatchHistory[] @relation("PlayerMatches") // Matches where user is the player
-  opponentMatches MatchHistory[] @relation("OpponentMatches") // Matches where user is the opponent
-
   rank    Rank?
   replays Replay[]
 
@@ -51,35 +48,17 @@ model UserSession {
   @@index([token])
 }
 
-model MatchHistory {
-  id          String   @id @default(uuid())
-  userId      String
-  user        User     @relation("PlayerMatches", fields: [userId], references: [id])
-  opponentId  String
-  opponent    User     @relation("OpponentMatches", fields: [opponentId], references: [id])
-  won         Boolean
-  unitsLost   Int
-  unitsKilled Int
-  turns       Int
-  duration    Int
-  rankChange  Int
-  replayId    String?
-  createdAt   DateTime @default(now())
-
-  @@index([userId])
-  @@index([createdAt])
-}
-
 model Rank {
-  userId    String   @id
-  user      User     @relation(fields: [userId], references: [id])
-  elo       Int      @default(1000)
-  tier      String   @default("BRONZE")
-  wins      Int      @default(0)
-  losses    Int      @default(0)
-  streak    Int      @default(0)
-  season    Int      @default(1)
-  updatedAt DateTime @updatedAt
+  userId         String   @id
+  user           User     @relation(fields: [userId], references: [id])
+  elo            Int      @default(1000)
+  tier           String   @default("BRONZE")
+  wins           Int      @default(0)
+  losses         Int      @default(0)
+  streak         Int      @default(0)
+  longestStreak  Int      @default(0)
+  season         Int      @default(1)
+  updatedAt      DateTime @updatedAt
 }
 
 model Cosmetic {
@@ -114,15 +93,100 @@ model Loadout {
   reaction  String  @default("default")
 }
 
-model Replay {
-  id        String   @id @default(uuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  matchData Json
-  winnerId  String
-  duration  Int
-  createdAt DateTime @default(now())
+model GameSession {
+  id          String   @id @default(uuid())
+  player1Id   String
+  player2Id   String
+  serverUrl   String?
+  port        Int?
+  status      String   @default("waiting") // waiting, match_found, in_progress, completed, abandoned
+  winnerId    String?
+  loserId     String?
+  endReason   String?  // timeout, noUnits, kingDefeated
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
+  gameStats   GameStats[]
+  replays     Replay[]
+
+  @@index([player1Id])
+  @@index([player2Id])
+  @@index([status])
+}
+
+model GameStats {
+  id                        String   @id @default(uuid())
+  gameSessionId             String
+  gameSession               GameSession @relation(fields: [gameSessionId], references: [id])
+  userId                    String
+  isPlayer1                 Boolean
+  unitsKilled               Int      @default(0)
+  unitsLost                 Int      @default(0)
+  damageDealt               Int      @default(0)
+  damageHealed              Int      @default(0)
+  rounds                    Int      @default(0)
+  duration                  Int      @default(0)
+  timeUsed                  Int      @default(0)
+  attacksMade               Int      @default(0)
+  killsLanded               Int      @default(0)
+  avgDamagePerAttack         Float    @default(0)
+  remainingKingHealth       Int      @default(0)
+  
+  // Damage by unit type
+  meleeDamage               Int      @default(0)
+  rangedDamage              Int      @default(0)
+  mageDamage                Int      @default(0)
+  healerDamage              Int      @default(0)
+  cavalryDamage            Int      @default(0)
+  scoutDamage               Int      @default(0)
+  tankDamage                Int      @default(0)
+  kingDamage                Int      @default(0)
+  
+  // Healing by unit type
+  meleeHealing             Int      @default(0)
+  rangedHealing            Int      @default(0)
+  mageHealing              Int      @default(0)
+  healerHealing            Int      @default(0)
+  cavalryHealing           Int      @default(0)
+  scoutHealing              Int      @default(0)
+  tankHealing               Int      @default(0)
+  kingHealing               Int      @default(0)
+  
+  // Units killed by type
+  meleeKilled               Int      @default(0)
+  rangedKilled              Int      @default(0)
+  mageKilled                Int      @default(0)
+  healerKilled              Int      @default(0)
+  cavalryKilled            Int      @default(0)
+  scoutKilled               Int      @default(0)
+  tankKilled                Int      @default(0)
+  kingKilled                Int      @default(0)
+  
+  // Units lost by type
+  meleeLost                 Int      @default(0)
+  rangedLost                Int      @default(0)
+  mageLost                  Int      @default(0)
+  healerLost                Int      @default(0)
+  cavalryLost               Int      @default(0)
+  scoutLost                 Int      @default(0)
+  tankLost                  Int      @default(0)
+  kingLost                  Int      @default(0)
+
+  @@index([userId])
+}
+
+model Replay {
+  id            String   @id @default(uuid())
+  gameSessionId String
+  gameSession   GameSession @relation(fields: [gameSessionId], references: [id])
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  matchData     Json
+  winnerId      String
+  duration      Int
+  createdAt     DateTime @default(now())
+
+  @@unique([gameSessionId, userId])
   @@index([userId])
   @@index([createdAt])
 }
@@ -136,19 +200,4 @@ model PatchNote {
   createdAt DateTime @default(now())
 
   @@index([createdAt])
-}
-
-model GameSession {
-  id          String   @id @default(uuid())
-  player1Id   String
-  player2Id   String
-  serverUrl   String?
-  port        Int?
-  status      String   @default("waiting") // waiting, match_found, in_progress, completed
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@index([player1Id])
-  @@index([player2Id])
-  @@index([status])
 }

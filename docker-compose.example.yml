@@ -1,0 +1,77 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: fortezza
+      POSTGRES_PASSWORD: fortezza123
+      POSTGRES_DB: fortezza
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fortezza"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  frontend:
+    image: your-dockerhub-user/frontend:latest
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_URL: "http://localhost:3000"
+      VITE_GAME_URL: "http://localhost:4000"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  backend:
+    image: your-dockerhub-user/backend:latest
+    network_mode: host
+    volumes:
+      - /etc/rancher/k3s/k3s.yaml:/app/.kube/config:ro
+    environment:
+      KUBECONFIG: /app/.kube/config
+      DATABASE_URL: "postgresql://fortezza:fortezza123@localhost:5432/fortezza?schema=public"
+      REDIS_URL: "redis://localhost:6379"
+      SESSION_SECRET: "your-super-secret-session-key-change-in-production"
+      GOOGLE_CLIENT_ID: "your-google-client-id"
+      GOOGLE_CLIENT_SECRET: "your-google-client-secret"
+      GOOGLE_CALLBACK_URL: "http://localhost:3000/auth/google/callback"
+      DISCORD_CLIENT_ID: "your-discord-client-id"
+      DISCORD_CLIENT_SECRET: "your-discord-client-secret"
+      DISCORD_CALLBACK_URL: "http://localhost:3000/auth/discord/callback"
+      PORT: "3000"
+      NODE_ENV: "development"
+      FRONTEND_URL: "http://localhost:5173"
+      GAME_URL: "http://localhost:4000"
+      GAME_SERVER_PORT: "4000"
+      LOCAL_GAME_SERVER: "false"
+      KUBERNETES_NAMESPACE: "game-servers"
+      K8S_NODE_IP: "localhost"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+
+volumes:
+  postgres_data:
+  redis_data:

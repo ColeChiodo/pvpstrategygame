@@ -11,7 +11,7 @@
             {{ formatReason(reason) }}
           </div>
 
-          <div class="xp-section" v-if="xpGained > 0 || currentXP > 0">
+          <div class="xp-section">
             <div class="xp-bar-container">
               <div class="xp-bar-label">XP Progress</div>
               <div class="xp-bar-track">
@@ -40,20 +40,112 @@
             <h3 class="stats-title">Your Stats</h3>
             <div class="stats-grid">
               <div class="stat-item">
-                <span class="stat-value">{{ stats.unitsKilled }}</span>
-                <span class="stat-label">Units Killed</span>
-              </div>
-              <div class="stat-item">
                 <span class="stat-value">{{ Math.round(stats.damageDealt) }}</span>
                 <span class="stat-label">Damage Dealt</span>
               </div>
               <div class="stat-item">
                 <span class="stat-value">{{ Math.round(stats.damageHealed) }}</span>
-                <span class="stat-label">Damage Healed</span>
+                <span class="stat-label">Healing Done</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-value">{{ stats.unitsKilled }}</span>
+                <span class="stat-label">Units Killed</span>
               </div>
               <div class="stat-item">
                 <span class="stat-value">{{ stats.unitsLost }}</span>
                 <span class="stat-label">Units Lost</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-value">{{ stats.rounds || 0 }}</span>
+                <span class="stat-label">Rounds</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-value">{{ formatDuration(stats.duration) }}</span>
+                <span class="stat-label">Duration</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-value">{{ stats.attacksMade || 0 }}</span>
+                <span class="stat-label">Attacks</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-value">{{ stats.avgDamagePerAttack?.toFixed(1) || 0 }}</span>
+                <span class="stat-label">Avg Dmg/Attack</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-value">{{ stats.remainingKingHealth || 0 }}</span>
+                <span class="stat-label">King HP Left</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="stats-section" v-if="mvpUnit">
+            <h3 class="stats-title">MVP Unit: {{ formatUnitName(mvpUnit.type) }}</h3>
+            <div class="stats-grid">
+              <div class="stat-item">
+                <span class="stat-value">{{ mvpUnit.kills }}</span>
+                <span class="stat-label">Kills</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-value">{{ Math.round(mvpUnit.damage) }}</span>
+                <span class="stat-label">Damage</span>
+              </div>
+              <div class="stat-item" v-if="mvpUnit.healing > 0">
+                <span class="stat-value">{{ Math.round(mvpUnit.healing) }}</span>
+                <span class="stat-label">Healing</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="stats-section" v-if="hasUnitStats">
+            <h3 class="stats-title">Unit Performance</h3>
+            <div class="stats-grid">
+              <div class="stat-item" v-if="stats.meleeKilled">
+                <span class="stat-value">{{ stats.meleeKilled }}</span>
+                <span class="stat-label">Melee Kills</span>
+              </div>
+              <div class="stat-item" v-if="stats.rangedKilled">
+                <span class="stat-value">{{ stats.rangedKilled }}</span>
+                <span class="stat-label">Ranged Kills</span>
+              </div>
+              <div class="stat-item" v-if="stats.mageKilled">
+                <span class="stat-value">{{ stats.mageKilled }}</span>
+                <span class="stat-label">Mage Kills</span>
+              </div>
+              <div class="stat-item" v-if="stats.healerKilled">
+                <span class="stat-value">{{ stats.healerKilled }}</span>
+                <span class="stat-label">Healer Kills</span>
+              </div>
+              <div class="stat-item" v-if="stats.cavalryKilled">
+                <span class="stat-value">{{ stats.cavalryKilled }}</span>
+                <span class="stat-label">Cavalry Kills</span>
+              </div>
+              <div class="stat-item" v-if="stats.scoutKilled">
+                <span class="stat-value">{{ stats.scoutKilled }}</span>
+                <span class="stat-label">Scout Kills</span>
+              </div>
+              <div class="stat-item" v-if="stats.tankKilled">
+                <span class="stat-value">{{ stats.tankKilled }}</span>
+                <span class="stat-label">Tank Kills</span>
+              </div>
+              <div class="stat-item" v-if="stats.kingKilled">
+                <span class="stat-value">{{ stats.kingKilled }}</span>
+                <span class="stat-label">King Kills</span>
+              </div>
+              <div class="stat-item" v-if="stats.meleeLost">
+                <span class="stat-value loss">{{ stats.meleeLost }}</span>
+                <span class="stat-label">Melee Lost</span>
+              </div>
+              <div class="stat-item" v-if="stats.rangedLost">
+                <span class="stat-value loss">{{ stats.rangedLost }}</span>
+                <span class="stat-label">Ranged Lost</span>
+              </div>
+              <div class="stat-item" v-if="stats.mageLost">
+                <span class="stat-value loss">{{ stats.mageLost }}</span>
+                <span class="stat-label">Mage Lost</span>
+              </div>
+              <div class="stat-item" v-if="stats.tankLost">
+                <span class="stat-value loss">{{ stats.tankLost }}</span>
+                <span class="stat-label">Tank Lost</span>
               </div>
             </div>
           </div>
@@ -77,6 +169,45 @@ interface PlayerStats {
   damageDealt: number;
   damageHealed: number;
   unitsLost: number;
+  rounds?: number;
+  duration?: number;
+  timeUsed?: number;
+  attacksMade?: number;
+  killsLanded?: number;
+  avgDamagePerAttack?: number;
+  remainingKingHealth?: number;
+  meleeDamage?: number;
+  rangedDamage?: number;
+  mageDamage?: number;
+  healerDamage?: number;
+  cavalryDamage?: number;
+  scoutDamage?: number;
+  tankDamage?: number;
+  kingDamage?: number;
+  meleeHealing?: number;
+  rangedHealing?: number;
+  mageHealing?: number;
+  healerHealing?: number;
+  cavalryHealing?: number;
+  scoutHealing?: number;
+  tankHealing?: number;
+  kingHealing?: number;
+  meleeKilled?: number;
+  rangedKilled?: number;
+  mageKilled?: number;
+  healerKilled?: number;
+  cavalryKilled?: number;
+  scoutKilled?: number;
+  tankKilled?: number;
+  kingKilled?: number;
+  meleeLost?: number;
+  rangedLost?: number;
+  mageLost?: number;
+  healerLost?: number;
+  cavalryLost?: number;
+  scoutLost?: number;
+  tankLost?: number;
+  kingLost?: number;
 }
 
 const props = withDefaults(defineProps<{
@@ -94,7 +225,7 @@ const props = withDefaults(defineProps<{
   leveledUp: false,
   currencyGained: 0,
   currentXP: 0,
-  xpForNextLevel: 1000,
+  xpForNextLevel: 250,
 });
 
 const emit = defineEmits<{
@@ -104,11 +235,13 @@ const emit = defineEmits<{
 const showXpAnimation = ref(false);
 
 const xpProgressBefore = computed(() => {
-  return Math.min(100, (props.currentXP / props.xpForNextLevel) * 100);
+  const xpInCurrentLevel = props.currentXP % props.xpForNextLevel;
+  return Math.min(100, (xpInCurrentLevel / props.xpForNextLevel) * 100);
 });
 
 const xpGainPercent = computed(() => {
-  const remainingXP = props.xpForNextLevel - props.currentXP;
+  const xpInCurrentLevel = props.currentXP % props.xpForNextLevel;
+  const remainingXP = props.xpForNextLevel - xpInCurrentLevel;
   return Math.min(100, (Math.min(props.xpGained, remainingXP) / props.xpForNextLevel) * 100);
 });
 
@@ -135,6 +268,53 @@ const formatReason = (reason: string): string => {
     default:
       return "Game ended";
   }
+};
+
+const formatDuration = (seconds?: number): string => {
+  if (!seconds) return "0:00";
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+};
+
+const hasUnitStats = computed(() => {
+  const s = props.stats;
+  return (s.meleeKilled || s.rangedKilled || s.mageKilled || s.healerKilled || 
+          s.cavalryKilled || s.scoutKilled || s.tankKilled || s.kingKilled ||
+          s.meleeLost || s.rangedLost || s.mageLost || s.tankLost);
+});
+
+interface MvpUnit {
+  type: string;
+  kills: number;
+  damage: number;
+  healing: number;
+}
+
+const mvpUnit = computed((): MvpUnit | null => {
+  const s = props.stats;
+  const units = [
+    { type: 'melee', kills: s.meleeKilled || 0, damage: s.meleeDamage || 0, healing: 0 },
+    { type: 'ranged', kills: s.rangedKilled || 0, damage: s.rangedDamage || 0, healing: 0 },
+    { type: 'mage', kills: s.mageKilled || 0, damage: s.mageDamage || 0, healing: 0 },
+    { type: 'healer', kills: s.healerKilled || 0, damage: s.healerDamage || 0, healing: s.healerHealing || 0 },
+    { type: 'cavalry', kills: s.cavalryKilled || 0, damage: s.cavalryDamage || 0, healing: 0 },
+    { type: 'scout', kills: s.scoutKilled || 0, damage: s.scoutDamage || 0, healing: 0 },
+    { type: 'tank', kills: s.tankKilled || 0, damage: s.tankDamage || 0, healing: 0 },
+    { type: 'king', kills: s.kingKilled || 0, damage: s.kingDamage || 0, healing: 0 },
+  ];
+  
+  if (units.every(u => u.kills === 0 && u.damage === 0)) return null;
+  
+  return units.reduce((best, current) => {
+    const currentScore = current.kills * 10 + current.damage / 10 + current.healing / 5;
+    const bestScore = best.kills * 10 + best.damage / 10 + best.healing / 5;
+    return currentScore > bestScore ? current : best;
+  });
+});
+
+const formatUnitName = (name: string): string => {
+  return name.charAt(0).toUpperCase() + name.slice(1);
 };
 </script>
 
@@ -299,6 +479,10 @@ const formatReason = (reason: string): string => {
   color: var(--color-cyan-400);
   font-size: 1.5rem;
   font-weight: bold;
+}
+
+.stat-value.loss {
+  color: var(--color-red-400);
 }
 
 .stat-label {

@@ -6,6 +6,9 @@ k8s/secrets.yaml
 .env.local
 .env.*.local
 
+# Docker
+docker-compose.yml
+
 # Node
 node_modules/
 npm-debug.log*

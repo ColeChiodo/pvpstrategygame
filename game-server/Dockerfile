@@ -8,9 +8,9 @@ RUN npm install --production
 COPY dist ./dist
 
 ENV NODE_ENV=production
-ENV GAME_ID=${GAME_ID:-default}
-ENV PORT=${PORT:-3000}
+ENV GAME_ID=default
+ENV PORT=3000
 
-EXPOSE $PORT
+EXPOSE 3000
 
 CMD ["node", "dist/index.js"]

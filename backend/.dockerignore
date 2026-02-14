@@ -1,8 +1,7 @@
 node_modules
-npm-debug.log
-*.tsbuildinfo
 dist
-shared
 .env
 .env.local
 .env.*.local
+*.log
+.DS_Store
