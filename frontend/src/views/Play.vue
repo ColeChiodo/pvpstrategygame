@@ -281,9 +281,9 @@
       </div>
 
       <ConfirmModal
-        v-if="pendingPurchaseAvatar"
+        :isOpen="showPurchaseConfirm"
         title="Purchase Avatar"
-        :message="`Purchase ${pendingPurchaseAvatar.path} for ${pendingPurchaseAvatar.price} coins?`"
+        :message="pendingPurchaseAvatar ? `Purchase ${pendingPurchaseAvatar.path} for ${pendingPurchaseAvatar.price} coins?` : ''"
         @close="showPurchaseConfirm = false"
         @confirm="confirmPurchase"
       />

@@ -14,6 +14,7 @@ import statsRoutes from "./routes/stats";
 import { createProxyMiddleware } from "http-proxy-middleware";
 import { Server as SocketIOServer } from "socket.io";
 import { setMatchmakingIO } from "./routes/matchmaking";
+import path from "path";
 
 const PORT = process.env.PORT || 3000;
 
@@ -64,6 +65,9 @@ async function main() {
 
   // JSON parser
   app.use(express.json());
+
+  // Static files for patch notes images
+  app.use("/assets/patchnotes", express.static(path.join(process.cwd(), "assets", "patchnotes")));
 
   // Redis client
   const redisClient = createClient({ url: process.env.REDIS_URL });

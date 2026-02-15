@@ -38,7 +38,7 @@
 
             <img
               v-if="patch.imageUrl"
-              :src="patch.imageUrl"
+              :src="getImageUrl(patch.imageUrl)"
               alt="Patch notes screenshot"
               class="patch-image"
             />
@@ -192,7 +192,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, onMounted, computed } from "vue";
 import PageHeader from "../components/PageHeader.vue";
 import Footer from "../components/Footer.vue";
 import { useAuthStore } from "../stores/auth";
@@ -240,6 +240,11 @@ const formatDate = (dateString: string) => {
     month: "long",
     day: "numeric",
   });
+};
+
+const getImageUrl = (imageUrl: string | null) => {
+  if (!imageUrl) return null;
+  return `${import.meta.env.VITE_API_URL}${imageUrl}`;
 };
 
 const fetchPatchNotes = async (pageNum: number) => {

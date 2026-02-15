@@ -13,7 +13,7 @@
     "build:backend": "cd backend && npm run build",
     "build:game": "cd game-server && npm run build",
     "prisma:generate": "cd backend && npx prisma generate",
-    "prisma:migrate": "cd backend && npx prisma migrate dev",
+    "prisma:migrate": "cd backend && DATABASE_URL=\"postgresql://fortezza:fortezza123@localhost:5432/fortezza?schema=public\" npx prisma migrate dev",
     "prisma:push": "cd backend && DATABASE_URL=\"postgresql://fortezza:fortezza123@localhost:5432/fortezza?schema=public\" npx prisma db push --skip-generate --accept-data-loss",
     "prisma:studio": "cd backend && npx prisma studio",
     "docker:build-all": "docker compose build --no-cache && docker compose up -d",

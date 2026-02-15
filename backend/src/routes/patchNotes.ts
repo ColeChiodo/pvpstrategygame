@@ -10,7 +10,7 @@ const router = express.Router();
 
 const storage = multer.diskStorage({
   destination: (req: any, file: any, cb: any) => {
-    const uploadDir = path.join(process.cwd(), "..", "frontend", "public", "assets", "patchnotes");
+    const uploadDir = path.join(process.cwd(), "assets", "patchnotes");
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }
