@@ -50,11 +50,6 @@
                 <div class="player-name">{{ authStore.displayName }}</div>
                 <div class="player-level">Level {{ userLevel }}</div>
               </div>
-              <div class="rank-info">
-                <div class="rank-badge" :class="rankTierClass">
-                  {{ rankTier }}
-                </div>
-              </div>
             </div>
           </div>
 
@@ -67,56 +62,78 @@
 
           <div class="match-section">
             <div class="match-card public-match">
-              <div class="match-header">
-                <h2 class="match-title">Public Match</h2>
-                <QueueButton
-                  text="Find Game"
-                  :is-in-queue="isInQueue"
-                  :queue-time="queueTime"
-                  @click="startMatchmaking"
-                  @cancel="leaveQueue"
-                />
-              </div>
-              <div class="match-content">
-                <img
-                  src="/assets/global/fight.png"
-                  alt="Fight"
-                  class="match-icon"
-                />
-                <div class="match-stats">
-                  <div class="stat">
-                    <span class="stat-value">{{ wins }}-{{ losses }}</span>
-                    <span class="stat-label">W-L</span>
+              <div class="public-match-top">
+                <div class="public-match-left">
+                  <h2 class="match-title">Ranked Match</h2>
+                  <div class="rank-info">
+                    <div class="rank-badge" :class="rankTierClass">
+                      {{ rankTier }}
+                    </div>
                   </div>
-                  <div class="stat">
-                    <span class="stat-value">{{ streak }}</span>
-                    <span class="stat-label">Streak</span>
+                </div>
+                <div class="public-match-right">
+                  <QueueButton
+                    text="Find Game"
+                    :is-in-queue="isInQueue"
+                    :queue-time="queueTime"
+                    @click="startMatchmaking"
+                    @cancel="leaveQueue"
+                  />
+                </div>
+              </div>
+              <div class="public-match-bottom">
+                <div class="public-match-bottom-left">
+                  <img
+                    src="/assets/global/fight.png"
+                    alt="Fight"
+                    class="match-icon"
+                  />
+                </div>
+                <div class="public-match-bottom-right">
+                  <div class="match-stats">
+                    <div class="stat">
+                      <span class="stat-value">{{ wins }}-{{ losses }}</span>
+                      <span class="stat-label">W-L</span>
+                    </div>
+                    <div class="stat">
+                      <span class="stat-value">{{ streak }}</span>
+                      <span class="stat-label">Streak</span>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
 
             <div class="match-card private-match">
-              <div class="match-header">
-                <h2 class="match-title">Private Match</h2>
-                <PlayButton text="Join/Create" color="emerald" />
+              <div class="public-match-top">
+                <div class="public-match-left">
+                  <h2 class="match-title">Private Match</h2>
+                </div>
+                <div class="public-match-right">
+                  <PlayButton text="Join/Create" color="emerald" />
+                </div>
               </div>
-              <div class="match-content">
-                <img
-                  src="/assets/global/hand_shake.png"
-                  alt="Handshake"
-                  class="match-icon"
-                />
+              <div class="public-match-bottom">
+                <div class="public-match-bottom-left">
+                  <img
+                    src="/assets/global/hand_shake.png"
+                    alt="Handshake"
+                    class="match-icon"
+                  />
+                </div>
               </div>
             </div>
           </div>
 
           <div class="bottom-row">
+            <div class="copyright">
+              <a href="https://colechiodo.cc" target="_blank" class="copyright-link">&copy; {{ new Date().getFullYear() }} colechiodo.cc</a>
+            </div>
             <div class="footer-links">
-              <RouterLink to="/patch-notes" class="footer-link">
-                View Patch Notes
-              </RouterLink>
               <div class="version">{{ latestVersion }}</div>
+              <RouterLink to="/patch-notes" class="footer-link">
+                Patch Notes
+              </RouterLink>
             </div>
           </div>
         </div>
@@ -143,48 +160,51 @@
                   <input v-model="newDisplayName" type="text" class="name-input" placeholder="Enter new name" minlength="3" maxlength="20" ref="nameInputRef" />
                 </div>
                 <div v-if="editingName" class="edit-actions-row">
-                  <button class="cancel-btn" @click="cancelEditName">Cancel</button>
-                  <button class="save-btn" @click="saveDisplayName" :disabled="isSavingName || !isValidName">Save</button>
+                  <PlayButton text="Cancel" color="gray" @click="cancelEditName" />
+                  <PlayButton text="Save" color="emerald" :disabled="isSavingName || !isValidName" @click="saveDisplayName" />
                 </div>
               </div>
-              <div class="rank-display">
-                <div class="rank-badge" :class="rankTierClass">{{ rankTier }}</div>
+              <div class="level-coins-display">
+                <div class="level-display">Level {{ authStore.user?.level }}</div>
+                <div class="coins-display">{{ authStore.currency }} Coins</div>
               </div>
             </div>
           </div>
 
-          <div class="stats-row">
-            <div class="stat-item">
-              <div class="stat-value">{{ authStore.user?.rank?.wins }}</div>
-              <div class="stat-label">Wins</div>
+          <div class="season-stats">
+            <div class="season-stats-header">
+              <h3 class="season-stats-title">Season Stats</h3>
+              <div class="rank-display">
+                <div class="rank-badge" :class="rankTierClass">{{ rankTier }}</div>
+                <select v-model="selectedSeason" class="season-select">
+                  <option v-for="season in displayedSeasons" :key="season" :value="season">S{{ season }}</option>
+                </select>
+              </div>
             </div>
-            <div class="stat-item">
-              <div class="stat-value">{{ authStore.user?.rank?.losses }}</div>
-              <div class="stat-label">Losses</div>
-            </div>
-            <div class="stat-item">
-              <div class="stat-value streak">{{ authStore.user?.rank?.streak || 0 }}</div>
-              <div class="stat-label">Streak</div>
-            </div>
-            <div class="stat-item">
-              <div class="stat-value">{{ authStore.user?.level }}</div>
-              <div class="stat-label">Level</div>
-            </div>
-          </div>
-
-          <div class="stats-row">
-            <div class="stat-item">
-              <div class="stat-value currency">{{ authStore.currency }}</div>
-              <div class="stat-label">Coins</div>
-            </div>
-            <div class="stat-item">
-              <div class="stat-value">{{ authStore.user?.rank?.longestStreak || 0 }}</div>
-              <div class="stat-label">Best Streak</div>
+            <div class="stats-row">
+              <div class="stat-item">
+                <div class="stat-value">{{ selectedSeasonRank?.wins ?? authStore.user?.rank?.wins }}</div>
+                <div class="stat-label">Wins</div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-value">{{ selectedSeasonRank?.losses ?? authStore.user?.rank?.losses }}</div>
+                <div class="stat-label">Losses</div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-value streak">{{ selectedSeasonRank?.streak ?? authStore.user?.rank?.streak ?? 0 }}</div>
+                <div class="stat-label">Streak</div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-value">{{ selectedSeasonRank?.longestStreak ?? authStore.user?.rank?.longestStreak ?? 0 }}</div>
+                <div class="stat-label">Best Streak</div>
+              </div>
             </div>
           </div>
 
           <div class="all-time-stats" v-if="userAllTimeStats">
-            <h3 class="all-time-title">All-Time Stats</h3>
+            <div class="all-time-stats-header">
+              <h3 class="all-time-stats-title">All-Time Stats</h3>
+            </div>
             <div class="stats-row">
               <div class="stat-item">
                 <div class="stat-value">{{ userAllTimeStats.totalGames }}</div>
@@ -210,9 +230,9 @@
             </div>
           </div>
 
-          <button @click="showMatchHistory = true" class="match-history-btn">Match History</button>
+          <PlayButton text="Match History" color="cyan" @click="showMatchHistory = true" />
 
-          <button @click="handleLogout" class="logout-btn">Logout</button>
+          <PlayButton text="Logout" color="rose" @click="handleLogout" />
         </div>
       </div>
 
@@ -342,6 +362,18 @@ const avatars = ref<Array<{id: string; path: string; price: number | null; owned
 const pendingPurchaseAvatar = ref<{id: string; path: string; price: number | null; owned: boolean} | null>(null);
 const showPurchaseConfirm = ref(false);
 const nameInputRef = ref<HTMLInputElement | null>(null);
+const seasons = ref<number[]>([]);
+const selectedSeason = ref<number>(1);
+const selectedSeasonRank = ref<{
+  elo: number;
+  tier: string;
+  wins: number;
+  losses: number;
+  streak: number;
+  longestStreak: number;
+  season: number;
+} | null>(null);
+const loadingSeasonRank = ref(false);
 
 const isInQueue = ref(false);
 const queueTime = ref(0);
@@ -408,8 +440,13 @@ watch(showUserModal, async (val) => {
     editingName.value = false;
     newDisplayName.value = "";
     userAllTimeStats.value = null;
+    selectedSeasonRank.value = null;
   } else {
     newDisplayName.value = authStore.displayName;
+    await fetchSeasons();
+    if (selectedSeason.value) {
+      await fetchSeasonRank(selectedSeason.value);
+    }
     // Fetch all-time stats
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/stats/user/${authStore.user?.id}`, {
@@ -465,6 +502,12 @@ watch(() => authStore.user?.id, (userId) => {
   }
 });
 
+watch(selectedSeason, async (newSeason) => {
+  if (newSeason && showUserModal.value) {
+    await fetchSeasonRank(newSeason);
+  }
+});
+
 const isValidName = computed(() => {
   return newDisplayName.value.length >= 3 && newDisplayName.value.length <= 20;
 });
@@ -503,6 +546,36 @@ const fetchLatestVersion = async () => {
     latestVersion.value = data.version;
   } catch (err) {
     console.error("Failed to fetch latest version:", err);
+  }
+};
+
+const fetchSeasons = async () => {
+  try {
+    const response = await fetch("/api/auth/seasons", {
+      credentials: "include",
+    });
+    const data = await response.json();
+    seasons.value = data.seasons || [];
+    if (seasons.value.length > 0) {
+      selectedSeason.value = seasons.value[0];
+    }
+  } catch (err) {
+    console.error("Failed to fetch seasons:", err);
+  }
+};
+
+const fetchSeasonRank = async (season: number) => {
+  loadingSeasonRank.value = true;
+  try {
+    const response = await fetch(`/api/auth/rank/${season}`, {
+      credentials: "include",
+    });
+    const data = await response.json();
+    selectedSeasonRank.value = data.rank;
+  } catch (err) {
+    console.error("Failed to fetch season rank:", err);
+  } finally {
+    loadingSeasonRank.value = false;
   }
 };
 
@@ -609,8 +682,15 @@ const userLevel = computed(() => {
   return authStore.user?.level || 1;
 });
 
+const displayedSeasons = computed(() => {
+  if (seasons.value.length > 0) {
+    return seasons.value;
+  }
+  return [1];
+});
+
 const rankTier = computed(() => {
-  return authStore.user?.rank?.tier || "BRONZE";
+  return (selectedSeasonRank?.tier ?? authStore.user?.rank?.tier) || "BRONZE";
 });
 
 const formatDuration = (seconds: number): string => {
@@ -986,7 +1066,6 @@ const fetchGameDetails = async (gameId: string) => {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  margin-left: auto;
 }
 
 .rank-badge {
@@ -1086,11 +1165,51 @@ const fetchGameDetails = async (gameId: string) => {
   border: 4px solid var(--color-primary);
 }
 
+.public-match-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+
+.public-match-left {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.public-match-right {
+  display: flex;
+  align-items: center;
+}
+
+.public-match-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+.public-match-bottom-left {
+  display: flex;
+  align-items: center;
+}
+
+.public-match-bottom-right {
+  display: flex;
+  align-items: center;
+}
+
 .match-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.match-header-top {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1rem;
 }
 
 .match-title {
@@ -1135,11 +1254,29 @@ const fetchGameDetails = async (gameId: string) => {
 
 .bottom-row {
   margin-top: 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+.copyright {
+  color: var(--color-gray-500);
+  font-size: 0.75rem;
+}
+
+.copyright-link {
+  color: var(--color-gray-500);
+  text-decoration: none;
+}
+
+.copyright-link:hover {
+  color: white;
+  text-decoration: underline;
 }
 
 .footer-links {
   display: flex;
-  justify-content: space-between;
+  gap: 1rem;
   align-items: flex-end;
 }
 
@@ -1349,6 +1486,7 @@ const fetchGameDetails = async (gameId: string) => {
 .rank-display {
   display: flex;
   align-items: center;
+  gap: 0.5rem;
 }
 
 .rank-badge {
@@ -1357,6 +1495,77 @@ const fetchGameDetails = async (gameId: string) => {
   font-weight: bold;
   font-size: 0.875rem;
   color: white;
+}
+
+.season-select {
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  border: 2px solid var(--color-accent);
+  background-color: var(--color-primary);
+  color: white;
+  font-size: 0.875rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.season-select:focus {
+  outline: none;
+}
+
+.level-coins-display {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.level-display {
+  font-weight: bold;
+  font-size: 0.875rem;
+  color: var(--color-accent);
+}
+
+.coins-display {
+  font-weight: bold;
+  font-size: 0.875rem;
+  color: #fbbf24;
+}
+
+.season-stats {
+  background-color: var(--color-primary);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.season-stats-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.season-stats-title {
+  margin: 0;
+  font-size: 1rem;
+  color: white;
+}
+
+.season-stats .season-select {
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  border: 2px solid var(--color-accent);
+  background-color: var(--color-secondary);
+  color: white;
+  font-size: 0.875rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.season-stats .rank-display {
+  display: flex;
+  justify-content: center;
+  margin-top: 1rem;
 }
 
 .cancel-btn, .save-btn {
@@ -1422,6 +1631,19 @@ const fetchGameDetails = async (gameId: string) => {
   border-radius: 0.5rem;
   padding: 1rem;
   margin-bottom: 1rem;
+}
+
+.all-time-stats-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.all-time-stats-title {
+  margin: 0;
+  font-size: 1rem;
+  color: white;
 }
 
 .all-time-title {

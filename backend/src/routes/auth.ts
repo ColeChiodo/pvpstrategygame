@@ -119,4 +119,56 @@ router.post("/logout", isAuthenticated, (req, res, next) => {
   });
 });
 
+router.get("/seasons", isAuthenticated, async (req, res) => {
+  try {
+    const user = req.user as any;
+    const { PrismaClient } = await import("@prisma/client");
+    const prisma = new PrismaClient();
+
+    const ranks = await prisma.rank.findMany({
+      where: { userId: user.id },
+      select: { season: true },
+      orderBy: { season: 'desc' },
+    });
+
+    const seasons = ranks.map(r => r.season);
+    res.json({ seasons });
+  } catch (error) {
+    console.error("Error fetching seasons:", error);
+    res.status(500).json({ error: "Failed to fetch seasons" });
+  }
+});
+
+router.get("/rank/:season", isAuthenticated, async (req, res) => {
+  try {
+    const user = req.user as any;
+    const { season } = req.params;
+    const { PrismaClient } = await import("@prisma/client");
+    const prisma = new PrismaClient();
+
+    const rank = await prisma.rank.findFirst({
+      where: { userId: user.id, season: parseInt(season) },
+    });
+
+    if (!rank) {
+      return res.json({ rank: null });
+    }
+
+    res.json({
+      rank: {
+        elo: rank.elo,
+        tier: rank.tier,
+        wins: rank.wins,
+        losses: rank.losses,
+        streak: rank.streak,
+        longestStreak: rank.longestStreak,
+        season: rank.season,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching season rank:", error);
+    res.status(500).json({ error: "Failed to fetch season rank" });
+  }
+});
+
 export default router;
