@@ -1,6 +1,8 @@
 # Kubernetes
 k8s/secrets.yaml
 
+tools/
+
 # Environment
 .env
 .env.local
@@ -46,3 +48,6 @@ temp/
 
 # Old code (not for commit)
 old/
+
+# Tool outputs
+tools/sprites_output/
